@@ -4,6 +4,7 @@ import { query } from '../client.js'
 type MessageRow = {
   id: string
   node_id: string
+  author_user_id: string
   role: MessageRole
   content: string
   created_at: string
@@ -11,6 +12,7 @@ type MessageRow = {
 
 const mapMessageRow = (row: MessageRow): MessageRecord => ({
   id: row.id,
+  authorUserId: row.author_user_id,
   nodeId: row.node_id,
   role: row.role,
   content: row.content,
@@ -20,7 +22,7 @@ const mapMessageRow = (row: MessageRow): MessageRecord => ({
 export const listMessagesForNode = async (nodeId: string): Promise<MessageRecord[]> => {
   const result = await query<MessageRow>(
     `
-    SELECT id, node_id, role, content, created_at
+    SELECT id, node_id, author_user_id, role, content, created_at
     FROM messages
     WHERE node_id = $1
     ORDER BY created_at ASC
@@ -34,11 +36,11 @@ export const listMessagesForNode = async (nodeId: string): Promise<MessageRecord
 export const createMessage = async (input: CreateMessageInput): Promise<MessageRecord> => {
   const result = await query<MessageRow>(
     `
-    INSERT INTO messages (node_id, role, content)
-    VALUES ($1, $2, $3)
-    RETURNING id, node_id, role, content, created_at
+    INSERT INTO messages (node_id, author_user_id, role, content)
+    VALUES ($1, $2, $3, $4)
+    RETURNING id, node_id, author_user_id, role, content, created_at
     `,
-    [input.nodeId, input.role, input.content],
+    [input.nodeId, input.authorUserId, input.role, input.content],
   )
 
   return mapMessageRow(result.rows[0])

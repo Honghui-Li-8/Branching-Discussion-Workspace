@@ -10,6 +10,7 @@ import { query } from '../client.js'
 type NodeRow = {
   id: string
   workspace_id: string
+  author_user_id: string
   parent_node_id: string
   depth: number
   type: NodeType
@@ -26,6 +27,7 @@ type NodeRow = {
 const mapNodeRow = (row: NodeRow): NodeRecord => ({
   id: row.id,
   workspaceId: row.workspace_id,
+  authorUserId: row.author_user_id,
   parentNodeId: row.parent_node_id,
   depth: row.depth,
   type: row.type,
@@ -45,6 +47,7 @@ export const listNodesByWorkspace = async (workspaceId: string): Promise<NodeRec
     SELECT
       id,
       workspace_id,
+      author_user_id,
       parent_node_id,
       depth,
       type,
@@ -72,6 +75,7 @@ export const getNodeById = async (id: string): Promise<NodeRecord | null> => {
     SELECT
       id,
       workspace_id,
+      author_user_id,
       parent_node_id,
       depth,
       type,
@@ -101,8 +105,8 @@ export const createNode = async (input: CreateNodeInput): Promise<NodeRecord> =>
     `
     INSERT INTO nodes (
       workspace_id,
+      author_user_id,
       parent_node_id,
-      depth,
       type,
       title,
       status,
@@ -114,20 +118,21 @@ export const createNode = async (input: CreateNodeInput): Promise<NodeRecord> =>
     SELECT
       $1,
       $2,
-      parent.depth + 1,
       $3,
       $4,
-      COALESCE($5, 'open'),
-      COALESCE($6, 'medium'),
-      $7,
+      $5,
+      COALESCE($6, 'open'),
+      COALESCE($7, 'medium'),
       $8,
-      $9
+      $9,
+      $10
     FROM nodes AS parent
-    WHERE parent.id = $2
+    WHERE parent.id = $3
       AND parent.workspace_id = $1
     RETURNING
       id,
       workspace_id,
+      author_user_id,
       parent_node_id,
       depth,
       type,
@@ -142,6 +147,7 @@ export const createNode = async (input: CreateNodeInput): Promise<NodeRecord> =>
     `,
     [
       input.workspaceId,
+      input.authorUserId,
       input.parentNodeId,
       input.type,
       input.title,

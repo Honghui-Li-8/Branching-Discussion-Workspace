@@ -11,6 +11,7 @@ export type NodeConfidence = 'low' | 'medium' | 'high'
 export interface NodeRecord {
   id: string
   workspaceId: string
+  authorUserId: string
   parentNodeId: string
   depth: number
   type: NodeType
@@ -26,6 +27,7 @@ export interface NodeRecord {
 
 export interface CreateNodeInput {
   workspaceId: string
+  authorUserId: string
   parentNodeId: string
   type: NodeType
   title: string

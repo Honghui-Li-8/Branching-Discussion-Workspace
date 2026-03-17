@@ -2,6 +2,7 @@ export type MessageRole = 'user' | 'assistant' | 'system'
 
 export interface MessageRecord {
   id: string
+  authorUserId: string
   nodeId: string
   role: MessageRole
   content: string
@@ -9,6 +10,7 @@ export interface MessageRecord {
 }
 
 export interface CreateMessageInput {
+  authorUserId: string
   nodeId: string
   role: MessageRole
   content: string

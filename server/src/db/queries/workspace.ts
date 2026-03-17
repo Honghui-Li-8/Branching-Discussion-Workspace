@@ -4,6 +4,7 @@ import { query } from '../client.js'
 type WorkspaceRow = {
   id: string
   title: string
+  author_user_id: string
   root_node_id: string
   created_at: string
   updated_at: string
@@ -12,6 +13,7 @@ type WorkspaceRow = {
 const mapWorkspaceRow = (row: WorkspaceRow): WorkspaceRecord => ({
   id: row.id,
   title: row.title,
+  authorUserId: row.author_user_id,
   rootNodeId: row.root_node_id,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
@@ -19,7 +21,7 @@ const mapWorkspaceRow = (row: WorkspaceRow): WorkspaceRecord => ({
 
 export const listWorkspaces = async (): Promise<WorkspaceRecord[]> => {
   const result = await query<WorkspaceRow>(`
-    SELECT id, title, root_node_id, created_at, updated_at
+    SELECT id, title, author_user_id, root_node_id, created_at, updated_at
     FROM workspaces
     ORDER BY created_at DESC
   `)
@@ -29,7 +31,7 @@ export const listWorkspaces = async (): Promise<WorkspaceRecord[]> => {
 export const getWorkspaceById = async (id: string): Promise<WorkspaceRecord | null> => {
   const result = await query<WorkspaceRow>(
     `
-    SELECT id, title, root_node_id, created_at, updated_at
+    SELECT id, title, author_user_id, root_node_id, created_at, updated_at
     FROM workspaces
     WHERE id = $1
     `,
@@ -50,17 +52,17 @@ export const createWorkspace = async (input: CreateWorkspaceInput): Promise<Work
       SELECT gen_random_uuid() AS workspace_id, gen_random_uuid() AS root_node_id
     ),
     inserted_workspace AS (
-      INSERT INTO workspaces (id, title, root_node_id)
-      SELECT workspace_id, $1, root_node_id
+      INSERT INTO workspaces (id, title, root_node_id, author_user_id)
+      SELECT workspace_id, $1, root_node_id, $2
       FROM generated_ids
-      RETURNING id, title, root_node_id, created_at, updated_at
+      RETURNING id, title, author_user_id, root_node_id, created_at, updated_at
     ),
     inserted_root_node AS (
       INSERT INTO nodes (
         id,
         workspace_id,
+        author_user_id,
         parent_node_id,
-        depth,
         type,
         title,
         status,
@@ -72,24 +74,25 @@ export const createWorkspace = async (input: CreateWorkspaceInput): Promise<Work
       SELECT
         generated_ids.root_node_id,
         generated_ids.workspace_id,
+        $2,
         generated_ids.root_node_id,
-        0,
         'decision',
-        COALESCE($2, 'Root decision'),
+        COALESCE($3, 'Root decision'),
         'open',
         'medium',
-        COALESCE($3, ''),
+        COALESCE($4, ''),
         NULL,
         NULL
       FROM generated_ids
       RETURNING id
     )
-    SELECT iw.id, iw.title, iw.root_node_id, iw.created_at, iw.updated_at
+    SELECT iw.id, iw.title, iw.author_user_id, iw.root_node_id, iw.created_at, iw.updated_at
     FROM inserted_workspace iw
     JOIN inserted_root_node ir ON TRUE
     `,
     [
       input.title,
+      input.authorUserId,
       input.rootNodeTitle ?? null,
       input.rootNodeSummary ?? null,
     ],
