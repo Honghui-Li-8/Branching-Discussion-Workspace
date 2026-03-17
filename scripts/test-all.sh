@@ -5,6 +5,7 @@ set -u
 TASKS=(
   "unit tests|yarn test:unit"
   "type check|yarn check:type"
+  "spell check|yarn spellcheck"
 )
 
 passed=0
@@ -36,4 +37,3 @@ echo "Summary: $passed passed, $failed failed."
 if (( failed > 0 )); then
   exit 1
 fi
-
