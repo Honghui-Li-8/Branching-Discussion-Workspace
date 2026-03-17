@@ -73,4 +73,3 @@ export const closePool = async (databaseTarget?: DatabaseTarget): Promise<void> 
 }
 
 export type { DatabaseTarget }
-}
