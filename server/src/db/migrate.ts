@@ -1,9 +1,10 @@
-import { dirname } from 'node:path'
+import { dirname, join } from 'node:path'
 import { readdir, readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { query, closePool, getClient, type DatabaseTarget, resolveDatabaseTarget } from './client.js'
 
-const migrationsDir = dirname(fileURLToPath(import.meta.url))
+const dbDir = dirname(fileURLToPath(import.meta.url))
+const migrationsDir = join(dbDir, 'migrations')
 
 type MigrationRecord = {
   version: string
