@@ -1,0 +1,40 @@
+{
+  "version": "0.2",
+  "language": "en",
+  "allowCompoundWords": true,
+  "useGitignore": true,
+  "ignorePaths": [
+    "**/node_modules/**",
+    "**/.yarn/**",
+    "**/.git/**",
+    "**/dist/**",
+    "**/build/**",
+    "**/*.lock",
+    "**/*.svg",
+    "**/*.png",
+    "**/*.jpg",
+    "**/*.jpeg",
+    "**/*.gif"
+  ],
+  "files": [
+    "**/*.{ts,tsx,js,cjs,mjs,json,md,sql,sh,yml,yaml,css}"
+  ],
+  "words": [
+    "Nodenext",
+    "tsconfig",
+    "TRPC",
+    "trpc",
+    "vite",
+    "superjson",
+    "authuserid",
+    "userid",
+    "postgres",
+    "postgresql",
+    "gen_random_uuid",
+    "TIMESTAMPTZ",
+    "pgcrypto",
+    "fkey",
+    "plpgsql",
+    "btrim"
+  ]
+}
