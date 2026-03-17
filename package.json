@@ -12,6 +12,9 @@
     "dev": "yarn workspace web dev",
     "dev:server": "yarn workspace server dev",
     "build": "yarn workspace web build",
+    "test": "bash ./scripts/test-all.sh",
+    "test:all": "bash ./scripts/test-all.sh",
+    "test:unit": "jest --config jest.config.cjs --watchman=false",
     "db:init": "yarn workspace server db:migrate",
     "db:seed": "yarn workspace server db:seed",
     "db:reset": "yarn workspace server db:reset",
@@ -19,5 +22,11 @@
     "check:type": "bash ./scripts/typecheck.sh",
     "preview": "yarn workspace web preview",
     "server": "yarn workspace server start"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "jest": "^30.3.0",
+    "ts-jest": "^29.4.6",
+    "typescript": "^5.9.3"
   }
 }
