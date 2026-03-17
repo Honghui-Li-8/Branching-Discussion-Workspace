@@ -4,7 +4,21 @@ import { createExpressMiddleware } from '@trpc/server/adapters/express'
 
 import { appRouter } from './router.js'
 import type { Request, Response } from 'express'
+import type { AppRouterContext } from '@branching/shared'
 import { closePool, testConnection } from './db/client.js'
+import {
+  createMessage,
+  createNode,
+  createUser,
+  createWorkspace,
+  getNodeById,
+  getUserById,
+  getWorkspaceById,
+  listMessagesForNode,
+  listNodesByWorkspace,
+  listUsers,
+  listWorkspaces,
+} from './db/index.js'
 
 const app = express()
 const PORT = Number(process.env.PORT) || 3001
@@ -20,8 +34,20 @@ app.use(
   '/trpc',
   createExpressMiddleware({
     router: appRouter,
-    createContext() {
-      return {}
+    createContext(): AppRouterContext {
+      return {
+        listUsers,
+        getUserById,
+        createUser,
+        listWorkspaces,
+        getWorkspaceById,
+        createWorkspace,
+        listNodesByWorkspace,
+        getNodeById,
+        createNode,
+        listMessagesForNode,
+        createMessage,
+      }
     },
   }),
 )
