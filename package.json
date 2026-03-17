@@ -4,12 +4,15 @@
   "version": "0.1.0",
   "packageManager": "yarn@4.12.0",
   "workspaces": [
-    "client/web"
+    "client/web",
+    "server"
   ],
   "scripts": {
     "dev": "yarn workspace web dev",
+    "dev:server": "yarn workspace server dev",
     "build": "yarn workspace web build",
     "lint": "yarn workspace web lint",
-    "preview": "yarn workspace web preview"
+    "preview": "yarn workspace web preview",
+    "server": "yarn workspace server start"
   }
 }
