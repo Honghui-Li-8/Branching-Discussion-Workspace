@@ -4,6 +4,25 @@ import {
   type QueryResult,
   type QueryResultRow,
 } from 'pg'
+import { resolve } from 'node:path'
+
+const loadEnvFiles = (): void => {
+  const candidates = [
+    resolve(process.cwd(), '.env'),
+    resolve(process.cwd(), 'server/.env'),
+    resolve(process.cwd(), '../.env'),
+  ]
+
+  for (const filePath of candidates) {
+    try {
+      process.loadEnvFile(filePath)
+    } catch {
+      // Ignore missing files and keep trying other locations.
+    }
+  }
+}
+
+loadEnvFiles()
 
 type DatabaseTarget = 'app' | 'dev'
 

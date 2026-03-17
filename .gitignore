@@ -24,3 +24,8 @@ dist-ssr
 .idea
 .DS_Store
 *.sw?
+
+# Environment
+.env
+.env.*
+!.env.example
