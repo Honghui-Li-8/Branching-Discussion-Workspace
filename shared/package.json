@@ -1,0 +1,16 @@
+{
+  "name": "@branching/shared",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "devDependencies": {
+    "@trpc/server": "latest",
+    "typescript": "^5.9.3",
+    "zod": "latest"
+  }
+}

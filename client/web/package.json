@@ -10,8 +10,14 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@branching/shared": "workspace:*",
+    "@tanstack/react-query": "latest",
+    "@trpc/client": "latest",
+    "@trpc/react-query": "latest",
+    "@trpc/server": "latest",
     "react": "^19.2.4",
-    "react-dom": "^19.2.4"
+    "react-dom": "^19.2.4",
+    "superjson": "latest"
   },
   "devDependencies": {
     "@eslint/js": "9.39.4",

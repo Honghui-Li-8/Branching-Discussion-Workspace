@@ -4,10 +4,20 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "node --watch src/index.js",
-    "start": "node src/index.js"
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts"
   },
   "dependencies": {
-    "express": "^5.2.1"
+    "@branching/shared": "workspace:*",
+    "@trpc/server": "latest",
+    "cors": "latest",
+    "express": "^5.2.1",
+    "zod": "latest"
+  },
+  "devDependencies": {
+    "@types/cors": "latest",
+    "@types/express": "latest",
+    "tsx": "latest",
+    "typescript": "^5.9.3"
   }
 }
