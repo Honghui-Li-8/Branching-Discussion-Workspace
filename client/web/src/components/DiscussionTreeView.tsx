@@ -227,6 +227,7 @@ export const DiscussionTreeView = ({ workspaceTitle }: DiscussionTreeViewProps) 
 
         {conversationNode ? (
           <NodeConversationPanel
+            key={conversationNode.id}
             node={conversationNode}
             width={panelWidth}
             isFullscreen={isPanelFullscreenLike}

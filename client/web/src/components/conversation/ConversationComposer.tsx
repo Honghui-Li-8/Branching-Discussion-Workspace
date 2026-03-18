@@ -27,7 +27,10 @@ export const ConversationComposer = ({
   conversationInputRef,
 }: ConversationComposerProps) => {
   return (
-    <form className="border-t border-[#c2dfef] bg-white px-4 py-3" onSubmit={onConversationSubmit}>
+    <form
+      className="border-t border-[#c2dfef] bg-white px-4 py-3"
+      onSubmit={onConversationSubmit}
+    >
       <div className="mb-2 flex items-center justify-between gap-3">
         <label className="flex items-center gap-2 text-xs text-[#2a6082]" htmlFor="chat-model">
           Model

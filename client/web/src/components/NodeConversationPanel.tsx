@@ -133,8 +133,8 @@ export const NodeConversationPanel = ({
     setConversationInputText('')
 
     if (conversationInputRef.current) {
-      conversationInputRef.current.style.height = `${CHAT_INPUT_MIN_HEIGHT}px`
       conversationInputRef.current.style.overflowY = 'hidden'
+      conversationInputRef.current.style.height = `${CHAT_INPUT_MIN_HEIGHT}px`
     }
   }
 
