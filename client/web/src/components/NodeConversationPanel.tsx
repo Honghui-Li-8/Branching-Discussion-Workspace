@@ -1,7 +1,7 @@
 import {
-  FormEvent,
-  KeyboardEvent,
-  type PointerEvent,
+  type KeyboardEvent,
+  type SubmitEvent,
+  type PointerEvent as ReactPointerEvent,
   useEffect,
   useRef,
   useState,
@@ -114,7 +114,7 @@ export const NodeConversationPanel = ({
     }
   }, [isResizing, onWidthChange])
 
-  const handleResizeStart = (event: PointerEvent<HTMLDivElement>) => {
+  const handleResizeStart = (event: ReactPointerEvent<HTMLDivElement>) => {
     event.preventDefault()
     event.stopPropagation()
     startXRef.current = event.clientX
@@ -138,7 +138,7 @@ export const NodeConversationPanel = ({
     }
   }
 
-  const handleConversationSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleConversationSubmit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault()
     sendConversationMessage()
   }

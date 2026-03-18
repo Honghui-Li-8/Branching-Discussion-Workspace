@@ -1,4 +1,4 @@
-import { FormEvent, KeyboardEvent, type RefObject } from 'react'
+import { type KeyboardEvent, type RefObject, type SubmitEvent } from 'react'
 
 export const CHAT_INPUT_MIN_HEIGHT = 24
 export const CHAT_INPUT_MAX_LINES = 10
@@ -12,7 +12,7 @@ type ConversationComposerProps = {
   onConversationInputChange: (nextValue: string) => void
   onInputResize: () => void
   onConversationKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void
-  onConversationSubmit: (event: FormEvent<HTMLFormElement>) => void
+  onConversationSubmit: (event: SubmitEvent<HTMLFormElement>) => void
   conversationInputRef: RefObject<HTMLTextAreaElement | null>
 }
 
