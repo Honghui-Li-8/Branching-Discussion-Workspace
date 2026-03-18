@@ -6,15 +6,11 @@ import {
   useRef,
   useState,
 } from 'react'
-import CloseFullscreenIcon from '@mui/icons-material/CloseFullscreen'
-import OpenInFullIcon from '@mui/icons-material/OpenInFull'
 import { zIndex } from '../theme/zIndex'
 import type { TreeMessage, TreeNode } from '../types/tree'
-
-const CHAT_INPUT_MIN_HEIGHT = 24
-const CHAT_INPUT_MAX_LINES = 10
-const CHAT_INPUT_MAX_HEIGHT = CHAT_INPUT_MIN_HEIGHT * CHAT_INPUT_MAX_LINES
-const CHAT_MODELS = ['gpt-5', 'gpt-4o', 'gpt-4.1', 'gpt-4']
+import { ConversationComposer, CHAT_INPUT_MAX_HEIGHT, CHAT_INPUT_MIN_HEIGHT, CHAT_MODELS } from './conversation/ConversationComposer'
+import { ConversationMessageList } from './conversation/ConversationMessageList'
+import { ConversationPanelHeader } from './conversation/ConversationPanelHeader'
 
 type NodeConversationPanelProps = {
   node: TreeNode
@@ -165,130 +161,24 @@ export const NodeConversationPanel = ({
         aria-label="Resize conversation panel"
       />
 
-      <header className="relative border-b border-[#c2dfef] px-4 py-3">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex items-start gap-2">
-            <button
-              type="button"
-              className="mt-1 inline-flex items-center justify-center text-[#2b6382] hover:text-[#1a4f69]"
-              title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
-              onClick={onToggleFullScreen}
-              aria-label="Toggle fullscreen conversation panel"
-            >
-                <span className="sr-only">
-                {isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
-              </span>
-              {isFullscreen ? (
-                <CloseFullscreenIcon fontSize="inherit" className="-scale-x-100" />
-              ) : (
-                <OpenInFullIcon fontSize="inherit" className="-scale-x-100" />
-              )}
-            </button>
-            <div className="min-w-0">
-              <p className="m-0 text-[11px] uppercase tracking-[0.1em] text-[#2f6f8e]">Topic</p>
-              <h2
-                className="mt-0.5 text-base font-medium leading-tight text-[#12384c]"
-                style={{ overflowWrap: 'anywhere' }}
-              >
-                {node.title}
-              </h2>
-            </div>
-          </div>
-          <p className="m-0 min-w-0 max-w-[220px] text-right text-[11px] leading-tight text-[#2f6f8e]">
-            {getNodeConclusion(messages)}
-          </p>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              className="rounded border border-[#b8d9ee] px-2 py-1 text-xs text-[#2b6382] hover:bg-[#eef9ff]"
-              onClick={onClose}
-              aria-label="Close conversation"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <div
-        ref={conversationScrollRef}
-        className="flex-1 overflow-y-auto bg-[linear-gradient(180deg,#fdfefe_0%,#f8fdff_100%)] px-4 py-3"
-        style={{ minHeight: 0 }}
-      >
-        <div className="flex min-h-full flex-col justify-end gap-2">
-          {messages.length ? (
-            messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                <div
-                  className={`max-w-[82%] rounded-[14px] px-3 py-2 text-sm leading-relaxed ${
-                    message.role === 'user'
-                      ? 'bg-[#e8f4fd] text-[#12384c]'
-                      : 'border border-[#b5deef] bg-white text-[#1f4f68]'
-                  }`}
-                  style={{ overflowWrap: 'anywhere' }}
-                >
-                  {message.content}
-                </div>
-              </div>
-            ))
-          ) : (
-            <p className="m-0 self-stretch rounded-lg border border-dashed border-[#bdd7eb] bg-white p-3 text-sm text-[#40657d]">
-              No messages yet for this node. Start with your first thought below.
-            </p>
-          )}
-        </div>
-      </div>
-
-      <form className="border-t border-[#c2dfef] bg-white px-4 py-3" onSubmit={handleConversationSubmit}>
-        <div className="mb-2 flex items-center justify-between gap-3">
-          <label className="flex items-center gap-2 text-xs text-[#2a6082]" htmlFor="chat-model">
-            Model
-            <select
-              id="chat-model"
-              className="rounded border border-[#9dc6dd] bg-white px-2 py-1 text-sm text-[#1e546f]"
-              value={conversationModel}
-              onChange={(event) => setConversationModel(event.target.value)}
-            >
-              {CHAT_MODELS.map((model) => (
-                <option key={model} value={model}>
-                  {model}
-                </option>
-              ))}
-            </select>
-          </label>
-          <span className="text-[11px] text-[#5f89a1]">Model: {conversationModel}</span>
-        </div>
-
-        <div className="flex items-end gap-2">
-          <textarea
-            ref={conversationInputRef}
-            value={conversationInputText}
-            onChange={(event) => {
-              setConversationInputText(event.target.value)
-            }}
-            onInput={adjustConversationInputHeight}
-            onKeyDown={handleConversationKeyDown}
-            className="w-full resize-none rounded-lg border border-[#a7d2e8] bg-white px-3 py-2 text-sm leading-6 text-[#12384c] focus:border-[#5da8d2] focus:outline-none"
-            placeholder="Message..."
-            rows={1}
-            style={{
-              minHeight: `${CHAT_INPUT_MIN_HEIGHT}px`,
-              maxHeight: `${CHAT_INPUT_MAX_HEIGHT}px`,
-              lineHeight: `${CHAT_INPUT_MIN_HEIGHT}px`,
-            }}
-          />
-          <button
-            type="submit"
-            className="h-9 rounded-lg border border-[#5a92ba] bg-gradient-to-b from-[#6db6e2] to-[#4ea2d3] px-4 text-sm font-semibold text-white shadow-[0_8px_18px_rgba(46,111,156,0.2)] hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={!conversationInputText.trim().length}
-          >
-            Send
-          </button>
-        </div>
-      </form>
+      <ConversationPanelHeader
+        topic={node.title}
+        conclusion={getNodeConclusion(messages)}
+        isFullscreen={isFullscreen}
+        onToggleFullScreen={onToggleFullScreen}
+        onClose={onClose}
+      />
+      <ConversationMessageList messages={messages} conversationScrollRef={conversationScrollRef} />
+      <ConversationComposer
+        conversationModel={conversationModel}
+        setConversationModel={setConversationModel}
+        conversationInputText={conversationInputText}
+        onConversationInputChange={setConversationInputText}
+        onInputResize={adjustConversationInputHeight}
+        onConversationKeyDown={handleConversationKeyDown}
+        onConversationSubmit={handleConversationSubmit}
+        conversationInputRef={conversationInputRef}
+      />
     </aside>
   )
 }

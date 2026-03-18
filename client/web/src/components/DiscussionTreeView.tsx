@@ -1,181 +1,20 @@
 import { useMemo, useRef, useState } from 'react'
-import { CardOptionsMenu } from './tree/CardOptionsMenu'
-import { FoldedNodesMenu } from './tree/FoldedNodesMenu'
 import { NodeConversationPanel } from './NodeConversationPanel'
+import { TreeNodeCard } from './tree/TreeNodeCard'
 import { mockTree } from '../data/mockTree'
 import { zIndex } from '../theme/zIndex'
-import type { FoldedNodeSummary, TreeMessage, TreeNode } from '../types/tree'
+import type { TreeNode } from '../types/tree'
+import {
+  buildTreeLayout,
+  cloneTree,
+  findNodeById,
+  appendMessagesToNode,
+  setNodeFolded,
+  CARD_WIDTH,
+} from './tree/treeUtils'
 
-const CARD_WIDTH = 230
-const CARD_MAX_HEIGHT = 104
-const HORIZONTAL_GAP = 320
-const VERTICAL_GAP = 120
-const CANVAS_PADDING = 50
 const DEFAULT_PANEL_WIDTH = 560
 const MIN_PANEL_WIDTH = 300
-
-type PositionedNode = {
-  id: string
-  title: string
-  status: TreeNode['status']
-  canFold: boolean
-  foldedChildren: FoldedNodeSummary[]
-  x: number
-  y: number
-}
-
-type TreeEdge = {
-  from: string
-  to: string
-}
-
-type TreeLayout = {
-  nodes: PositionedNode[]
-  edges: TreeEdge[]
-  nodeById: Map<string, PositionedNode>
-  width: number
-  height: number
-}
-
-const cloneTree = (node: TreeNode): TreeNode => ({
-  ...node,
-  messages: node.messages ? [...node.messages] : undefined,
-  children: node.children?.map(cloneTree),
-})
-
-const findNodeById = (node: TreeNode, nodeId: string): TreeNode | null => {
-  if (node.id === nodeId) {
-    return node
-  }
-
-  if (!node.children || node.children.length === 0) {
-    return null
-  }
-
-  for (const child of node.children) {
-    const match = findNodeById(child, nodeId)
-    if (match) {
-      return match
-    }
-  }
-
-  return null
-}
-
-const setNodeFolded = (node: TreeNode, nodeId: string, folded: boolean): TreeNode => {
-  if (node.id === nodeId) {
-    if (node.folded === folded) {
-      return node
-    }
-
-    return { ...node, folded }
-  }
-
-  if (!node.children || node.children.length === 0) {
-    return node
-  }
-
-  let changed = false
-  const nextChildren = node.children.map((child) => {
-    const nextChild = setNodeFolded(child, nodeId, folded)
-    if (nextChild !== child) {
-      changed = true
-    }
-    return nextChild
-  })
-
-  return changed ? { ...node, children: nextChildren } : node
-}
-
-const appendMessagesToNode = (
-  node: TreeNode,
-  nodeId: string,
-  messages: TreeMessage[],
-): TreeNode => {
-  if (node.id === nodeId) {
-    const existingMessages = node.messages ?? []
-    return { ...node, messages: [...existingMessages, ...messages] }
-  }
-
-  if (!node.children || node.children.length === 0) {
-    return node
-  }
-
-  let changed = false
-  const nextChildren = node.children.map((child) => {
-    const nextChild = appendMessagesToNode(child, nodeId, messages)
-    if (nextChild !== child) {
-      changed = true
-    }
-
-    return nextChild
-  })
-
-  return changed ? { ...node, children: nextChildren } : node
-}
-
-const buildTreeLayout = (root: TreeNode): TreeLayout => {
-  const nodes: PositionedNode[] = []
-  const edges: TreeEdge[] = []
-  let leafCursor = 0
-  let maxDepth = 0
-
-  const visit = (node: TreeNode, depth: number): number => {
-    maxDepth = Math.max(maxDepth, depth)
-
-    const allChildren = node.children ?? []
-    const foldedChildren: FoldedNodeSummary[] = allChildren
-      .filter((child) => child.folded)
-      .map((child) => ({ id: child.id, title: child.title }))
-    const visibleChildren = allChildren.filter((child) => !child.folded)
-
-    const childYs = visibleChildren.map((child) => {
-      const childY = visit(child, depth + 1)
-      edges.push({ from: node.id, to: child.id })
-      return childY
-    })
-
-    const y =
-      childYs.length === 0
-        ? CANVAS_PADDING + leafCursor++ * VERTICAL_GAP
-        : childYs.reduce((sum, value) => sum + value, 0) / childYs.length
-
-    nodes.push({
-      id: node.id,
-      title: node.title,
-      status: node.status,
-      canFold: depth > 0,
-      foldedChildren,
-      x: CANVAS_PADDING + depth * HORIZONTAL_GAP,
-      y,
-    })
-
-    return y
-  }
-
-  visit(root, 0)
-
-  const width = CANVAS_PADDING * 2 + maxDepth * HORIZONTAL_GAP + CARD_WIDTH
-  const height = Math.max(
-    420,
-    CANVAS_PADDING * 2 + Math.max(leafCursor - 1, 0) * VERTICAL_GAP + CARD_MAX_HEIGHT,
-  )
-
-  const nodeById = new Map(nodes.map((node) => [node.id, node]))
-  return { nodes, edges, nodeById, width, height }
-}
-
-const statusCardClass = (status: TreeNode['status']) => {
-  if (status === 'Approved') {
-    return 'border-[#79c89d]'
-  }
-
-  if (status === 'Exploring') {
-    return 'border-[#ffbe62]'
-  }
-
-  return 'border-[#8bb8cd]'
-}
 
 type DiscussionTreeViewProps = {
   workspaceTitle: string
@@ -348,76 +187,39 @@ export const DiscussionTreeView = ({ workspaceTitle }: DiscussionTreeViewProps) 
               const isConversationSelected = conversationNodeId === node.id
 
               return (
-                <article
+                <TreeNodeCard
                   key={node.id}
-                  className={`absolute flex min-h-[72px] max-h-[104px] w-[230px] -translate-y-1/2 flex-col gap-2 overflow-visible rounded-[14px] border bg-white p-2.5 shadow-[0_8px_20px_rgba(47,104,130,0.12)] ${statusCardClass(
-                    node.status,
-                  )} ${isConversationSelected ? 'ring-2 ring-[#4b90ac]' : ''}`}
+                  node={node}
+                  isConversationSelected={isConversationSelected}
+                  isFoldMenuOpen={foldMenuOpen}
+                  isCardOptionsOpen={cardOptionsOpen}
+                  foldedCount={foldedCount}
+                  onOpenConversation={() => openConversation(node.id)}
+                  onCardOptionsOpenChange={(nextOpen) => {
+                    if (nextOpen) {
+                      setExpandedFoldMenuNodeId(null)
+                    }
+                    setExpandedCardOptionsNodeId(nextOpen ? node.id : null)
+                  }}
+                  onFoldedMenuOpenChange={(nextOpen) => {
+                    if (nextOpen) {
+                      setExpandedCardOptionsNodeId(null)
+                    }
+                    setExpandedFoldMenuNodeId(nextOpen ? node.id : null)
+                  }}
+                  onFoldNode={() => foldNode(node.id)}
+                  onOpenFoldedNode={(foldedNodeId) => {
+                    unfoldNode(foldedNodeId)
+                    setExpandedFoldMenuNodeId(null)
+                  }}
                   style={{
-                    left: `${node.x}px`,
-                    top: `${node.y}px`,
                     zIndex: cardIsElevated
                       ? zIndex.popoverMenu - 1
                       : isConversationSelected
                         ? zIndex.popoverMenu
                         : zIndex.cardLayer,
                   }}
-                  onDoubleClick={() => openConversation(node.id)}
-                >
-                  <CardOptionsMenu
-                    canCollapse={node.canFold}
-                    isOpen={cardOptionsOpen}
-                    onOpenChange={(nextOpen) => {
-                      if (nextOpen) {
-                        setExpandedFoldMenuNodeId(null)
-                      }
-                      setExpandedCardOptionsNodeId(nextOpen ? node.id : null)
-                    }}
-                    onCollapse={() => foldNode(node.id)}
-                  />
-
-                  {foldedCount > 0 ? (
-                    <div
-                      className="absolute -right-7 top-1/2 -translate-y-1/2"
-                      style={{ zIndex: cardOptionsOpen ? zIndex.cardLayer : zIndex.inlineControls }}
-                    >
-                      <button
-                        type="button"
-                        className="inline-flex h-6 min-w-8 items-center justify-center rounded-full border border-[#7eb9d5] bg-[#f8fdff] px-1.5 text-[11px] font-semibold text-[#235d79] hover:bg-[#eef9ff]"
-                        aria-label={`${foldedCount} folded nodes`}
-                        onClick={(event) => {
-                          event.stopPropagation()
-                          setExpandedCardOptionsNodeId(null)
-                          setExpandedFoldMenuNodeId((current) =>
-                            current === node.id ? null : node.id,
-                          )
-                        }}
-                      >
-                        {foldedCount}+
-                      </button>
-
-                      <FoldedNodesMenu
-                        isOpen={foldMenuOpen}
-                        nodes={node.foldedChildren}
-                        onOpenNode={(foldedNodeId) => {
-                          unfoldNode(foldedNodeId)
-                          setExpandedFoldMenuNodeId(null)
-                        }}
-                        onClose={() => setExpandedFoldMenuNodeId(null)}
-                      />
-                    </div>
-                  ) : null}
-
-                  <h3
-                    className="m-0 min-h-[1.35em] max-h-[calc(1.35em*3)] overflow-y-auto pr-1 text-sm leading-[1.35] text-[#12384c]"
-                    style={{ overflowWrap: 'anywhere' }}
-                  >
-                    {node.title}
-                  </h3>
-                  <span className="inline-flex self-start rounded-full border border-[#93bfd3] bg-[#ecf9ff] px-2.5 py-[2px] text-[11px] text-[#2d647f]">
-                    {node.status}
-                  </span>
-                </article>
+                />
               )
             })}
           </div>
