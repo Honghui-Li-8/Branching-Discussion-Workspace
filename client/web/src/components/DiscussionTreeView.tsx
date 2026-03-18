@@ -1,15 +1,18 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { CardOptionsMenu } from './tree/CardOptionsMenu'
 import { FoldedNodesMenu } from './tree/FoldedNodesMenu'
+import { NodeConversationPanel } from './NodeConversationPanel'
 import { mockTree } from '../data/mockTree'
 import { zIndex } from '../theme/zIndex'
-import type { FoldedNodeSummary, TreeNode } from '../types/tree'
+import type { FoldedNodeSummary, TreeMessage, TreeNode } from '../types/tree'
 
 const CARD_WIDTH = 230
 const CARD_MAX_HEIGHT = 104
 const HORIZONTAL_GAP = 320
 const VERTICAL_GAP = 120
 const CANVAS_PADDING = 50
+const DEFAULT_PANEL_WIDTH = 560
+const MIN_PANEL_WIDTH = 300
 
 type PositionedNode = {
   id: string
@@ -40,6 +43,25 @@ const cloneTree = (node: TreeNode): TreeNode => ({
   children: node.children?.map(cloneTree),
 })
 
+const findNodeById = (node: TreeNode, nodeId: string): TreeNode | null => {
+  if (node.id === nodeId) {
+    return node
+  }
+
+  if (!node.children || node.children.length === 0) {
+    return null
+  }
+
+  for (const child of node.children) {
+    const match = findNodeById(child, nodeId)
+    if (match) {
+      return match
+    }
+  }
+
+  return null
+}
+
 const setNodeFolded = (node: TreeNode, nodeId: string, folded: boolean): TreeNode => {
   if (node.id === nodeId) {
     if (node.folded === folded) {
@@ -59,6 +81,33 @@ const setNodeFolded = (node: TreeNode, nodeId: string, folded: boolean): TreeNod
     if (nextChild !== child) {
       changed = true
     }
+    return nextChild
+  })
+
+  return changed ? { ...node, children: nextChildren } : node
+}
+
+const appendMessagesToNode = (
+  node: TreeNode,
+  nodeId: string,
+  messages: TreeMessage[],
+): TreeNode => {
+  if (node.id === nodeId) {
+    const existingMessages = node.messages ?? []
+    return { ...node, messages: [...existingMessages, ...messages] }
+  }
+
+  if (!node.children || node.children.length === 0) {
+    return node
+  }
+
+  let changed = false
+  const nextChildren = node.children.map((child) => {
+    const nextChild = appendMessagesToNode(child, nodeId, messages)
+    if (nextChild !== child) {
+      changed = true
+    }
+
     return nextChild
   })
 
@@ -138,8 +187,21 @@ export const DiscussionTreeView = ({ workspaceTitle }: DiscussionTreeViewProps) 
   const [expandedCardOptionsNodeId, setExpandedCardOptionsNodeId] = useState<string | null>(
     null,
   )
+  const [conversationNodeId, setConversationNodeId] = useState<string | null>(null)
+  const [conversationPanelWidth, setConversationPanelWidth] = useState(DEFAULT_PANEL_WIDTH)
+  const [conversationPanelFullscreen, setConversationPanelFullscreen] = useState(false)
+
+  const canvasRef = useRef<HTMLDivElement | null>(null)
 
   const layout = useMemo(() => buildTreeLayout(tree), [tree])
+  const conversationNode = conversationNodeId ? findNodeById(tree, conversationNodeId) : null
+  const containerWidth = canvasRef.current?.clientWidth ?? 0
+  const isPanelNearFullscreen = containerWidth > 0 && conversationPanelWidth >= containerWidth * 0.8
+  const isPanelFullscreenLike = conversationPanelFullscreen || isPanelNearFullscreen
+
+  const panelWidth = conversationPanelFullscreen
+    ? containerWidth || conversationPanelWidth
+    : conversationPanelWidth
 
   const foldNode = (nodeId: string) => {
     setTree((current) => setNodeFolded(current, nodeId, true))
@@ -151,25 +213,82 @@ export const DiscussionTreeView = ({ workspaceTitle }: DiscussionTreeViewProps) 
     setTree((current) => setNodeFolded(current, nodeId, false))
   }
 
+  const openConversation = (nodeId: string) => {
+    setConversationNodeId(nodeId)
+    setExpandedFoldMenuNodeId(null)
+    setExpandedCardOptionsNodeId(null)
+    setConversationPanelFullscreen(false)
+    setConversationPanelWidth((current) => (containerWidth ? clampPanelWidth(current) : current))
+  }
+
+  const sendConversationMessage = (text: string) => {
+    if (!conversationNodeId) {
+      return
+    }
+
+    const trimmed = text.trim()
+    if (!trimmed.length) {
+      return
+    }
+
+    const userMessage = {
+      id: `m-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      role: 'user' as const,
+      content: trimmed,
+    }
+
+    const assistantMessage = {
+      id: `m-${Date.now() + 1}-${Math.random().toString(36).slice(2, 8)}`,
+      role: 'assistant' as const,
+      content: `echo: ${trimmed}`,
+    }
+
+    setTree((current) =>
+      appendMessagesToNode(current, conversationNodeId, [userMessage, assistantMessage]),
+    )
+  }
+
+  const clampPanelWidth = (candidate: number) => {
+    if (!containerWidth) {
+      return candidate
+    }
+
+    const bounded = Math.min(candidate, containerWidth)
+    return Math.max(Math.min(MIN_PANEL_WIDTH, containerWidth), bounded)
+  }
+
+  const handlePanelResize = (nextWidth: number) => {
+    setConversationPanelWidth(clampPanelWidth(nextWidth))
+  }
+
+  const resetPanelToDefault = () => {
+    setConversationPanelWidth(clampPanelWidth(DEFAULT_PANEL_WIDTH))
+    setConversationPanelFullscreen(false)
+  }
+
+  const expandToFullscreen = () => {
+    if (containerWidth) {
+      setConversationPanelWidth(clampPanelWidth(containerWidth))
+    }
+    setConversationPanelFullscreen(true)
+  }
+
   return (
     <section
-      className="flex h-auto min-h-[430px] flex-col overflow-hidden rounded-[18px] border border-[#a8d1e5] bg-[linear-gradient(180deg,#f5fbff_0%,#f8fdff_100%)] lg:h-[calc(100vh-40px)] lg:min-h-0"
+      className="relative flex h-auto min-h-[430px] flex-col overflow-hidden rounded-[18px] border border-[#a8d1e5] bg-[linear-gradient(180deg,#f5fbff_0%,#f8fdff_100%)] lg:h-[calc(100vh-40px)] lg:min-h-0"
       aria-label="Discussion tree view"
     >
       <header
         className="relative border-b border-[#c3e0ef] bg-[linear-gradient(90deg,#ebf7ff_0%,#f8fdff_100%)] px-5 py-4"
         style={{ zIndex: zIndex.discussionHeader }}
       >
-        <p className="m-0 text-[11px] uppercase tracking-[0.11em] text-[#40718a]">
-          Workspace
-        </p>
-        <h1 className="mb-0 mt-1 text-[26px] leading-[1.2] text-[#12384c]">
-          {workspaceTitle}
-        </h1>
+        <p className="m-0 text-[11px] uppercase tracking-[0.11em] text-[#40718a]">Workspace</p>
+        <h1 className="mb-0 mt-1 text-[26px] leading-[1.2] text-[#12384c]">{workspaceTitle}</h1>
       </header>
 
       <div
-        className="flex-1 overflow-auto"
+        ref={canvasRef}
+        className="relative flex-1 overflow-hidden"
         style={{
           background:
             'radial-gradient(circle at 1px 1px, rgba(125, 172, 195, 0.18) 1px, transparent 0) 0 0 / 22px 22px, linear-gradient(180deg, #f8fdff 0%, #fffefb 100%)',
@@ -177,116 +296,146 @@ export const DiscussionTreeView = ({ workspaceTitle }: DiscussionTreeViewProps) 
         }}
       >
         <div
-          className="relative"
-          style={{ width: `${layout.width}px`, height: `${layout.height}px` }}
+          className="h-full overflow-auto"
+          style={{
+            paddingRight:
+              conversationNode && !conversationPanelFullscreen
+                ? `${conversationPanelWidth}px`
+                : undefined,
+          }}
         >
-          <svg
-            className="pointer-events-none absolute inset-0 h-full w-full"
-            viewBox={`0 0 ${layout.width} ${layout.height}`}
-            style={{ zIndex: zIndex.edgeLayer }}
+          <div
+            className="relative"
+            style={{ width: `${layout.width}px`, height: `${layout.height}px` }}
           >
-            {layout.edges.map((edge) => {
-              const from = layout.nodeById.get(edge.from)
-              const to = layout.nodeById.get(edge.to)
-              if (!from || !to) {
-                return null
-              }
+            <svg
+              className="pointer-events-none absolute inset-0 h-full w-full"
+              viewBox={`0 0 ${layout.width} ${layout.height}`}
+              style={{ zIndex: zIndex.edgeLayer }}
+            >
+              {layout.edges.map((edge) => {
+                const from = layout.nodeById.get(edge.from)
+                const to = layout.nodeById.get(edge.to)
+                if (!from || !to) {
+                  return null
+                }
 
-              const startX = from.x + CARD_WIDTH
-              const startY = from.y
-              const endX = to.x
-              const endY = to.y
-              const controlOffset = Math.max(48, (endX - startX) * 0.45)
-              const path = `M ${startX} ${startY} C ${startX + controlOffset} ${startY}, ${
-                endX - controlOffset
-              } ${endY}, ${endX} ${endY}`
+                const startX = from.x + CARD_WIDTH
+                const startY = from.y
+                const endX = to.x
+                const endY = to.y
+                const controlOffset = Math.max(48, (endX - startX) * 0.45)
+                const path = `M ${startX} ${startY} C ${startX + controlOffset} ${startY}, ${
+                  endX - controlOffset
+                } ${endY}, ${endX} ${endY}`
+
+                return (
+                  <path
+                    key={`${edge.from}-${edge.to}`}
+                    d={path}
+                    className="fill-none stroke-[#8bb8cd] stroke-2"
+                    style={{ strokeLinecap: 'round' }}
+                  />
+                )
+              })}
+            </svg>
+
+            {layout.nodes.map((node) => {
+              const foldMenuOpen = expandedFoldMenuNodeId === node.id
+              const cardOptionsOpen = expandedCardOptionsNodeId === node.id
+              const cardIsElevated = foldMenuOpen || cardOptionsOpen
+              const foldedCount = node.foldedChildren.length
+              const isConversationSelected = conversationNodeId === node.id
 
               return (
-                <path
-                  key={`${edge.from}-${edge.to}`}
-                  d={path}
-                  className="fill-none stroke-[#8bb8cd] stroke-2"
-                  style={{ strokeLinecap: 'round' }}
-                />
+                <article
+                  key={node.id}
+                  className={`absolute flex min-h-[72px] max-h-[104px] w-[230px] -translate-y-1/2 flex-col gap-2 overflow-visible rounded-[14px] border bg-white p-2.5 shadow-[0_8px_20px_rgba(47,104,130,0.12)] ${statusCardClass(
+                    node.status,
+                  )} ${isConversationSelected ? 'ring-2 ring-[#4b90ac]' : ''}`}
+                  style={{
+                    left: `${node.x}px`,
+                    top: `${node.y}px`,
+                    zIndex: cardIsElevated
+                      ? zIndex.popoverMenu - 1
+                      : isConversationSelected
+                        ? zIndex.popoverMenu
+                        : zIndex.cardLayer,
+                  }}
+                  onDoubleClick={() => openConversation(node.id)}
+                >
+                  <CardOptionsMenu
+                    canCollapse={node.canFold}
+                    isOpen={cardOptionsOpen}
+                    onOpenChange={(nextOpen) => {
+                      if (nextOpen) {
+                        setExpandedFoldMenuNodeId(null)
+                      }
+                      setExpandedCardOptionsNodeId(nextOpen ? node.id : null)
+                    }}
+                    onCollapse={() => foldNode(node.id)}
+                  />
+
+                  {foldedCount > 0 ? (
+                    <div
+                      className="absolute -right-7 top-1/2 -translate-y-1/2"
+                      style={{ zIndex: cardOptionsOpen ? zIndex.cardLayer : zIndex.inlineControls }}
+                    >
+                      <button
+                        type="button"
+                        className="inline-flex h-6 min-w-8 items-center justify-center rounded-full border border-[#7eb9d5] bg-[#f8fdff] px-1.5 text-[11px] font-semibold text-[#235d79] hover:bg-[#eef9ff]"
+                        aria-label={`${foldedCount} folded nodes`}
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          setExpandedCardOptionsNodeId(null)
+                          setExpandedFoldMenuNodeId((current) =>
+                            current === node.id ? null : node.id,
+                          )
+                        }}
+                      >
+                        {foldedCount}+
+                      </button>
+
+                      <FoldedNodesMenu
+                        isOpen={foldMenuOpen}
+                        nodes={node.foldedChildren}
+                        onOpenNode={(foldedNodeId) => {
+                          unfoldNode(foldedNodeId)
+                          setExpandedFoldMenuNodeId(null)
+                        }}
+                        onClose={() => setExpandedFoldMenuNodeId(null)}
+                      />
+                    </div>
+                  ) : null}
+
+                  <h3
+                    className="m-0 min-h-[1.35em] max-h-[calc(1.35em*3)] overflow-y-auto pr-1 text-sm leading-[1.35] text-[#12384c]"
+                    style={{ overflowWrap: 'anywhere' }}
+                  >
+                    {node.title}
+                  </h3>
+                  <span className="inline-flex self-start rounded-full border border-[#93bfd3] bg-[#ecf9ff] px-2.5 py-[2px] text-[11px] text-[#2d647f]">
+                    {node.status}
+                  </span>
+                </article>
               )
             })}
-          </svg>
-
-          {layout.nodes.map((node) => {
-            const foldMenuOpen = expandedFoldMenuNodeId === node.id
-            const cardOptionsOpen = expandedCardOptionsNodeId === node.id
-            const cardIsElevated = foldMenuOpen || cardOptionsOpen
-            const foldedCount = node.foldedChildren.length
-
-            return (
-              <article
-                key={node.id}
-                className={`absolute flex min-h-[72px] max-h-[104px] w-[230px] -translate-y-1/2 flex-col gap-2 overflow-visible rounded-[14px] border bg-white p-2.5 shadow-[0_8px_20px_rgba(47,104,130,0.12)] ${statusCardClass(node.status)}`}
-                style={{
-                  left: `${node.x}px`,
-                  top: `${node.y}px`,
-                  zIndex: cardIsElevated ? zIndex.popoverMenu - 1 : zIndex.cardLayer,
-                }}
-              >
-                <CardOptionsMenu
-                  canCollapse={node.canFold}
-                  isOpen={cardOptionsOpen}
-                  onOpenChange={(nextOpen) => {
-                    if (nextOpen) {
-                      setExpandedFoldMenuNodeId(null)
-                    }
-                    setExpandedCardOptionsNodeId(nextOpen ? node.id : null)
-                  }}
-                  onCollapse={() => foldNode(node.id)}
-                />
-
-                {foldedCount > 0 ? (
-                  <div
-                    className="absolute -right-7 top-1/2 -translate-y-1/2"
-                    style={{
-                      zIndex: cardOptionsOpen ? zIndex.cardLayer : zIndex.inlineControls,
-                    }}
-                  >
-                    <button
-                      type="button"
-                      className="inline-flex h-6 min-w-8 items-center justify-center rounded-full border border-[#7eb9d5] bg-[#f8fdff] px-1.5 text-[11px] font-semibold text-[#235d79] hover:bg-[#eef9ff]"
-                      aria-label={`${foldedCount} folded nodes`}
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        setExpandedCardOptionsNodeId(null)
-                        setExpandedFoldMenuNodeId((current) =>
-                          current === node.id ? null : node.id,
-                        )
-                      }}
-                    >
-                      {foldedCount}+
-                    </button>
-
-                    <FoldedNodesMenu
-                      isOpen={foldMenuOpen}
-                      nodes={node.foldedChildren}
-                      onOpenNode={(foldedNodeId) => {
-                        unfoldNode(foldedNodeId)
-                        setExpandedFoldMenuNodeId(null)
-                      }}
-                      onClose={() => setExpandedFoldMenuNodeId(null)}
-                    />
-                  </div>
-                ) : null}
-
-                <h3
-                  className="m-0 min-h-[1.35em] max-h-[calc(1.35em*3)] overflow-y-auto pr-1 text-sm leading-[1.35] text-[#12384c]"
-                  style={{ overflowWrap: 'anywhere' }}
-                >
-                  {node.title}
-                </h3>
-                <span className="inline-flex self-start rounded-full border border-[#93bfd3] bg-[#ecf9ff] px-2.5 py-[2px] text-[11px] text-[#2d647f]">
-                  {node.status}
-                </span>
-              </article>
-            )
-          })}
+          </div>
         </div>
+
+        {conversationNode ? (
+          <NodeConversationPanel
+            node={conversationNode}
+            width={panelWidth}
+            isFullscreen={isPanelFullscreenLike}
+            onClose={() => setConversationNodeId(null)}
+            onSendMessage={sendConversationMessage}
+            onWidthChange={handlePanelResize}
+            onToggleFullScreen={() =>
+              isPanelFullscreenLike ? resetPanelToDefault() : expandToFullscreen()
+            }
+          />
+        ) : null}
       </div>
     </section>
   )

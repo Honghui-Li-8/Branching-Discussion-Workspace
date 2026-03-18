@@ -6,4 +6,5 @@ export const zIndex = {
   inlineControls: 50,
   dropdownMenu: 60,
   popoverMenu: 70,
+  conversationPanel: 80,
 } as const
