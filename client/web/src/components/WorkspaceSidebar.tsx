@@ -18,18 +18,6 @@ export const WorkspaceSidebar = ({
       className="flex min-h-0 flex-col border-b border-[#b8dced] bg-[linear-gradient(180deg,#d9f0fd_0%,#e9f7ff_100%)] lg:min-h-screen lg:border-r lg:border-b-0"
       aria-label="Workspace navigation"
     >
-      <section className="border-b border-[#b8dced] px-3 py-2.5">
-        <div className="flex items-center gap-2.5">
-          <span
-            className="inline-flex h-[26px] w-[26px] items-center justify-center rounded-full border border-[#97c2d8] bg-white text-[13px] font-bold text-[#225c79]"
-            aria-hidden="true"
-          >
-            H
-          </span>
-          <p className="m-0 text-sm font-semibold text-[#164760]">Henry</p>
-        </div>
-      </section>
-
       <section className="flex min-h-0 flex-1 flex-col">
         <header className="flex items-center justify-between gap-2.5 border-b border-[#b8dced] px-2.5 pt-2.5 pb-2">
           <h2 className="m-0 text-[11px] uppercase tracking-[0.1em] text-[#1f607d]">
@@ -69,6 +57,18 @@ export const WorkspaceSidebar = ({
             )
           })}
         </ul>
+      </section>
+
+      <section className="border-t border-[#b8dced] px-3 py-3">
+        <div className="flex items-center gap-2.5">
+          <span
+            className="inline-flex h-[26px] w-[26px] items-center justify-center rounded-full border border-[#97c2d8] bg-white text-[13px] font-bold text-[#225c79]"
+            aria-hidden="true"
+          >
+            H
+          </span>
+          <p className="m-0 text-sm font-semibold text-[#164760]">Henry</p>
+        </div>
       </section>
     </aside>
   )
