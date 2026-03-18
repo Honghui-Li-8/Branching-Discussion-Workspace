@@ -6,10 +6,16 @@ export type TreeMessage = {
   content: string
 }
 
+export type FoldedNodeSummary = {
+  id: string
+  title: string
+}
+
 export type TreeNode = {
   id: string
   title: string
   status: TreeStatus
+  folded?: boolean
   messages?: TreeMessage[]
   children?: TreeNode[]
 }
