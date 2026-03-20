@@ -16,13 +16,8 @@ type AuthState = {
 }
 
 const initialState: AuthState = {
-  status: 'authenticated',
-  user: {
-    id: 'user-local-henry',
-    authUserId: 'local:henry',
-    email: 'henry@example.com',
-    displayName: 'Henry',
-  },
+  status: 'unknown',
+  user: null,
 }
 
 const authSlice = createSlice({

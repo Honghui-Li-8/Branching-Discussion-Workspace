@@ -1,20 +1,18 @@
-import type { Workspace } from '../types/workspace'
+import { useAppDispatch, useAppSelector } from '../store/hooks'
+import {
+  createWorkspace,
+  selectActiveWorkspaceId,
+  selectWorkspaces,
+  setActiveWorkspaceId,
+} from '../store/slices/appShellSlice'
+import { selectAuthUser } from '../store/slices/authSlice'
 
-type WorkspaceSidebarProps = {
-  workspaces: Workspace[]
-  activeWorkspaceId: string | null
-  currentUserName: string
-  onSelectWorkspace: (workspaceId: string) => void
-  onCreateWorkspace: () => void
-}
-
-export const WorkspaceSidebar = ({
-  workspaces,
-  activeWorkspaceId,
-  currentUserName,
-  onSelectWorkspace,
-  onCreateWorkspace,
-}: WorkspaceSidebarProps) => {
+export const AppSidebar = () => {
+  const dispatch = useAppDispatch()
+  const workspaces = useAppSelector(selectWorkspaces)
+  const activeWorkspaceId = useAppSelector(selectActiveWorkspaceId)
+  const authUser = useAppSelector(selectAuthUser)
+  const currentUserName = authUser?.displayName ?? 'User'
   const avatarInitial = currentUserName.trim().slice(0, 1).toUpperCase() || '?'
 
   return (
@@ -30,7 +28,7 @@ export const WorkspaceSidebar = ({
           <button
             type="button"
             className="h-7 w-7 cursor-pointer rounded-[10px] border border-[#6ea9c7] bg-[#fbfeff] text-xl leading-none text-[#1f607d] transition hover:bg-[#eef9ff] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ffad3f]"
-            onClick={onCreateWorkspace}
+            onClick={() => dispatch(createWorkspace())}
             aria-label="Create workspace"
           >
             +
@@ -50,7 +48,7 @@ export const WorkspaceSidebar = ({
                       ? 'border-[#ffbe62] bg-[#fff8eb]'
                       : 'border-[#a6cee1] bg-[#fbfeff] hover:border-[#7eb9d5] hover:bg-[#f2fbff]'
                   }`}
-                  onClick={() => onSelectWorkspace(workspace.id)}
+                  onClick={() => dispatch(setActiveWorkspaceId(workspace.id))}
                 >
                   <span className="text-[13px] font-semibold text-[#12384c]">
                     {workspace.title}

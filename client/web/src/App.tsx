@@ -1,32 +1,18 @@
 import { DiscussionTreeView } from './components/DiscussionTreeView'
 import { IntroScreen } from './components/IntroScreen'
-import { WorkspaceSidebar } from './components/WorkspaceSidebar'
-import { useAppDispatch, useAppSelector } from './store/hooks'
-import {
-  createWorkspace,
-  selectActiveWorkspace,
-  selectActiveWorkspaceId,
-  selectWorkspaces,
-  setActiveWorkspaceId,
-} from './store/slices/appShellSlice'
-import { selectAuthUser } from './store/slices/authSlice'
+import { AppSidebar } from './components/AppSidebar'
+import { useAuth } from './hooks/useAuth'
+import { useAppSelector } from './store/hooks'
+import { selectActiveWorkspace } from './store/slices/appShellSlice'
 
 const App = () => {
-  const dispatch = useAppDispatch()
-  const workspaces = useAppSelector(selectWorkspaces)
-  const activeWorkspaceId = useAppSelector(selectActiveWorkspaceId)
+  useAuth()
+
   const activeWorkspace = useAppSelector(selectActiveWorkspace)
-  const authUser = useAppSelector(selectAuthUser)
 
   return (
     <div className="grid min-h-screen grid-cols-1 bg-[linear-gradient(165deg,#e9f6ff_0%,#f3fbff_55%,#fffdf5_100%)] lg:grid-cols-[240px_minmax(0,1fr)]">
-      <WorkspaceSidebar
-        workspaces={workspaces}
-        activeWorkspaceId={activeWorkspaceId}
-        currentUserName={authUser?.displayName ?? 'User'}
-        onSelectWorkspace={(workspaceId) => dispatch(setActiveWorkspaceId(workspaceId))}
-        onCreateWorkspace={() => dispatch(createWorkspace())}
-      />
+      <AppSidebar />
 
       <main className="min-h-0 min-w-0 p-3.5 lg:min-h-screen lg:p-5">
         {activeWorkspace ? (
