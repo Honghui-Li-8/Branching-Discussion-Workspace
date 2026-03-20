@@ -1,13 +1,10 @@
 import { DiscussionTreeView } from './components/DiscussionTreeView'
 import { IntroScreen } from './components/IntroScreen'
 import { AppSidebar } from './components/AppSidebar'
-import { useAuth } from './hooks/useAuth'
 import { useAppSelector } from './store/hooks'
 import { selectActiveWorkspace } from './store/slices/appShellSlice'
 
 const App = () => {
-  useAuth()
-
   const activeWorkspace = useAppSelector(selectActiveWorkspace)
 
   return (

@@ -5,14 +5,22 @@ import {
   selectWorkspaces,
   setActiveWorkspaceId,
 } from '../store/slices/appShellSlice'
-import { selectAuthUser } from '../store/slices/authSlice'
+import { useAuth } from './AuthProvider'
 
 export const AppSidebar = () => {
   const dispatch = useAppDispatch()
   const workspaces = useAppSelector(selectWorkspaces)
   const activeWorkspaceId = useAppSelector(selectActiveWorkspaceId)
-  const authUser = useAppSelector(selectAuthUser)
-  const currentUserName = authUser?.displayName ?? 'User'
+  const {
+    authUser,
+    isAuthenticated,
+    isAuthActionPending,
+    authError,
+    login,
+    logout,
+  } = useAuth()
+
+  const currentUserName = authUser?.displayName ?? 'Guest'
   const avatarInitial = currentUserName.trim().slice(0, 1).toUpperCase() || '?'
 
   return (
@@ -62,15 +70,28 @@ export const AppSidebar = () => {
       </section>
 
       <section className="border-t border-[#b8dced] px-3 py-3">
-        <div className="flex items-center gap-2.5">
-          <span
-            className="inline-flex h-[26px] w-[26px] items-center justify-center rounded-full border border-[#97c2d8] bg-white text-[13px] font-bold text-[#225c79]"
-            aria-hidden="true"
+        <div className="flex items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2.5">
+            <span
+              className="inline-flex h-[26px] w-[26px] items-center justify-center rounded-full border border-[#97c2d8] bg-white text-[13px] font-bold text-[#225c79]"
+              aria-hidden="true"
+            >
+              {avatarInitial}
+            </span>
+            <p className="m-0 text-sm font-semibold text-[#164760]">{currentUserName}</p>
+          </div>
+          <button
+            type="button"
+            className="cursor-pointer rounded-[10px] border border-[#6ea9c7] bg-[#fbfeff] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.04em] text-[#1f607d] transition hover:bg-[#eef9ff] disabled:cursor-not-allowed disabled:opacity-60"
+            onClick={isAuthenticated ? () => void logout() : () => void login()}
+            disabled={isAuthActionPending}
           >
-            {avatarInitial}
-          </span>
-          <p className="m-0 text-sm font-semibold text-[#164760]">{currentUserName}</p>
+            {isAuthActionPending ? 'Working...' : isAuthenticated ? 'Logout' : 'Login'}
+          </button>
         </div>
+        {authError ? (
+          <p className="mt-2 mb-0 text-[11px] text-[#8a3f2b]">{authError}</p>
+        ) : null}
       </section>
     </aside>
   )

@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { Provider } from 'react-redux'
 import { trpc, trpcClient, queryClient } from './trpc'
+import { AuthProvider } from './components/AuthProvider'
 import { store } from './store'
 
 import './index.css'
@@ -13,7 +14,9 @@ createRoot(document.getElementById('root')!).render(
     <Provider store={store}>
       <trpc.Provider client={trpcClient} queryClient={queryClient}>
         <QueryClientProvider client={queryClient}>
-          <App />
+          <AuthProvider>
+            <App />
+          </AuthProvider>
         </QueryClientProvider>
       </trpc.Provider>
     </Provider>
