@@ -6,6 +6,8 @@ import { appRouter } from './router.js'
 import type { Request, Response } from 'express'
 import type { AppRouterContext } from '@branching/shared'
 import { closePool, testConnection } from './db/client.js'
+import { registerAuthRoutes } from './auth/routes.js'
+import { startSessionCleanup } from './auth/sessionStore.js'
 import {
   createMessage,
   createNode,
@@ -29,6 +31,10 @@ app.use(
     credentials: true,
   }),
 )
+app.use(express.json())
+registerAuthRoutes(app)
+
+const sessionCleanupTimer = startSessionCleanup()
 
 app.use(
   '/trpc',
@@ -72,6 +78,7 @@ const server = app.listen(PORT, async () => {
 
 const shutdown = async (signal: string): Promise<void> => {
   console.log(`${signal} received. Shutting down...`)
+  clearInterval(sessionCleanupTimer)
   server.close(async () => {
     await closePool()
     process.exit(0)
