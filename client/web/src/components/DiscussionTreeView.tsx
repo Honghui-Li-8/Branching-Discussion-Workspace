@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { NodeConversationPanel } from './NodeConversationPanel'
 import { TreeNodeCard } from './tree/TreeNodeCard'
 import { mockTree } from '../data/mockTree'
@@ -22,6 +22,7 @@ type DiscussionTreeViewProps = {
 
 export const DiscussionTreeView = ({ workspaceTitle }: DiscussionTreeViewProps) => {
   const [tree, setTree] = useState<TreeNode>(() => cloneTree(mockTree))
+  const [containerWidth, setContainerWidth] = useState(0)
   const [expandedFoldMenuNodeId, setExpandedFoldMenuNodeId] = useState<string | null>(null)
   const [expandedCardOptionsNodeId, setExpandedCardOptionsNodeId] = useState<string | null>(
     null,
@@ -32,9 +33,34 @@ export const DiscussionTreeView = ({ workspaceTitle }: DiscussionTreeViewProps) 
 
   const canvasRef = useRef<HTMLDivElement | null>(null)
 
+  useEffect(() => {
+    const canvasElement = canvasRef.current
+    if (!canvasElement) {
+      return
+    }
+
+    const updateContainerWidth = () => {
+      setContainerWidth(canvasElement.clientWidth)
+    }
+
+    updateContainerWidth()
+
+    if (typeof ResizeObserver !== 'undefined') {
+      const resizeObserver = new ResizeObserver(updateContainerWidth)
+      resizeObserver.observe(canvasElement)
+      return () => {
+        resizeObserver.disconnect()
+      }
+    }
+
+    window.addEventListener('resize', updateContainerWidth)
+    return () => {
+      window.removeEventListener('resize', updateContainerWidth)
+    }
+  }, [])
+
   const layout = useMemo(() => buildTreeLayout(tree), [tree])
   const conversationNode = conversationNodeId ? findNodeById(tree, conversationNodeId) : null
-  const containerWidth = canvasRef.current?.clientWidth ?? 0
   const isPanelNearFullscreen = containerWidth > 0 && conversationPanelWidth >= containerWidth * 0.8
   const isPanelFullscreenLike = conversationPanelFullscreen || isPanelNearFullscreen
 
@@ -57,7 +83,9 @@ export const DiscussionTreeView = ({ workspaceTitle }: DiscussionTreeViewProps) 
     setExpandedFoldMenuNodeId(null)
     setExpandedCardOptionsNodeId(null)
     setConversationPanelFullscreen(false)
-    setConversationPanelWidth((current) => (containerWidth ? clampPanelWidth(current) : current))
+    if (containerWidth) {
+      setConversationPanelWidth(clampPanelWidth(conversationPanelWidth))
+    }
   }
 
   const sendConversationMessage = (text: string) => {

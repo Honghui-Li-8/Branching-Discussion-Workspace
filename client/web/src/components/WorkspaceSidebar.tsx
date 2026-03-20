@@ -3,6 +3,7 @@ import type { Workspace } from '../types/workspace'
 type WorkspaceSidebarProps = {
   workspaces: Workspace[]
   activeWorkspaceId: string | null
+  currentUserName: string
   onSelectWorkspace: (workspaceId: string) => void
   onCreateWorkspace: () => void
 }
@@ -10,9 +11,12 @@ type WorkspaceSidebarProps = {
 export const WorkspaceSidebar = ({
   workspaces,
   activeWorkspaceId,
+  currentUserName,
   onSelectWorkspace,
   onCreateWorkspace,
 }: WorkspaceSidebarProps) => {
+  const avatarInitial = currentUserName.trim().slice(0, 1).toUpperCase() || '?'
+
   return (
     <aside
       className="flex min-h-0 flex-col border-b border-[#b8dced] bg-[linear-gradient(180deg,#d9f0fd_0%,#e9f7ff_100%)] lg:min-h-screen lg:border-r lg:border-b-0"
@@ -65,9 +69,9 @@ export const WorkspaceSidebar = ({
             className="inline-flex h-[26px] w-[26px] items-center justify-center rounded-full border border-[#97c2d8] bg-white text-[13px] font-bold text-[#225c79]"
             aria-hidden="true"
           >
-            H
+            {avatarInitial}
           </span>
-          <p className="m-0 text-sm font-semibold text-[#164760]">Henry</p>
+          <p className="m-0 text-sm font-semibold text-[#164760]">{currentUserName}</p>
         </div>
       </section>
     </aside>
