@@ -55,11 +55,26 @@ const makeContext = (): AppRouterContext => {
     listWorkspaces: jest.fn(async () => [workspace]),
     getWorkspaceById: jest.fn(async (id: string) => (id === workspace.id ? workspace : null)),
     createWorkspace: jest.fn(async () => workspace),
+    updateWorkspace: jest.fn(async () => workspace),
+    deleteWorkspace: jest.fn(async () => ({
+      id: workspace.id,
+      deletedNodeCount: 3,
+      deletedMessageCount: 5,
+    })),
     listNodesByWorkspace: jest.fn(async () => [node]),
     getNodeById: jest.fn(async (id: string) => (id === node.id ? node : null)),
     createNode: jest.fn(async () => node),
+    updateNode: jest.fn(async () => node),
+    deleteNode: jest.fn(async () => ({
+      id: node.id,
+      deletedWorkspace: false,
+      deletedNodeCount: 2,
+      deletedMessageCount: 4,
+    })),
     listMessagesForNode: jest.fn(async () => [message]),
     createMessage: jest.fn(async () => message),
+    updateMessage: jest.fn(async () => message),
+    deleteMessage: jest.fn(async () => ({ id: message.id })),
   }
 }
 
@@ -109,6 +124,28 @@ describe('appRouter', () => {
     ).rejects.toThrow()
   })
 
+  test('workspaceUpdate delegates to context', async () => {
+    const ctx = makeContext()
+    const caller = appRouter.createCaller(ctx)
+    const input = { id: 'w1', title: 'Workspace One (Updated)' }
+
+    const result = await caller.workspaceUpdate(input)
+
+    expect(ctx.updateWorkspace).toHaveBeenCalledWith(input)
+    expect(result?.id).toBe('w1')
+  })
+
+  test('nodeUpdate delegates to context', async () => {
+    const ctx = makeContext()
+    const caller = appRouter.createCaller(ctx)
+    const input = { id: 'n1', summary: 'updated summary' }
+
+    const result = await caller.nodeUpdate(input)
+
+    expect(ctx.updateNode).toHaveBeenCalledWith(input)
+    expect(result?.id).toBe('n1')
+  })
+
   test('messageCreate delegates to context', async () => {
     const ctx = makeContext()
     const caller = appRouter.createCaller(ctx)
@@ -118,5 +155,23 @@ describe('appRouter', () => {
 
     expect(ctx.createMessage).toHaveBeenCalledWith(input)
     expect(result.nodeId).toBe('n1')
+  })
+
+  test('messageUpdate validates patch payload', async () => {
+    const caller = appRouter.createCaller(makeContext())
+    await expect(caller.messageUpdate({ id: 'm1' } as never)).rejects.toThrow()
+  })
+
+  test('delete procedures delegate to context', async () => {
+    const ctx = makeContext()
+    const caller = appRouter.createCaller(ctx)
+
+    await caller.workspaceDelete({ id: 'w1' })
+    await caller.nodeDelete({ id: 'n1' })
+    await caller.messageDelete({ id: 'm1' })
+
+    expect(ctx.deleteWorkspace).toHaveBeenCalledWith('w1')
+    expect(ctx.deleteNode).toHaveBeenCalledWith('n1')
+    expect(ctx.deleteMessage).toHaveBeenCalledWith('m1')
   })
 })

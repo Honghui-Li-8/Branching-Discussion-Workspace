@@ -13,3 +13,14 @@ export interface CreateWorkspaceInput {
   rootNodeTitle?: string
   rootNodeSummary?: string
 }
+
+export interface UpdateWorkspaceInput {
+  id: string
+  title: string
+}
+
+export interface DeleteWorkspaceResult {
+  id: string
+  deletedNodeCount: number
+  deletedMessageCount: number
+}

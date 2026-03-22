@@ -13,6 +13,9 @@ import {
   createNode,
   createUser,
   createWorkspace,
+  deleteMessage,
+  deleteNode,
+  deleteWorkspace,
   getNodeById,
   getUserById,
   getWorkspaceById,
@@ -20,6 +23,9 @@ import {
   listNodesByWorkspace,
   listUsers,
   listWorkspaces,
+  updateMessage,
+  updateNode,
+  updateWorkspace,
 } from './db/index.js'
 
 const app = express()
@@ -48,11 +54,17 @@ app.use(
         listWorkspaces,
         getWorkspaceById,
         createWorkspace,
+        updateWorkspace,
+        deleteWorkspace,
         listNodesByWorkspace,
         getNodeById,
         createNode,
+        updateNode,
+        deleteNode,
         listMessagesForNode,
         createMessage,
+        updateMessage,
+        deleteMessage,
       }
     },
   }),

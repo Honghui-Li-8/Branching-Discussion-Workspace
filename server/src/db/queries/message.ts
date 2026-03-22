@@ -1,4 +1,9 @@
-import type { CreateMessageInput, MessageRecord, MessageRole } from '../models/message.js'
+import type {
+  CreateMessageInput,
+  MessageRecord,
+  MessageRole,
+  UpdateMessageInput,
+} from '../models/message.js'
 import { query } from '../client.js'
 
 type MessageRow = {
@@ -37,11 +42,64 @@ export const createMessage = async (input: CreateMessageInput): Promise<MessageR
   const result = await query<MessageRow>(
     `
     INSERT INTO messages (node_id, author_user_id, role, content)
-    VALUES ($1, $2, $3, $4)
+    SELECT $1, $2, $3, $4
+    FROM nodes
+    WHERE id = $1
     RETURNING id, node_id, author_user_id, role, content, created_at
     `,
     [input.nodeId, input.authorUserId, input.role, input.content],
   )
 
+  if (result.rows.length === 0) {
+    throw new Error('Node not found')
+  }
+
   return mapMessageRow(result.rows[0])
+}
+
+export const updateMessage = async (input: UpdateMessageInput): Promise<MessageRecord | null> => {
+  const result = await query<MessageRow>(
+    `
+    UPDATE messages
+    SET
+      role = CASE WHEN $2::boolean THEN $3 ELSE role END,
+      content = CASE WHEN $4::boolean THEN $5 ELSE content END
+    WHERE id = $1
+    RETURNING id, node_id, author_user_id, role, content, created_at
+    `,
+    [
+      input.id,
+      input.role !== undefined,
+      input.role ?? null,
+      input.content !== undefined,
+      input.content ?? null,
+    ],
+  )
+
+  if (result.rows.length === 0) {
+    return null
+  }
+
+  return mapMessageRow(result.rows[0])
+}
+
+type DeletedMessageRow = {
+  id: string
+}
+
+export const deleteMessage = async (id: string): Promise<{ id: string } | null> => {
+  const result = await query<DeletedMessageRow>(
+    `
+    DELETE FROM messages
+    WHERE id = $1
+    RETURNING id
+    `,
+    [id],
+  )
+
+  if (result.rows.length === 0) {
+    return null
+  }
+
+  return { id: result.rows[0].id }
 }

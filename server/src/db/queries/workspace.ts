@@ -1,4 +1,9 @@
-import type { CreateWorkspaceInput, WorkspaceRecord } from '../models/workspace.js'
+import type {
+  CreateWorkspaceInput,
+  DeleteWorkspaceResult,
+  UpdateWorkspaceInput,
+  WorkspaceRecord,
+} from '../models/workspace.js'
 import { query } from '../client.js'
 
 type WorkspaceRow = {
@@ -103,4 +108,67 @@ export const createWorkspace = async (input: CreateWorkspaceInput): Promise<Work
   }
 
   return mapWorkspaceRow(result.rows[0])
+}
+
+export const updateWorkspace = async (input: UpdateWorkspaceInput): Promise<WorkspaceRecord | null> => {
+  const result = await query<WorkspaceRow>(
+    `
+    UPDATE workspaces
+    SET title = $2
+    WHERE id = $1
+    RETURNING id, title, author_user_id, root_node_id, created_at, updated_at
+    `,
+    [input.id, input.title],
+  )
+
+  if (result.rows.length === 0) {
+    return null
+  }
+
+  return mapWorkspaceRow(result.rows[0])
+}
+
+type DeleteWorkspaceRow = {
+  id: string
+  deleted_node_count: number
+  deleted_message_count: number
+}
+
+export const deleteWorkspace = async (id: string): Promise<DeleteWorkspaceResult | null> => {
+  const result = await query<DeleteWorkspaceRow>(
+    `
+    WITH target_nodes AS (
+      SELECT id
+      FROM nodes
+      WHERE workspace_id = $1
+    ),
+    target_messages AS (
+      SELECT m.id
+      FROM messages m
+      JOIN target_nodes tn ON tn.id = m.node_id
+    ),
+    deleted_workspace AS (
+      DELETE FROM workspaces
+      WHERE id = $1
+      RETURNING id
+    )
+    SELECT
+      dw.id,
+      (SELECT COUNT(*)::int FROM target_nodes) AS deleted_node_count,
+      (SELECT COUNT(*)::int FROM target_messages) AS deleted_message_count
+    FROM deleted_workspace dw
+    `,
+    [id],
+  )
+
+  if (result.rows.length === 0) {
+    return null
+  }
+
+  const row = result.rows[0]
+  return {
+    id: row.id,
+    deletedNodeCount: row.deleted_node_count,
+    deletedMessageCount: row.deleted_message_count,
+  }
 }

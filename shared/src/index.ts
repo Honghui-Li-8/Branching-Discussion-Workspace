@@ -59,6 +59,15 @@ const createWorkspaceInputSchema = z.object({
   rootNodeSummary: z.string().optional(),
 })
 
+const updateWorkspaceInputSchema = z.object({
+  id: z.string(),
+  title: z.string().min(1),
+})
+
+const deleteWorkspaceInputSchema = z.object({
+  id: z.string(),
+})
+
 const createNodeInputSchema = z.object({
   workspaceId: z.string(),
   authorUserId: z.string(),
@@ -72,11 +81,53 @@ const createNodeInputSchema = z.object({
   rationale: z.string().nullable().optional(),
 })
 
+const updateNodeInputSchema = z
+  .object({
+    id: z.string(),
+    type: z.enum(['decision', 'question', 'option', 'constraint']).optional(),
+    title: z.string().min(1).optional(),
+    status: z.enum(['open', 'exploring', 'needs_approval', 'approved', 'deferred', 'closed']).optional(),
+    confidence: z.enum(['low', 'medium', 'high']).optional(),
+    summary: z.string().optional(),
+    conclusion: z.string().nullable().optional(),
+    rationale: z.string().nullable().optional(),
+  })
+  .refine(
+    (value) =>
+      value.type !== undefined ||
+      value.title !== undefined ||
+      value.status !== undefined ||
+      value.confidence !== undefined ||
+      value.summary !== undefined ||
+      value.conclusion !== undefined ||
+      value.rationale !== undefined,
+    { message: 'At least one node field must be provided for update.' },
+  )
+
+const deleteNodeInputSchema = z.object({
+  id: z.string(),
+})
+
 const createMessageInputSchema = z.object({
   authorUserId: z.string(),
   nodeId: z.string(),
   role: z.enum(['user', 'assistant', 'system']),
   content: z.string(),
+})
+
+const updateMessageInputSchema = z
+  .object({
+    id: z.string(),
+    role: z.enum(['user', 'assistant', 'system']).optional(),
+    content: z.string().optional(),
+  })
+  .refine(
+    (value) => value.role !== undefined || value.content !== undefined,
+    { message: 'At least one message field must be provided for update.' },
+  )
+
+const deleteMessageInputSchema = z.object({
+  id: z.string(),
 })
 
 type User = z.infer<typeof userSchema>
@@ -85,8 +136,11 @@ type Node = z.infer<typeof nodeSchema>
 type Message = z.infer<typeof messageSchema>
 type CreateUserInput = z.infer<typeof createUserInputSchema>
 type CreateWorkspaceInput = z.infer<typeof createWorkspaceInputSchema>
+type UpdateWorkspaceInput = z.infer<typeof updateWorkspaceInputSchema>
 type CreateNodeInput = z.infer<typeof createNodeInputSchema>
+type UpdateNodeInput = z.infer<typeof updateNodeInputSchema>
 type CreateMessageInput = z.infer<typeof createMessageInputSchema>
+type UpdateMessageInput = z.infer<typeof updateMessageInputSchema>
 
 export type AppRouterContext = {
   listUsers: () => Promise<User[]>
@@ -95,11 +149,32 @@ export type AppRouterContext = {
   listWorkspaces: () => Promise<Workspace[]>
   getWorkspaceById: (id: string) => Promise<Workspace | null>
   createWorkspace: (input: CreateWorkspaceInput) => Promise<Workspace>
+  updateWorkspace: (
+    input: UpdateWorkspaceInput,
+  ) => Promise<Workspace | null>
+  deleteWorkspace: (
+    id: string,
+  ) => Promise<{
+    id: string
+    deletedNodeCount: number
+    deletedMessageCount: number
+  } | null>
   listNodesByWorkspace: (workspaceId: string) => Promise<Node[]>
   getNodeById: (id: string) => Promise<Node | null>
   createNode: (input: CreateNodeInput) => Promise<Node>
+  updateNode: (input: UpdateNodeInput) => Promise<Node | null>
+  deleteNode: (
+    id: string,
+  ) => Promise<{
+    id: string
+    deletedWorkspace: boolean
+    deletedNodeCount: number
+    deletedMessageCount: number
+  } | null>
   listMessagesForNode: (nodeId: string) => Promise<Message[]>
   createMessage: (input: CreateMessageInput) => Promise<Message>
+  updateMessage: (input: UpdateMessageInput) => Promise<Message | null>
+  deleteMessage: (id: string) => Promise<{ id: string } | null>
 }
 
 const t = initTRPC.context<AppRouterContext>().create()
@@ -129,6 +204,12 @@ export const appRouter = t.router({
   workspaceCreate: t.procedure
     .input(createWorkspaceInputSchema)
     .mutation(({ ctx, input }) => ctx.createWorkspace(input)),
+  workspaceUpdate: t.procedure
+    .input(updateWorkspaceInputSchema)
+    .mutation(({ ctx, input }) => ctx.updateWorkspace(input)),
+  workspaceDelete: t.procedure
+    .input(deleteWorkspaceInputSchema)
+    .mutation(({ ctx, input }) => ctx.deleteWorkspace(input.id)),
 
   nodesByWorkspace: t.procedure
     .input(z.object({ workspaceId: z.string() }))
@@ -139,6 +220,12 @@ export const appRouter = t.router({
   nodeCreate: t.procedure
     .input(createNodeInputSchema)
     .mutation(({ ctx, input }) => ctx.createNode(input)),
+  nodeUpdate: t.procedure
+    .input(updateNodeInputSchema)
+    .mutation(({ ctx, input }) => ctx.updateNode(input)),
+  nodeDelete: t.procedure
+    .input(deleteNodeInputSchema)
+    .mutation(({ ctx, input }) => ctx.deleteNode(input.id)),
 
   messagesByNode: t.procedure
     .input(z.object({ nodeId: z.string() }))
@@ -146,6 +233,12 @@ export const appRouter = t.router({
   messageCreate: t.procedure
     .input(createMessageInputSchema)
     .mutation(({ ctx, input }) => ctx.createMessage(input)),
+  messageUpdate: t.procedure
+    .input(updateMessageInputSchema)
+    .mutation(({ ctx, input }) => ctx.updateMessage(input)),
+  messageDelete: t.procedure
+    .input(deleteMessageInputSchema)
+    .mutation(({ ctx, input }) => ctx.deleteMessage(input.id)),
 })
 
 export type AppRouter = typeof appRouter
