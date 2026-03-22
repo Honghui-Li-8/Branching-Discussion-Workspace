@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globals'
 import type { Request, Response } from 'express'
+import { getOrCreateUserByAuthIdentity, seedIntroWorkspace } from '../db/index.js'
 import { clearAllSessions } from './sessionStore'
 import { handleLogin, handleLogout, handleMe } from './routes'
 
@@ -10,6 +11,31 @@ jest.mock('node:crypto', () => {
     randomUUID: jest.fn(() => 'mocked-session-id'),
   }
 })
+
+jest.mock('../db/index.js', () => ({
+  getOrCreateUserByAuthIdentity: jest.fn(async () => ({
+    id: '00000000-0000-4000-8000-000000000001',
+    authUserId: 'local:dev-user',
+    email: 'dev@example.com',
+    displayName: 'Local Dev',
+    creditBalance: 0,
+    createdAt: '2026-03-19T00:00:00.000Z',
+    updatedAt: '2026-03-19T00:00:00.000Z',
+  })),
+  seedIntroWorkspace: jest.fn(async () => ({
+    id: '10000000-0000-4000-8000-000000000001',
+    title: 'Project Decision (dummy example)',
+    authorUserId: '00000000-0000-4000-8000-000000000001',
+    rootNodeId: '20000000-0000-4000-8000-000000000001',
+    createdAt: '2026-03-19T00:00:00.000Z',
+    updatedAt: '2026-03-19T00:00:00.000Z',
+  })),
+}))
+
+const getOrCreateUserByAuthIdentityMock = getOrCreateUserByAuthIdentity as jest.MockedFunction<
+  typeof getOrCreateUserByAuthIdentity
+>
+const seedIntroWorkspaceMock = seedIntroWorkspace as jest.MockedFunction<typeof seedIntroWorkspace>
 
 type AuthResponseBody = {
   authenticated?: unknown
@@ -63,6 +89,8 @@ describe('auth handlers', () => {
   beforeEach(() => {
     process.env.DEV_AUTH_TOKEN = 'dev-token-123'
     clearAllSessions()
+    getOrCreateUserByAuthIdentityMock.mockClear()
+    seedIntroWorkspaceMock.mockClear()
   })
 
   afterEach(() => {
@@ -80,11 +108,13 @@ describe('auth handlers', () => {
     expect(res.statusCode).toBe(200)
     expect(res.body?.authenticated).toBe(true)
     expect(res.body?.user).toEqual({
-      id: 'user-local-dev',
+      id: '00000000-0000-4000-8000-000000000001',
       authUserId: 'local:dev-user',
       email: 'dev@example.com',
       displayName: 'Local Dev',
     })
+    expect(getOrCreateUserByAuthIdentityMock).toHaveBeenCalledTimes(1)
+    expect(seedIntroWorkspaceMock).toHaveBeenCalledWith('00000000-0000-4000-8000-000000000001')
     expect(res.headers['set-cookie']).toContain('bdw_session=mocked-session-id')
     expect(res.headers['set-cookie']).toContain('HttpOnly')
   })
@@ -102,7 +132,7 @@ describe('auth handlers', () => {
 
     expect(meRes.statusCode).toBe(200)
     expect(meRes.body?.authenticated).toBe(true)
-    expect(meRes.body?.user?.id).toBe('user-local-dev')
+    expect(meRes.body?.user?.id).toBe('00000000-0000-4000-8000-000000000001')
   })
 
   test('handleMe returns 401 when session cookie is missing', () => {
@@ -125,6 +155,8 @@ describe('auth handlers', () => {
     expect(res.statusCode).toBe(501)
     expect(res.body?.error).toBe('Third-party auth flow is not implemented yet.')
     expect(consoleErrorSpy).toHaveBeenCalled()
+    expect(getOrCreateUserByAuthIdentityMock).not.toHaveBeenCalled()
+    expect(seedIntroWorkspaceMock).not.toHaveBeenCalled()
   })
 
   test('handleLogout clears session and invalidates auth/me', async () => {
