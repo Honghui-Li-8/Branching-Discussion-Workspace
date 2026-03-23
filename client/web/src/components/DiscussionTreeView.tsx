@@ -1,7 +1,6 @@
 import { useRef } from 'react'
 import { NodeConversationPanel } from './NodeConversationPanel'
 import { IntroScreen } from './IntroScreen'
-import { zIndex } from '../theme/zIndex'
 import { useAppSelector } from '../store/hooks'
 import { selectActiveWorkspace } from '../store/slices/appShellSlice'
 import { findNodeById } from './tree/treeUtils'
@@ -9,6 +8,9 @@ import { useWorkspaceTreeData } from './discussion-tree/hooks/useWorkspaceTreeDa
 import { useTreeCanvasWidth } from './discussion-tree/hooks/useTreeCanvasWidth'
 import { useDiscussionTreeUiState } from './discussion-tree/hooks/useDiscussionTreeUiState'
 import { TreeCanvasContent } from './discussion-tree/components/TreeCanvasContent'
+import { DiscussionTreeShell } from './discussion-tree/components/DiscussionTreeShell'
+import { TreeCanvasFrame } from './discussion-tree/components/TreeCanvasFrame'
+import { TreeCanvasScrollArea } from './discussion-tree/components/TreeCanvasScrollArea'
 
 type WorkspaceTreeCanvasProps = {
   activeWorkspace: {
@@ -30,35 +32,12 @@ const WorkspaceTreeCanvas = ({ activeWorkspace }: WorkspaceTreeCanvasProps) => {
     tree && ui.conversationNodeId ? findNodeById(tree, ui.conversationNodeId) : null
 
   return (
-    <section
-      className="relative flex h-auto min-h-[430px] flex-col overflow-hidden rounded-[18px] border border-[#a8d1e5] bg-[linear-gradient(180deg,#f5fbff_0%,#f8fdff_100%)] lg:h-[calc(100vh-40px)] lg:min-h-0"
-      aria-label="Discussion tree view"
-    >
-      <header
-        className="relative border-b border-[#c3e0ef] bg-[linear-gradient(90deg,#ebf7ff_0%,#f8fdff_100%)] px-5 py-4"
-        style={{ zIndex: zIndex.discussionHeader }}
-      >
-        <p className="m-0 text-[11px] uppercase tracking-[0.11em] text-[#40718a]">Workspace</p>
-        <h1 className="mb-0 mt-1 text-[26px] leading-[1.2] text-[#12384c]">{activeWorkspace.title}</h1>
-      </header>
-
-      <div
-        ref={canvasRef}
-        className="relative flex-1 overflow-hidden"
-        style={{
-          background:
-            'radial-gradient(circle at 1px 1px, rgba(125, 172, 195, 0.18) 1px, transparent 0) 0 0 / 22px 22px, linear-gradient(180deg, #f8fdff 0%, #fffefb 100%)',
-          zIndex: zIndex.canvasBase,
-        }}
-      >
-        <div
-          className="h-full overflow-auto"
-          style={{
-            paddingRight:
-              conversationNode && !ui.conversationPanelFullscreen
-                ? `${ui.conversationPanelWidth}px`
-                : undefined,
-          }}
+    <DiscussionTreeShell workspaceTitle={activeWorkspace.title}>
+      <TreeCanvasFrame canvasRef={canvasRef}>
+        <TreeCanvasScrollArea
+          hasConversationPanel={conversationNode !== null}
+          conversationPanelFullscreen={ui.conversationPanelFullscreen}
+          conversationPanelWidth={ui.conversationPanelWidth}
         >
           <TreeCanvasContent
             layout={layout}
@@ -76,7 +55,7 @@ const WorkspaceTreeCanvas = ({ activeWorkspace }: WorkspaceTreeCanvasProps) => {
               ui.clearMenus()
             }}
           />
-        </div>
+        </TreeCanvasScrollArea>
 
         {conversationNode ? (
           <NodeConversationPanel
@@ -90,8 +69,8 @@ const WorkspaceTreeCanvas = ({ activeWorkspace }: WorkspaceTreeCanvasProps) => {
             onToggleFullScreen={ui.togglePanelFullScreen}
           />
         ) : null}
-      </div>
-    </section>
+      </TreeCanvasFrame>
+    </DiscussionTreeShell>
   )
 }
 
