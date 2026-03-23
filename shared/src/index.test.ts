@@ -16,6 +16,7 @@ const makeContext = (): AppRouterContext => {
   const workspace = {
     id: 'w1',
     title: 'Workspace One',
+    summary: 'Root summary',
     authorUserId: 'u1',
     rootNodeId: 'n1',
     createdAt: fixedNow,

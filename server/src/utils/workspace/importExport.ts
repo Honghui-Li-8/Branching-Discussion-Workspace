@@ -83,6 +83,7 @@ type IdRow = {
 type WorkspaceRow = {
   id: string
   title: string
+  summary: string | null
   author_user_id: string
   root_node_id: string
   created_at: string
@@ -107,6 +108,7 @@ export type CreateWorkspaceFromRestoredDataResult = {
 const mapWorkspaceRow = (row: WorkspaceRow): WorkspaceRecord => ({
   id: row.id,
   title: row.title,
+  summary: row.summary,
   authorUserId: row.author_user_id,
   rootNodeId: row.root_node_id,
   createdAt: row.created_at,
@@ -291,9 +293,17 @@ const ensureUsersExist = async (client: PoolClient, userIds: string[]): Promise<
 const selectWorkspaceById = async (client: PoolClient, workspaceId: string): Promise<WorkspaceRecord> => {
   const result = await client.query<WorkspaceRow>(
     `
-    SELECT id, title, author_user_id, root_node_id, created_at, updated_at
-    FROM workspaces
-    WHERE id = $1
+    SELECT
+      w.id,
+      w.title,
+      NULLIF(BTRIM(rn.summary), '') AS summary,
+      w.author_user_id,
+      w.root_node_id,
+      w.created_at,
+      w.updated_at
+    FROM workspaces w
+    LEFT JOIN nodes rn ON rn.id = w.root_node_id
+    WHERE w.id = $1
     `,
     [workspaceId],
   )

@@ -262,10 +262,28 @@ const setupFakeDatabase = (
       return { rows: [{ id }] } as never
     }
 
-    if (compactSql.startsWith('SELECT id, title, author_user_id, root_node_id, created_at, updated_at FROM workspaces WHERE id = $1')) {
+    if (
+      compactSql.includes('FROM workspaces w') &&
+      compactSql.includes('LEFT JOIN nodes rn ON rn.id = w.root_node_id') &&
+      compactSql.includes('WHERE w.id = $1')
+    ) {
       const workspaceId = (params?.[0] as string) ?? ''
       const workspace = store.workspaceById.get(workspaceId)
-      return { rows: workspace ? [workspace] : [] } as never
+      if (!workspace) {
+        return { rows: [] } as never
+      }
+
+      const rootNode = store.nodeById.get(workspace.root_node_id)
+      const summary = rootNode?.summary.trim() ? rootNode.summary : null
+
+      return {
+        rows: [
+          {
+            ...workspace,
+            summary,
+          },
+        ],
+      } as never
     }
 
     throw new Error(`Unexpected SQL in fake DB: ${compactSql}`)
@@ -279,9 +297,13 @@ const setupFakeDatabase = (
   getWorkspaceByIdMock.mockImplementation(async (workspaceId: string) => {
     const workspace = store.workspaceById.get(workspaceId)
     if (!workspace) return null
+    const rootNode = store.nodeById.get(workspace.root_node_id)
+    const summary = rootNode?.summary.trim() ? rootNode.summary : null
+
     return {
       id: workspace.id,
       title: workspace.title,
+      summary,
       authorUserId: workspace.author_user_id,
       rootNodeId: workspace.root_node_id,
       createdAt: workspace.created_at,

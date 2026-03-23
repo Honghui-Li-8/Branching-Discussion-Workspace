@@ -4,6 +4,7 @@ import type { RootState } from '..'
 type WorkspaceNavItem = {
   id: string
   title: string
+  summary: string | null
 }
 
 type AppShellState = {

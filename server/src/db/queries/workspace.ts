@@ -9,6 +9,7 @@ import { query } from '../client.js'
 type WorkspaceRow = {
   id: string
   title: string
+  summary: string | null
   author_user_id: string
   root_node_id: string
   created_at: string
@@ -18,6 +19,7 @@ type WorkspaceRow = {
 const mapWorkspaceRow = (row: WorkspaceRow): WorkspaceRecord => ({
   id: row.id,
   title: row.title,
+  summary: row.summary,
   authorUserId: row.author_user_id,
   rootNodeId: row.root_node_id,
   createdAt: row.created_at,
@@ -26,9 +28,17 @@ const mapWorkspaceRow = (row: WorkspaceRow): WorkspaceRecord => ({
 
 export const listWorkspaces = async (): Promise<WorkspaceRecord[]> => {
   const result = await query<WorkspaceRow>(`
-    SELECT id, title, author_user_id, root_node_id, created_at, updated_at
-    FROM workspaces
-    ORDER BY created_at DESC
+    SELECT
+      w.id,
+      w.title,
+      NULLIF(BTRIM(rn.summary), '') AS summary,
+      w.author_user_id,
+      w.root_node_id,
+      w.created_at,
+      w.updated_at
+    FROM workspaces w
+    LEFT JOIN nodes rn ON rn.id = w.root_node_id
+    ORDER BY w.created_at DESC
   `)
   return result.rows.map(mapWorkspaceRow)
 }
@@ -36,9 +46,17 @@ export const listWorkspaces = async (): Promise<WorkspaceRecord[]> => {
 export const getWorkspaceById = async (id: string): Promise<WorkspaceRecord | null> => {
   const result = await query<WorkspaceRow>(
     `
-    SELECT id, title, author_user_id, root_node_id, created_at, updated_at
-    FROM workspaces
-    WHERE id = $1
+    SELECT
+      w.id,
+      w.title,
+      NULLIF(BTRIM(rn.summary), '') AS summary,
+      w.author_user_id,
+      w.root_node_id,
+      w.created_at,
+      w.updated_at
+    FROM workspaces w
+    LEFT JOIN nodes rn ON rn.id = w.root_node_id
+    WHERE w.id = $1
     `,
     [id],
   )
@@ -89,9 +107,16 @@ export const createWorkspace = async (input: CreateWorkspaceInput): Promise<Work
         NULL,
         NULL
       FROM generated_ids
-      RETURNING id
+      RETURNING id, summary
     )
-    SELECT iw.id, iw.title, iw.author_user_id, iw.root_node_id, iw.created_at, iw.updated_at
+    SELECT
+      iw.id,
+      iw.title,
+      NULLIF(BTRIM(ir.summary), '') AS summary,
+      iw.author_user_id,
+      iw.root_node_id,
+      iw.created_at,
+      iw.updated_at
     FROM inserted_workspace iw
     JOIN inserted_root_node ir ON TRUE
     `,
@@ -113,10 +138,22 @@ export const createWorkspace = async (input: CreateWorkspaceInput): Promise<Work
 export const updateWorkspace = async (input: UpdateWorkspaceInput): Promise<WorkspaceRecord | null> => {
   const result = await query<WorkspaceRow>(
     `
-    UPDATE workspaces
-    SET title = $2
-    WHERE id = $1
-    RETURNING id, title, author_user_id, root_node_id, created_at, updated_at
+    WITH updated_workspace AS (
+      UPDATE workspaces
+      SET title = $2
+      WHERE id = $1
+      RETURNING id, title, author_user_id, root_node_id, created_at, updated_at
+    )
+    SELECT
+      uw.id,
+      uw.title,
+      NULLIF(BTRIM(rn.summary), '') AS summary,
+      uw.author_user_id,
+      uw.root_node_id,
+      uw.created_at,
+      uw.updated_at
+    FROM updated_workspace uw
+    LEFT JOIN nodes rn ON rn.id = uw.root_node_id
     `,
     [input.id, input.title],
   )

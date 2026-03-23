@@ -105,6 +105,7 @@ export const AppSidebar = () => {
           ) : (
             workspaces.map((workspace) => {
               const isActive = workspace.id === activeWorkspaceId
+              const workspaceSummary = workspace.summary?.trim() || 'No summary yet.'
 
               return (
                 <li key={workspace.id}>
@@ -120,7 +121,7 @@ export const AppSidebar = () => {
                     <span className="text-[13px] font-semibold text-[#12384c]">
                       {workspace.title}
                     </span>
-                    <small className="text-[11px] text-[#40718a]">Decision workspace</small>
+                    <small className="text-[11px] text-[#40718a]">{workspaceSummary}</small>
                   </button>
                 </li>
               )

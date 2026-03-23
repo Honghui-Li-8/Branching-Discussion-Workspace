@@ -119,6 +119,7 @@ describe('workspace import/export utilities', () => {
     getWorkspaceByIdMock.mockResolvedValue({
       id: SOURCE_WORKSPACE_ID,
       title: 'Source Workspace',
+      summary: 'Root summary',
       authorUserId: SOURCE_AUTHOR_ID,
       rootNodeId: SOURCE_ROOT_NODE_ID,
       createdAt: '2026-03-21T00:00:00.000Z',
@@ -246,12 +247,13 @@ describe('workspace import/export utilities', () => {
         }
         return { rows: [{ id: NEW_CHILD_MESSAGE_ID }] } as never
       }
-      if (sql.includes('SELECT id, title, author_user_id, root_node_id, created_at, updated_at')) {
+      if (sql.includes('FROM workspaces w') && sql.includes('LEFT JOIN nodes rn ON rn.id = w.root_node_id')) {
         return {
           rows: [
             {
               id: NEW_WORKSPACE_ID,
               title: 'Imported Workspace',
+              summary: 'Root summary',
               author_user_id: TARGET_AUTHOR_ID,
               root_node_id: NEW_ROOT_NODE_ID,
               created_at: '2026-03-21T00:00:00.000Z',

@@ -14,6 +14,7 @@ const userSchema = z.object({
 const workspaceSchema = z.object({
   id: z.string(),
   title: z.string(),
+  summary: z.string().nullable(),
   authorUserId: z.string(),
   rootNodeId: z.string(),
   createdAt: z.string(),

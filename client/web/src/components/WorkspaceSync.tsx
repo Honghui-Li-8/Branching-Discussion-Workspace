@@ -22,6 +22,7 @@ export const WorkspaceSync = ({ children }: WorkspaceSyncProps) => {
       workspacesQuery.data?.map((workspace) => ({
         id: workspace.id,
         title: workspace.title,
+        summary: workspace.summary,
       })) ?? null,
     [workspacesQuery.data],
   )

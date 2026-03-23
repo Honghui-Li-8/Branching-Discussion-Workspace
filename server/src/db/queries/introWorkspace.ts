@@ -11,6 +11,7 @@ import {
 type WorkspaceRow = {
   id: string
   title: string
+  summary: string | null
   author_user_id: string
   root_node_id: string
   created_at: string
@@ -20,6 +21,7 @@ type WorkspaceRow = {
 const mapWorkspaceRow = (row: WorkspaceRow): WorkspaceRecord => ({
   id: row.id,
   title: row.title,
+  summary: row.summary,
   authorUserId: row.author_user_id,
   rootNodeId: row.root_node_id,
   createdAt: row.created_at,
@@ -56,11 +58,19 @@ export const seedIntroWorkspace = async (authorUserId: string): Promise<Workspac
     // and replace this process-local lock with an upsert/constraint-backed flow.
     const existingResult = await query<WorkspaceRow>(
       `
-      SELECT id, title, author_user_id, root_node_id, created_at, updated_at
-      FROM workspaces
-      WHERE author_user_id = $1
-        AND title = $2
-      ORDER BY created_at ASC
+      SELECT
+        w.id,
+        w.title,
+        NULLIF(BTRIM(rn.summary), '') AS summary,
+        w.author_user_id,
+        w.root_node_id,
+        w.created_at,
+        w.updated_at
+      FROM workspaces w
+      LEFT JOIN nodes rn ON rn.id = w.root_node_id
+      WHERE w.author_user_id = $1
+        AND w.title = $2
+      ORDER BY w.created_at ASC
       LIMIT 1
       `,
       [authorUserId, introWorkspaceTitle],

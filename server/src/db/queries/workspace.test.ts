@@ -17,6 +17,7 @@ const queryMock = query as unknown as jest.MockedFunction<typeof query>
 const workspaceRow = {
   id: 'w1',
   title: 'Workspace One',
+  summary: 'Root summary',
   author_user_id: 'u1',
   root_node_id: 'n1',
   created_at: '2026-03-17T00:00:00.000Z',
@@ -37,6 +38,7 @@ describe('workspace queries', () => {
       {
         id: 'w1',
         title: 'Workspace One',
+        summary: 'Root summary',
         authorUserId: 'u1',
         rootNodeId: 'n1',
         createdAt: '2026-03-17T00:00:00.000Z',

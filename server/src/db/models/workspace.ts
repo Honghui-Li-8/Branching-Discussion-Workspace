@@ -1,6 +1,7 @@
 export interface WorkspaceRecord {
   id: string
   title: string
+  summary: string | null
   authorUserId: string
   rootNodeId: string
   createdAt: string

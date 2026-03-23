@@ -25,6 +25,7 @@ jest.mock('../db/index.js', () => ({
   seedIntroWorkspace: jest.fn(async () => ({
     id: '10000000-0000-4000-8000-000000000001',
     title: 'Project Decision (dummy example)',
+    summary: 'Intro workspace root summary',
     authorUserId: '00000000-0000-4000-8000-000000000001',
     rootNodeId: '20000000-0000-4000-8000-000000000001',
     createdAt: '2026-03-19T00:00:00.000Z',
