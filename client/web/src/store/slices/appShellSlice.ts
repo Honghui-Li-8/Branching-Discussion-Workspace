@@ -1,51 +1,47 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit'
-import { initialWorkspaces } from '../../data/mockWorkspaces'
-import type { Workspace } from '../../types/workspace'
 import type { RootState } from '..'
 
+type WorkspaceNavItem = {
+  id: string
+  title: string
+}
+
 type AppShellState = {
-  workspaces: Workspace[]
+  workspaces: WorkspaceNavItem[]
   activeWorkspaceId: string | null
+  isWorkspacesLoading: boolean
 }
 
 const initialState: AppShellState = {
-  workspaces: initialWorkspaces,
+  workspaces: [],
   activeWorkspaceId: null,
+  isWorkspacesLoading: false,
 }
 
 const appShellSlice = createSlice({
   name: 'appShell',
   initialState,
   reducers: {
-    setWorkspaces: (state, action: PayloadAction<Workspace[]>) => {
+    setWorkspaces: (state, action: PayloadAction<WorkspaceNavItem[]>) => {
       state.workspaces = action.payload
-      if (!action.payload.some((workspace) => workspace.id === state.activeWorkspaceId)) {
-        state.activeWorkspaceId = null
-      }
+    },
+    setWorkspacesLoading: (state, action: PayloadAction<boolean>) => {
+      state.isWorkspacesLoading = action.payload
     },
     setActiveWorkspaceId: (state, action: PayloadAction<string | null>) => {
       state.activeWorkspaceId = action.payload
     },
-    createWorkspace: (state) => {
-      const nextNumber = state.workspaces.length + 1
-      const newWorkspace: Workspace = {
-        id: `workspace-${Date.now()}`,
-        title: `New Workspace ${nextNumber}`,
-        summary: 'New decision workspace',
-      }
-
-      state.workspaces.unshift(newWorkspace)
-      state.activeWorkspaceId = newWorkspace.id
-    },
   },
 })
 
-export const { setWorkspaces, setActiveWorkspaceId, createWorkspace } = appShellSlice.actions
+export const { setWorkspaces, setWorkspacesLoading, setActiveWorkspaceId } = appShellSlice.actions
 
 export const selectWorkspaces = (state: RootState) => state.appShell.workspaces
 export const selectActiveWorkspaceId = (state: RootState) => state.appShell.activeWorkspaceId
+export const selectWorkspacesLoading = (state: RootState) => state.appShell.isWorkspacesLoading
 export const selectActiveWorkspace = (state: RootState) =>
-  state.appShell.workspaces.find((workspace) => workspace.id === state.appShell.activeWorkspaceId) ??
-  null
+  state.appShell.activeWorkspaceId
+    ? state.appShell.workspaces.find((workspace) => workspace.id === state.appShell.activeWorkspaceId) ?? null
+    : null
 
 export default appShellSlice.reducer

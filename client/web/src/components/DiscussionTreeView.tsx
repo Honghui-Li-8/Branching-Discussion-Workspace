@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { NodeConversationPanel } from './NodeConversationPanel'
 import { TreeNodeCard } from './tree/TreeNodeCard'
+import { IntroScreen } from './IntroScreen'
 import { mockTree } from '../data/mockTree'
 import { zIndex } from '../theme/zIndex'
 import type { TreeNode } from '../types/tree'
+import { useAppSelector } from '../store/hooks'
+import { selectActiveWorkspace } from '../store/slices/appShellSlice'
 import {
   buildTreeLayout,
   cloneTree,
@@ -16,11 +19,9 @@ import {
 const DEFAULT_PANEL_WIDTH = 560
 const MIN_PANEL_WIDTH = 300
 
-type DiscussionTreeViewProps = {
-  workspaceTitle: string
-}
-
-export const DiscussionTreeView = ({ workspaceTitle }: DiscussionTreeViewProps) => {
+export const DiscussionTreeView = () => {
+  const activeWorkspace = useAppSelector(selectActiveWorkspace)
+  const activeWorkspaceId = activeWorkspace?.id ?? null
   const [tree, setTree] = useState<TreeNode>(() => cloneTree(mockTree))
   const [containerWidth, setContainerWidth] = useState(0)
   const [expandedFoldMenuNodeId, setExpandedFoldMenuNodeId] = useState<string | null>(null)
@@ -67,6 +68,23 @@ export const DiscussionTreeView = ({ workspaceTitle }: DiscussionTreeViewProps) 
   const panelWidth = conversationPanelFullscreen
     ? containerWidth || conversationPanelWidth
     : conversationPanelWidth
+
+  useEffect(() => {
+    if (!activeWorkspaceId) {
+      return
+    }
+
+    setTree(cloneTree(mockTree))
+    setExpandedFoldMenuNodeId(null)
+    setExpandedCardOptionsNodeId(null)
+    setConversationNodeId(null)
+    setConversationPanelWidth(DEFAULT_PANEL_WIDTH)
+    setConversationPanelFullscreen(false)
+  }, [activeWorkspaceId])
+
+  if (!activeWorkspace) {
+    return <IntroScreen />
+  }
 
   const foldNode = (nodeId: string) => {
     setTree((current) => setNodeFolded(current, nodeId, true))
@@ -150,7 +168,9 @@ export const DiscussionTreeView = ({ workspaceTitle }: DiscussionTreeViewProps) 
         style={{ zIndex: zIndex.discussionHeader }}
       >
         <p className="m-0 text-[11px] uppercase tracking-[0.11em] text-[#40718a]">Workspace</p>
-        <h1 className="mb-0 mt-1 text-[26px] leading-[1.2] text-[#12384c]">{workspaceTitle}</h1>
+        <h1 className="mb-0 mt-1 text-[26px] leading-[1.2] text-[#12384c]">
+          {activeWorkspace.title}
+        </h1>
       </header>
 
       <div

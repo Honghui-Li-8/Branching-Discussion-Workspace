@@ -1,16 +1,19 @@
 import { useAppDispatch, useAppSelector } from '../store/hooks'
 import {
-  createWorkspace,
   selectActiveWorkspaceId,
   selectWorkspaces,
+  selectWorkspacesLoading,
   setActiveWorkspaceId,
 } from '../store/slices/appShellSlice'
 import { useAuth } from './AuthProvider'
+import { trpc } from '../trpc'
 
 export const AppSidebar = () => {
   const dispatch = useAppDispatch()
   const workspaces = useAppSelector(selectWorkspaces)
   const activeWorkspaceId = useAppSelector(selectActiveWorkspaceId)
+  const isWorkspacesLoading = useAppSelector(selectWorkspacesLoading)
+  const utils = trpc.useUtils()
   const {
     authUser,
     isAuthenticated,
@@ -21,8 +24,31 @@ export const AppSidebar = () => {
     logout,
   } = useAuth()
 
+  const createWorkspaceMutation = trpc.workspaceCreate.useMutation({
+    onSuccess: async (workspace) => {
+      await utils.workspacesList.invalidate()
+      dispatch(setActiveWorkspaceId(workspace.id))
+    },
+  })
+
+  const createWorkspace = () => {
+    if (!authUser?.id || createWorkspaceMutation.isPending) {
+      return
+    }
+
+    const nextNumber = workspaces.length + 1
+    createWorkspaceMutation.mutate({
+      authorUserId: authUser.id,
+      title: `New Workspace ${nextNumber}`,
+      rootNodeTitle: 'Root decision',
+      rootNodeSummary: '',
+    })
+  }
+
   const currentUserName = isAuthBootstrapPending ? '...' : (authUser?.displayName ?? 'Guest')
   const avatarInitial = currentUserName.trim().slice(0, 1).toUpperCase() || '?'
+  const isCreateWorkspacePending = createWorkspaceMutation.isPending
+  const workspaceActionError = createWorkspaceMutation.error?.message ?? null
 
   return (
     <aside
@@ -37,36 +63,47 @@ export const AppSidebar = () => {
           <button
             type="button"
             className="h-7 w-7 cursor-pointer rounded-[10px] border border-[#6ea9c7] bg-[#fbfeff] text-xl leading-none text-[#1f607d] transition hover:bg-[#eef9ff] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ffad3f]"
-            onClick={() => dispatch(createWorkspace())}
+            onClick={createWorkspace}
             aria-label="Create workspace"
+            disabled={!isAuthenticated || isAuthBootstrapPending || isCreateWorkspacePending}
           >
             +
           </button>
         </header>
 
         <ul className="m-0 flex max-h-[220px] list-none flex-col gap-[7px] overflow-y-auto p-2 lg:max-h-none">
-          {workspaces.map((workspace) => {
-            const isActive = workspace.id === activeWorkspaceId
+          {isWorkspacesLoading && workspaces.length === 0 ? (
+            <li className="rounded-[10px] border border-[#a6cee1] bg-[#fbfeff] px-2.5 py-2.5 text-[12px] text-[#40718a]">
+              Loading workspaces...
+            </li>
+          ) : workspaces.length === 0 ? (
+            <li className="rounded-[10px] border border-dashed border-[#a6cee1] bg-[#fbfeff] px-2.5 py-2.5 text-[12px] text-[#40718a]">
+              No workspaces yet.
+            </li>
+          ) : (
+            workspaces.map((workspace) => {
+              const isActive = workspace.id === activeWorkspaceId
 
-            return (
-              <li key={workspace.id}>
-                <button
-                  type="button"
-                  className={`flex w-full cursor-pointer flex-col gap-1.5 rounded-[10px] border px-2.5 py-2.5 text-left transition ${
-                    isActive
-                      ? 'border-[#ffbe62] bg-[#fff8eb]'
-                      : 'border-[#a6cee1] bg-[#fbfeff] hover:border-[#7eb9d5] hover:bg-[#f2fbff]'
-                  }`}
-                  onClick={() => dispatch(setActiveWorkspaceId(workspace.id))}
-                >
-                  <span className="text-[13px] font-semibold text-[#12384c]">
-                    {workspace.title}
-                  </span>
-                  <small className="text-[11px] text-[#40718a]">{workspace.summary}</small>
-                </button>
-              </li>
-            )
-          })}
+              return (
+                <li key={workspace.id}>
+                  <button
+                    type="button"
+                    className={`flex w-full cursor-pointer flex-col gap-1.5 rounded-[10px] border px-2.5 py-2.5 text-left transition ${
+                      isActive
+                        ? 'border-[#ffbe62] bg-[#fff8eb]'
+                        : 'border-[#a6cee1] bg-[#fbfeff] hover:border-[#7eb9d5] hover:bg-[#f2fbff]'
+                    }`}
+                    onClick={() => dispatch(setActiveWorkspaceId(workspace.id))}
+                  >
+                    <span className="text-[13px] font-semibold text-[#12384c]">
+                      {workspace.title}
+                    </span>
+                    <small className="text-[11px] text-[#40718a]">Decision workspace</small>
+                  </button>
+                </li>
+              )
+            })
+          )}
         </ul>
       </section>
 
@@ -98,6 +135,8 @@ export const AppSidebar = () => {
         </div>
         {authError && !isAuthBootstrapPending ? (
           <p className="mt-2 mb-0 text-[11px] text-[#8a3f2b]">{authError}</p>
+        ) : workspaceActionError ? (
+          <p className="mt-2 mb-0 text-[11px] text-[#8a3f2b]">{workspaceActionError}</p>
         ) : null}
       </section>
     </aside>
