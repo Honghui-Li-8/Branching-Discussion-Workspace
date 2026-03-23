@@ -13,7 +13,6 @@ import { getSessionUser, startSessionCleanup } from './auth/sessionStore.js'
 import {
   createMessage as createMessageRecord,
   createNode as createNodeRecord,
-  createUser,
   createWorkspace as createWorkspaceRecord,
   deleteMessage as deleteMessageRecord,
   deleteNode as deleteNodeRecord,
@@ -110,9 +109,29 @@ app.use(
 
       return {
         sessionUserId,
-        listUsers,
-        getUserById,
-        createUser,
+        listUsers: async () => {
+          const currentUserId = requireSessionUserId()
+          const currentUser = await getUserById(currentUserId)
+          return currentUser ? [currentUser] : []
+        },
+        getUserById: async (id) => {
+          const currentUserId = requireSessionUserId()
+          if (id !== currentUserId) {
+            throw new TRPCError({
+              code: 'FORBIDDEN',
+              message: 'User access is forbidden.',
+            })
+          }
+
+          return getUserById(id)
+        },
+        createUser: async () => {
+          requireSessionUserId()
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'User creation is managed by the auth flow.',
+          })
+        },
         listWorkspaces: async () => {
           const currentUserId = requireSessionUserId()
           const workspaces = await listWorkspacesRecord()

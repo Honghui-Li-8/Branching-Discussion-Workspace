@@ -119,6 +119,13 @@ describe('appRouter', () => {
     })
 
     await expect(caller.workspacesList()).rejects.toThrow('Authentication required.')
+    await expect(
+      caller.userCreate({
+        authUserId: 'auth-u1',
+        email: 'u1@example.com',
+        displayName: 'User One',
+      }),
+    ).rejects.toThrow('Authentication required.')
   })
 
   test('nodeCreate validates input', async () => {

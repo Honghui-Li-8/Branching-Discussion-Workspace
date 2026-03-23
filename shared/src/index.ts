@@ -198,11 +198,11 @@ export const appRouter = t.router({
     .input(z.string())
     .query(({ input }) => ({ message: `Hello, ${input}` })),
 
-  usersList: t.procedure.query(({ ctx }) => ctx.listUsers()),
-  userById: t.procedure
+  usersList: protectedProcedure.query(({ ctx }) => ctx.listUsers()),
+  userById: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(({ ctx, input }) => ctx.getUserById(input.id)),
-  userCreate: t.procedure
+  userCreate: protectedProcedure
     .input(createUserInputSchema)
     .mutation(({ ctx, input }) => ctx.createUser(input)),
 
