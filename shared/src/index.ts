@@ -1,4 +1,4 @@
-import { initTRPC } from '@trpc/server'
+import { TRPCError, initTRPC } from '@trpc/server'
 import { z } from 'zod'
 
 const userSchema = z.object({
@@ -54,7 +54,6 @@ const createUserInputSchema = z.object({
 })
 
 const createWorkspaceInputSchema = z.object({
-  authorUserId: z.string(),
   title: z.string(),
   rootNodeTitle: z.string().optional(),
   rootNodeSummary: z.string().optional(),
@@ -71,7 +70,6 @@ const deleteWorkspaceInputSchema = z.object({
 
 const createNodeInputSchema = z.object({
   workspaceId: z.string(),
-  authorUserId: z.string(),
   parentNodeId: z.string(),
   type: z.enum(['decision', 'question', 'option', 'constraint']),
   title: z.string(),
@@ -110,7 +108,6 @@ const deleteNodeInputSchema = z.object({
 })
 
 const createMessageInputSchema = z.object({
-  authorUserId: z.string(),
   nodeId: z.string(),
   role: z.enum(['user', 'assistant', 'system']),
   content: z.string(),
@@ -144,6 +141,7 @@ type CreateMessageInput = z.infer<typeof createMessageInputSchema>
 type UpdateMessageInput = z.infer<typeof updateMessageInputSchema>
 
 export type AppRouterContext = {
+  sessionUserId: string | null
   listUsers: () => Promise<User[]>
   getUserById: (id: string) => Promise<User | null>
   createUser: (input: CreateUserInput) => Promise<User>
@@ -179,6 +177,16 @@ export type AppRouterContext = {
 }
 
 const t = initTRPC.context<AppRouterContext>().create()
+const protectedProcedure = t.procedure.use(({ ctx, next }) => {
+  if (!ctx.sessionUserId) {
+    throw new TRPCError({
+      code: 'UNAUTHORIZED',
+      message: 'Authentication required.',
+    })
+  }
+
+  return next()
+})
 
 export const appRouter = t.router({
   health: t.procedure.query(() => ({
@@ -198,46 +206,46 @@ export const appRouter = t.router({
     .input(createUserInputSchema)
     .mutation(({ ctx, input }) => ctx.createUser(input)),
 
-  workspacesList: t.procedure.query(({ ctx }) => ctx.listWorkspaces()),
-  workspaceById: t.procedure
+  workspacesList: protectedProcedure.query(({ ctx }) => ctx.listWorkspaces()),
+  workspaceById: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(({ ctx, input }) => ctx.getWorkspaceById(input.id)),
-  workspaceCreate: t.procedure
+  workspaceCreate: protectedProcedure
     .input(createWorkspaceInputSchema)
     .mutation(({ ctx, input }) => ctx.createWorkspace(input)),
-  workspaceUpdate: t.procedure
+  workspaceUpdate: protectedProcedure
     .input(updateWorkspaceInputSchema)
     .mutation(({ ctx, input }) => ctx.updateWorkspace(input)),
-  workspaceDelete: t.procedure
+  workspaceDelete: protectedProcedure
     .input(deleteWorkspaceInputSchema)
     .mutation(({ ctx, input }) => ctx.deleteWorkspace(input.id)),
 
-  nodesByWorkspace: t.procedure
+  nodesByWorkspace: protectedProcedure
     .input(z.object({ workspaceId: z.string() }))
     .query(({ ctx, input }) => ctx.listNodesByWorkspace(input.workspaceId)),
-  nodeById: t.procedure
+  nodeById: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(({ ctx, input }) => ctx.getNodeById(input.id)),
-  nodeCreate: t.procedure
+  nodeCreate: protectedProcedure
     .input(createNodeInputSchema)
     .mutation(({ ctx, input }) => ctx.createNode(input)),
-  nodeUpdate: t.procedure
+  nodeUpdate: protectedProcedure
     .input(updateNodeInputSchema)
     .mutation(({ ctx, input }) => ctx.updateNode(input)),
-  nodeDelete: t.procedure
+  nodeDelete: protectedProcedure
     .input(deleteNodeInputSchema)
     .mutation(({ ctx, input }) => ctx.deleteNode(input.id)),
 
-  messagesByNode: t.procedure
+  messagesByNode: protectedProcedure
     .input(z.object({ nodeId: z.string() }))
     .query(({ ctx, input }) => ctx.listMessagesForNode(input.nodeId)),
-  messageCreate: t.procedure
+  messageCreate: protectedProcedure
     .input(createMessageInputSchema)
     .mutation(({ ctx, input }) => ctx.createMessage(input)),
-  messageUpdate: t.procedure
+  messageUpdate: protectedProcedure
     .input(updateMessageInputSchema)
     .mutation(({ ctx, input }) => ctx.updateMessage(input)),
-  messageDelete: t.procedure
+  messageDelete: protectedProcedure
     .input(deleteMessageInputSchema)
     .mutation(({ ctx, input }) => ctx.deleteMessage(input.id)),
 })

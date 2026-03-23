@@ -34,7 +34,7 @@ const mapMessageRoleToTreeRole = (role: NodeMessage['role']): TreeMessage['role'
 
 type UseNodeConversationParams = {
   nodeId: string | null
-  authorUserId: string | null
+  canSendMessages: boolean
 }
 
 type PendingMessage = {
@@ -61,7 +61,7 @@ type UseNodeConversationResult = {
  * Loads and writes node discussion messages via tRPC.
  * Maps backend roles to UI-safe roles and invalidates node message cache after writes.
  */
-export const useNodeConversation = ({ nodeId, authorUserId }: UseNodeConversationParams) => {
+export const useNodeConversation = ({ nodeId, canSendMessages }: UseNodeConversationParams) => {
   const utils = trpc.useUtils()
   const [pendingMessages, setPendingMessages] = useState<PendingMessage[]>([])
   const messagesQuery = trpc.messagesByNode.useQuery(
@@ -110,7 +110,7 @@ export const useNodeConversation = ({ nodeId, authorUserId }: UseNodeConversatio
   )
 
   const queueMessage = (pendingMessage: PendingMessage): boolean => {
-    if (!nodeId || !authorUserId || createMessageMutation.isPending) {
+    if (!nodeId || !canSendMessages || createMessageMutation.isPending) {
       return false
     }
 
@@ -126,7 +126,6 @@ export const useNodeConversation = ({ nodeId, authorUserId }: UseNodeConversatio
     createMessageMutation.reset()
     createMessageMutation.mutate(
       {
-        authorUserId,
         nodeId,
         role: 'user',
         content: pendingMessage.content,

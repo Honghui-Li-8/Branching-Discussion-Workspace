@@ -1,6 +1,12 @@
 import { beforeEach, describe, expect, jest, test } from '@jest/globals'
 import { query } from '../client.js'
-import { createMessage, deleteMessage, listMessagesForNode, updateMessage } from './message'
+import {
+  createMessage,
+  deleteMessage,
+  getMessageById,
+  listMessagesForNode,
+  updateMessage,
+} from './message'
 
 jest.mock('../client.js', () => ({
   query: jest.fn(),
@@ -53,6 +59,18 @@ describe('message queries', () => {
     expect(queryMock).toHaveBeenCalledWith(
       expect.stringContaining('FROM nodes'),
       ['n1', 'u1', 'user', 'hello'],
+    )
+  })
+
+  test('getMessageById returns null when not found', async () => {
+    queryMock.mockResolvedValueOnce({ rows: [] } as never)
+
+    const result = await getMessageById('missing')
+
+    expect(result).toBeNull()
+    expect(queryMock).toHaveBeenCalledWith(
+      expect.stringContaining('FROM messages'),
+      ['missing'],
     )
   })
 

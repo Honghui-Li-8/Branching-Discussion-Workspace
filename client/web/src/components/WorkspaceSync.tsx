@@ -1,6 +1,7 @@
 import { useEffect, useMemo, type ReactNode } from 'react'
 import { trpc } from '../trpc'
 import { useAppDispatch, useAppSelector } from '../store/hooks'
+import { selectAuthStatus } from '../store/slices/authSlice'
 import {
   selectActiveWorkspaceId,
   setActiveWorkspaceId,
@@ -14,8 +15,12 @@ type WorkspaceSyncProps = {
 
 export const WorkspaceSync = ({ children }: WorkspaceSyncProps) => {
   const dispatch = useAppDispatch()
+  const authStatus = useAppSelector(selectAuthStatus)
   const activeWorkspaceId = useAppSelector(selectActiveWorkspaceId)
-  const workspacesQuery = trpc.workspacesList.useQuery()
+  const isAuthenticated = authStatus === 'authenticated'
+  const workspacesQuery = trpc.workspacesList.useQuery(undefined, {
+    enabled: isAuthenticated,
+  })
 
   const workspaces = useMemo(
     () =>
@@ -28,8 +33,20 @@ export const WorkspaceSync = ({ children }: WorkspaceSyncProps) => {
   )
 
   useEffect(() => {
+    if (authStatus === 'unauthenticated') {
+      dispatch(setWorkspacesLoading(false))
+      dispatch(setWorkspaces([]))
+      dispatch(setActiveWorkspaceId(null))
+      return
+    }
+
+    if (authStatus === 'unknown') {
+      dispatch(setWorkspacesLoading(true))
+      return
+    }
+
     dispatch(setWorkspacesLoading(workspacesQuery.isLoading))
-  }, [dispatch, workspacesQuery.isLoading])
+  }, [authStatus, dispatch, workspacesQuery.isLoading])
 
   useEffect(() => {
     if (workspaces === null) {

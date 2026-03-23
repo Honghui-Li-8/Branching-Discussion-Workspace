@@ -50,6 +50,7 @@ const makeContext = (): AppRouterContext => {
   }
 
   return {
+    sessionUserId: 'u1',
     listUsers: jest.fn(async () => [user]),
     getUserById: jest.fn(async (id: string) => (id === user.id ? user : null)),
     createUser: jest.fn(async () => user),
@@ -103,12 +104,21 @@ describe('appRouter', () => {
   test('workspaceCreate delegates to context', async () => {
     const ctx = makeContext()
     const caller = appRouter.createCaller(ctx)
-    const input = { authorUserId: 'u1', title: 'Workspace One', rootNodeTitle: 'Root', rootNodeSummary: 'summary' }
+    const input = { title: 'Workspace One', rootNodeTitle: 'Root', rootNodeSummary: 'summary' }
 
     const result = await caller.workspaceCreate(input)
 
     expect(ctx.createWorkspace).toHaveBeenCalledWith(input)
     expect(result.id).toBe('w1')
+  })
+
+  test('protected procedures require authenticated context', async () => {
+    const caller = appRouter.createCaller({
+      ...makeContext(),
+      sessionUserId: null,
+    })
+
+    await expect(caller.workspacesList()).rejects.toThrow('Authentication required.')
   })
 
   test('nodeCreate validates input', async () => {
@@ -117,7 +127,6 @@ describe('appRouter', () => {
     await expect(
       caller.nodeCreate({
         workspaceId: 'w1',
-        authorUserId: 'u1',
         type: 'decision',
         title: 'Root',
         summary: 'summary',
@@ -150,7 +159,7 @@ describe('appRouter', () => {
   test('messageCreate delegates to context', async () => {
     const ctx = makeContext()
     const caller = appRouter.createCaller(ctx)
-    const input = { authorUserId: 'u1', nodeId: 'n1', role: 'user' as const, content: 'hello' }
+    const input = { nodeId: 'n1', role: 'user' as const, content: 'hello' }
 
     const result = await caller.messageCreate(input)
 

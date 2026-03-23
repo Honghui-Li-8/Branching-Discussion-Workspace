@@ -38,6 +38,23 @@ export const listMessagesForNode = async (nodeId: string): Promise<MessageRecord
   return result.rows.map(mapMessageRow)
 }
 
+export const getMessageById = async (id: string): Promise<MessageRecord | null> => {
+  const result = await query<MessageRow>(
+    `
+    SELECT id, node_id, author_user_id, role, content, created_at
+    FROM messages
+    WHERE id = $1
+    `,
+    [id],
+  )
+
+  if (result.rows.length === 0) {
+    return null
+  }
+
+  return mapMessageRow(result.rows[0])
+}
+
 export const createMessage = async (input: CreateMessageInput): Promise<MessageRecord> => {
   const result = await query<MessageRow>(
     `

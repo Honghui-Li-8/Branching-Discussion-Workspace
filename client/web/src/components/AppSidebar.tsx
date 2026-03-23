@@ -54,13 +54,12 @@ export const AppSidebar = () => {
   }
 
   const createWorkspace = () => {
-    if (!authUser?.id || workspaceMutations.create.isPending) {
+    if (!isAuthenticated || workspaceMutations.create.isPending) {
       return
     }
 
     const nextNumber = workspaces.length + 1
     workspaceMutations.create.mutate({
-      authorUserId: authUser.id,
       title: `New Workspace ${nextNumber}`,
       rootNodeTitle: 'Root decision',
       rootNodeSummary: '',

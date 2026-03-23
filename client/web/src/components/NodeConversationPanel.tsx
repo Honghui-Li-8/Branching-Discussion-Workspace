@@ -48,7 +48,7 @@ export const NodeConversationPanel = ({
   const authUser = useAppSelector(selectAuthUser)
   const conversation = useNodeConversation({
     nodeId: node.id,
-    authorUserId: authUser?.id ?? null,
+    canSendMessages: Boolean(authUser?.id),
   })
   const [conversationInputText, setConversationInputText] = useState('')
   const [conversationModel, setConversationModel] = useState(CHAT_MODELS[0])
