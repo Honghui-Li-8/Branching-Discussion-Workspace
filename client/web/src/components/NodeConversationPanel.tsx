@@ -60,6 +60,7 @@ export const NodeConversationPanel = ({
   const conversationInputRef = useRef<HTMLTextAreaElement | null>(null)
 
   const messages = conversation.messages
+  const hasFailedMessages = conversation.failedMessageIds.size > 0
 
   const adjustConversationInputHeight = () => {
     const input = conversationInputRef.current
@@ -138,7 +139,11 @@ export const NodeConversationPanel = ({
       return
     }
 
-    conversation.sendMessage(text)
+    const didQueueSend = conversation.sendMessage(text)
+    if (!didQueueSend) {
+      return
+    }
+
     setConversationInputText('')
 
     if (conversationInputRef.current) {
@@ -180,9 +185,18 @@ export const NodeConversationPanel = ({
       <ConversationMessageList
         messages={messages}
         isLoading={conversation.isLoadingMessages}
-        errorMessage={conversation.messagesError}
+        errorMessage={conversation.messagesLoadError}
+        pendingMessageIds={conversation.pendingMessageIds}
+        failedMessageIds={conversation.failedMessageIds}
+        onRetryFailedMessage={conversation.retryFailedMessage}
+        onDismissFailedMessage={conversation.dismissFailedMessage}
         conversationScrollRef={conversationScrollRef}
       />
+      {conversation.messageSendError && !hasFailedMessages ? (
+        <p className="m-0 border-t border-[#f1cabd] bg-[#fff6f3] px-4 py-2 text-xs text-[#8a3f2b]">
+          Failed to send message: {conversation.messageSendError}
+        </p>
+      ) : null}
       <ConversationComposer
         conversationModel={conversationModel}
         setConversationModel={setConversationModel}
