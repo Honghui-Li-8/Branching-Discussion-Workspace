@@ -1,5 +1,7 @@
 import {
   createContext,
+  useCallback,
+  useEffect,
   useContext,
   useMemo,
   useState,
@@ -8,6 +10,7 @@ import {
 import { useAppDispatch, useAppSelector } from '../store/hooks'
 import {
   clearAuthenticatedUser,
+  setAuthState,
   selectAuthStatus,
   selectAuthUser,
   setAuthenticatedUser,
@@ -17,6 +20,7 @@ import {
 type AuthContextValue = {
   authUser: AuthUser | null
   isAuthenticated: boolean
+  isAuthBootstrapPending: boolean
   isAuthActionPending: boolean
   authError: string | null
   login: () => Promise<void>
@@ -60,9 +64,55 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     import.meta.env.VITE_DEV_AUTH_TOKEN ?? import.meta.env.VITE_BACKDOOR_AUTH_TOKEN ?? ''
 
   const isAuthenticated = authStatus === 'authenticated' && authUser !== null
+  const isAuthBootstrapPending = authStatus === 'unknown'
 
-  const login = async (): Promise<void> => {
-    if (isAuthActionPending) {
+  useEffect(() => {
+    if (authStatus !== 'unknown') {
+      return
+    }
+
+    let isCancelled = false
+
+    const bootstrapAuth = async (): Promise<void> => {
+      try {
+        const response = await fetch(`${apiBaseUrl}/auth/me`, {
+          method: 'GET',
+          credentials: 'include',
+        })
+
+        const payload = (await response.json().catch(() => ({}))) as {
+          authenticated?: unknown
+          user?: unknown
+        }
+
+        if (isCancelled) {
+          return
+        }
+
+        if (response.ok && payload.authenticated === true && isAuthUser(payload.user)) {
+          dispatch(setAuthState({ status: 'authenticated', user: payload.user }))
+          return
+        }
+
+        dispatch(setAuthState({ status: 'unauthenticated', user: null }))
+      } catch {
+        if (isCancelled) {
+          return
+        }
+
+        dispatch(setAuthState({ status: 'unauthenticated', user: null }))
+      }
+    }
+
+    void bootstrapAuth()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [apiBaseUrl, authStatus, dispatch])
+
+  const login = useCallback(async (): Promise<void> => {
+    if (isAuthActionPending || isAuthBootstrapPending) {
       return
     }
 
@@ -105,10 +155,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     } finally {
       setIsAuthActionPending(false)
     }
-  }
+  }, [apiBaseUrl, devToken, dispatch, isAuthActionPending, isAuthBootstrapPending])
 
-  const logout = async (): Promise<void> => {
-    if (isAuthActionPending) {
+  const logout = useCallback(async (): Promise<void> => {
+    if (isAuthActionPending || isAuthBootstrapPending) {
       return
     }
 
@@ -132,18 +182,27 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     } finally {
       setIsAuthActionPending(false)
     }
-  }
+  }, [apiBaseUrl, dispatch, isAuthActionPending, isAuthBootstrapPending])
 
   const value = useMemo<AuthContextValue>(
     () => ({
       authUser,
       isAuthenticated,
+      isAuthBootstrapPending,
       isAuthActionPending,
       authError,
       login,
       logout,
     }),
-    [authUser, isAuthenticated, isAuthActionPending, authError],
+    [
+      authUser,
+      isAuthenticated,
+      isAuthBootstrapPending,
+      isAuthActionPending,
+      authError,
+      login,
+      logout,
+    ],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

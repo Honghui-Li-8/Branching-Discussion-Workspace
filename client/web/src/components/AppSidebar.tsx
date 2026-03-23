@@ -14,13 +14,14 @@ export const AppSidebar = () => {
   const {
     authUser,
     isAuthenticated,
+    isAuthBootstrapPending,
     isAuthActionPending,
     authError,
     login,
     logout,
   } = useAuth()
 
-  const currentUserName = authUser?.displayName ?? 'Guest'
+  const currentUserName = isAuthBootstrapPending ? '...' : (authUser?.displayName ?? 'Guest')
   const avatarInitial = currentUserName.trim().slice(0, 1).toUpperCase() || '?'
 
   return (
@@ -84,12 +85,18 @@ export const AppSidebar = () => {
             type="button"
             className="cursor-pointer rounded-[10px] border border-[#6ea9c7] bg-[#fbfeff] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.04em] text-[#1f607d] transition hover:bg-[#eef9ff] disabled:cursor-not-allowed disabled:opacity-60"
             onClick={isAuthenticated ? () => void logout() : () => void login()}
-            disabled={isAuthActionPending}
+            disabled={isAuthActionPending || isAuthBootstrapPending}
           >
-            {isAuthActionPending ? 'Working...' : isAuthenticated ? 'Logout' : 'Login'}
+            {isAuthBootstrapPending
+              ? 'Checking...'
+              : isAuthActionPending
+                ? 'Working...'
+                : isAuthenticated
+                  ? 'Logout'
+                  : 'Login'}
           </button>
         </div>
-        {authError ? (
+        {authError && !isAuthBootstrapPending ? (
           <p className="mt-2 mb-0 text-[11px] text-[#8a3f2b]">{authError}</p>
         ) : null}
       </section>
