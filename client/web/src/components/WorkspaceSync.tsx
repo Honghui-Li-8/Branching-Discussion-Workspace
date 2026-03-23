@@ -18,7 +18,11 @@ export const WorkspaceSync = ({ children }: WorkspaceSyncProps) => {
   const workspacesQuery = trpc.workspacesList.useQuery()
 
   const workspaces = useMemo(
-    () => (workspacesQuery.data ?? []).map((workspace) => ({ id: workspace.id, title: workspace.title })),
+    () =>
+      workspacesQuery.data?.map((workspace) => ({
+        id: workspace.id,
+        title: workspace.title,
+      })) ?? null,
     [workspacesQuery.data],
   )
 
@@ -27,11 +31,15 @@ export const WorkspaceSync = ({ children }: WorkspaceSyncProps) => {
   }, [dispatch, workspacesQuery.isLoading])
 
   useEffect(() => {
+    if (workspaces === null) {
+      return
+    }
+
     dispatch(setWorkspaces(workspaces))
   }, [dispatch, workspaces])
 
   useEffect(() => {
-    if (workspacesQuery.isLoading) {
+    if (workspaces === null) {
       return
     }
 
@@ -51,7 +59,7 @@ export const WorkspaceSync = ({ children }: WorkspaceSyncProps) => {
     if (!activeWorkspaceExists) {
       dispatch(setActiveWorkspaceId(workspaces[0].id))
     }
-  }, [activeWorkspaceId, dispatch, workspaces, workspacesQuery.isLoading])
+  }, [activeWorkspaceId, dispatch, workspaces])
 
   return children
 }
