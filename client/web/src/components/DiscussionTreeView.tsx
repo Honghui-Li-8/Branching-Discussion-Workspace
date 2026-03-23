@@ -1,17 +1,14 @@
-import { useRef, useState } from 'react'
+import { useRef } from 'react'
 import { NodeConversationPanel } from './NodeConversationPanel'
 import { TreeNodeCard } from './tree/TreeNodeCard'
 import { IntroScreen } from './IntroScreen'
 import { zIndex } from '../theme/zIndex'
-import type { TreeMessage } from '../types/tree'
 import { useAppSelector } from '../store/hooks'
 import { selectActiveWorkspace } from '../store/slices/appShellSlice'
 import { findNodeById, CARD_WIDTH } from './tree/treeUtils'
 import { useWorkspaceTreeData } from './discussion-tree/hooks/useWorkspaceTreeData'
 import { useTreeCanvasWidth } from './discussion-tree/hooks/useTreeCanvasWidth'
-
-const DEFAULT_PANEL_WIDTH = 560
-const MIN_PANEL_WIDTH = 300
+import { useDiscussionTreeUiState } from './discussion-tree/hooks/useDiscussionTreeUiState'
 
 type WorkspaceTreeCanvasProps = {
   activeWorkspace: {
@@ -21,119 +18,16 @@ type WorkspaceTreeCanvasProps = {
 }
 
 const WorkspaceTreeCanvas = ({ activeWorkspace }: WorkspaceTreeCanvasProps) => {
-  const [expandedFoldMenuNodeId, setExpandedFoldMenuNodeId] = useState<string | null>(null)
-  const [expandedCardOptionsNodeId, setExpandedCardOptionsNodeId] = useState<string | null>(null)
-  const [conversationNodeId, setConversationNodeId] = useState<string | null>(null)
-  const [conversationPanelWidth, setConversationPanelWidth] = useState(DEFAULT_PANEL_WIDTH)
-  const [conversationPanelFullscreen, setConversationPanelFullscreen] = useState(false)
-  const [foldedNodeIds, setFoldedNodeIds] = useState<Record<string, true>>({})
-  const [localMessagesByNodeId, setLocalMessagesByNodeId] = useState<
-    Record<string, TreeMessage[]>
-  >({})
-
   const canvasRef = useRef<HTMLDivElement | null>(null)
   const containerWidth = useTreeCanvasWidth(canvasRef)
+  const ui = useDiscussionTreeUiState({ containerWidth })
   const { tree, layout, isLoading: isTreeLoading, error: treeError } = useWorkspaceTreeData({
     workspaceId: activeWorkspace.id,
-    foldedNodeIds,
-    localMessagesByNodeId,
+    foldedNodeIds: ui.foldedNodeIds,
+    localMessagesByNodeId: ui.localMessagesByNodeId,
   })
   const conversationNode =
-    tree && conversationNodeId ? findNodeById(tree, conversationNodeId) : null
-  const isPanelNearFullscreen =
-    containerWidth > 0 && conversationPanelWidth >= containerWidth * 0.8
-  const isPanelFullscreenLike = conversationPanelFullscreen || isPanelNearFullscreen
-
-  const panelWidth = conversationPanelFullscreen
-    ? containerWidth || conversationPanelWidth
-    : conversationPanelWidth
-
-  const foldNode = (nodeId: string) => {
-    setFoldedNodeIds((current) => {
-      if (current[nodeId]) {
-        return current
-      }
-
-      return { ...current, [nodeId]: true }
-    })
-    setExpandedFoldMenuNodeId(null)
-    setExpandedCardOptionsNodeId(null)
-  }
-
-  const unfoldNode = (nodeId: string) => {
-    setFoldedNodeIds((current) => {
-      if (!current[nodeId]) {
-        return current
-      }
-
-      const next = { ...current }
-      delete next[nodeId]
-      return next
-    })
-  }
-
-  const openConversation = (nodeId: string) => {
-    setConversationNodeId(nodeId)
-    setExpandedFoldMenuNodeId(null)
-    setExpandedCardOptionsNodeId(null)
-    setConversationPanelFullscreen(false)
-    if (containerWidth) {
-      setConversationPanelWidth(clampPanelWidth(conversationPanelWidth))
-    }
-  }
-
-  const sendConversationMessage = (text: string) => {
-    if (!conversationNodeId) {
-      return
-    }
-
-    const trimmed = text.trim()
-    if (!trimmed.length) {
-      return
-    }
-
-    const userMessage: TreeMessage = {
-      id: `m-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      role: 'user',
-      content: trimmed,
-    }
-
-    const assistantMessage: TreeMessage = {
-      id: `m-${Date.now() + 1}-${Math.random().toString(36).slice(2, 8)}`,
-      role: 'assistant',
-      content: `echo: ${trimmed}`,
-    }
-
-    setLocalMessagesByNodeId((current) => ({
-      ...current,
-      [conversationNodeId]: [...(current[conversationNodeId] ?? []), userMessage, assistantMessage],
-    }))
-  }
-
-  const clampPanelWidth = (candidate: number) => {
-    if (!containerWidth) {
-      return candidate
-    }
-
-    const bounded = Math.min(candidate, containerWidth)
-    return Math.max(Math.min(MIN_PANEL_WIDTH, containerWidth), bounded)
-  }
-
-  const handlePanelResize = (nextWidth: number) => {
-    setConversationPanelWidth(clampPanelWidth(nextWidth))
-  }
-
-  const resetPanelToDefault = () => {
-    setConversationPanelWidth(clampPanelWidth(DEFAULT_PANEL_WIDTH))
-    setConversationPanelFullscreen(false)
-  }
-
-  const expandToFullscreen = () => {
-    if (containerWidth) {
-      setConversationPanelWidth(clampPanelWidth(containerWidth))
-    }
-    setConversationPanelFullscreen(true)
-  }
+    tree && ui.conversationNodeId ? findNodeById(tree, ui.conversationNodeId) : null
 
   return (
     <section
@@ -161,8 +55,8 @@ const WorkspaceTreeCanvas = ({ activeWorkspace }: WorkspaceTreeCanvasProps) => {
           className="h-full overflow-auto"
           style={{
             paddingRight:
-              conversationNode && !conversationPanelFullscreen
-                ? `${conversationPanelWidth}px`
+              conversationNode && !ui.conversationPanelFullscreen
+                ? `${ui.conversationPanelWidth}px`
                 : undefined,
           }}
         >
@@ -213,11 +107,11 @@ const WorkspaceTreeCanvas = ({ activeWorkspace }: WorkspaceTreeCanvasProps) => {
                 </svg>
 
                 {layout.nodes.map((node) => {
-                  const foldMenuOpen = expandedFoldMenuNodeId === node.id
-                  const cardOptionsOpen = expandedCardOptionsNodeId === node.id
+                  const foldMenuOpen = ui.expandedFoldMenuNodeId === node.id
+                  const cardOptionsOpen = ui.expandedCardOptionsNodeId === node.id
                   const cardIsElevated = foldMenuOpen || cardOptionsOpen
                   const foldedCount = node.foldedChildren.length
-                  const isConversationSelected = conversationNodeId === node.id
+                  const isConversationSelected = ui.conversationNodeId === node.id
 
                   return (
                     <TreeNodeCard
@@ -227,23 +121,17 @@ const WorkspaceTreeCanvas = ({ activeWorkspace }: WorkspaceTreeCanvasProps) => {
                       isFoldMenuOpen={foldMenuOpen}
                       isCardOptionsOpen={cardOptionsOpen}
                       foldedCount={foldedCount}
-                      onOpenConversation={() => openConversation(node.id)}
-                      onCardOptionsOpenChange={(nextOpen) => {
-                        if (nextOpen) {
-                          setExpandedFoldMenuNodeId(null)
-                        }
-                        setExpandedCardOptionsNodeId(nextOpen ? node.id : null)
-                      }}
-                      onFoldedMenuOpenChange={(nextOpen) => {
-                        if (nextOpen) {
-                          setExpandedCardOptionsNodeId(null)
-                        }
-                        setExpandedFoldMenuNodeId(nextOpen ? node.id : null)
-                      }}
-                      onFoldNode={() => foldNode(node.id)}
+                      onOpenConversation={() => ui.openConversation(node.id)}
+                      onCardOptionsOpenChange={(nextOpen) =>
+                        ui.onCardOptionsOpenChange(node.id, nextOpen)
+                      }
+                      onFoldedMenuOpenChange={(nextOpen) =>
+                        ui.onFoldedMenuOpenChange(node.id, nextOpen)
+                      }
+                      onFoldNode={() => ui.foldNode(node.id)}
                       onOpenFoldedNode={(foldedNodeId) => {
-                        unfoldNode(foldedNodeId)
-                        setExpandedFoldMenuNodeId(null)
+                        ui.unfoldNode(foldedNodeId)
+                        ui.clearMenus()
                       }}
                       style={{
                         zIndex: cardIsElevated
@@ -264,14 +152,12 @@ const WorkspaceTreeCanvas = ({ activeWorkspace }: WorkspaceTreeCanvasProps) => {
           <NodeConversationPanel
             key={conversationNode.id}
             node={conversationNode}
-            width={panelWidth}
-            isFullscreen={isPanelFullscreenLike}
-            onClose={() => setConversationNodeId(null)}
-            onSendMessage={sendConversationMessage}
-            onWidthChange={handlePanelResize}
-            onToggleFullScreen={() =>
-              isPanelFullscreenLike ? resetPanelToDefault() : expandToFullscreen()
-            }
+            width={ui.panelWidth}
+            isFullscreen={ui.isPanelFullscreenLike}
+            onClose={ui.closeConversation}
+            onSendMessage={ui.sendConversationMessage}
+            onWidthChange={ui.handlePanelResize}
+            onToggleFullScreen={ui.togglePanelFullScreen}
           />
         ) : null}
       </div>
