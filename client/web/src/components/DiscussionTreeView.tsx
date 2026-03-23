@@ -1,14 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { NodeConversationPanel } from './NodeConversationPanel'
 import { TreeNodeCard } from './tree/TreeNodeCard'
 import { IntroScreen } from './IntroScreen'
 import { zIndex } from '../theme/zIndex'
-import type { TreeMessage, TreeNode } from '../types/tree'
+import type { TreeMessage } from '../types/tree'
 import { useAppSelector } from '../store/hooks'
 import { selectActiveWorkspace } from '../store/slices/appShellSlice'
-import { trpc } from '../trpc'
-import { buildTreeLayout, findNodeById, CARD_WIDTH } from './tree/treeUtils'
-import { buildTreeFromWorkspaceNodes } from './tree/treeHydration'
+import { findNodeById, CARD_WIDTH } from './tree/treeUtils'
+import { useWorkspaceTreeData } from './discussion-tree/hooks/useWorkspaceTreeData'
+import { useTreeCanvasWidth } from './discussion-tree/hooks/useTreeCanvasWidth'
 
 const DEFAULT_PANEL_WIDTH = 560
 const MIN_PANEL_WIDTH = 300
@@ -20,26 +20,7 @@ type WorkspaceTreeCanvasProps = {
   }
 }
 
-const applyLocalUiState = (
-  node: TreeNode,
-  foldedNodeIds: Record<string, true>,
-  localMessagesByNodeId: Record<string, TreeMessage[]>,
-): TreeNode => {
-  const children = node.children?.map((child) =>
-    applyLocalUiState(child, foldedNodeIds, localMessagesByNodeId),
-  )
-  const mergedMessages = [...(node.messages ?? []), ...(localMessagesByNodeId[node.id] ?? [])]
-
-  return {
-    ...node,
-    folded: foldedNodeIds[node.id] === true,
-    messages: mergedMessages.length > 0 ? mergedMessages : undefined,
-    children,
-  }
-}
-
 const WorkspaceTreeCanvas = ({ activeWorkspace }: WorkspaceTreeCanvasProps) => {
-  const [containerWidth, setContainerWidth] = useState(0)
   const [expandedFoldMenuNodeId, setExpandedFoldMenuNodeId] = useState<string | null>(null)
   const [expandedCardOptionsNodeId, setExpandedCardOptionsNodeId] = useState<string | null>(null)
   const [conversationNodeId, setConversationNodeId] = useState<string | null>(null)
@@ -51,46 +32,12 @@ const WorkspaceTreeCanvas = ({ activeWorkspace }: WorkspaceTreeCanvasProps) => {
   >({})
 
   const canvasRef = useRef<HTMLDivElement | null>(null)
-  const nodesQuery = trpc.nodesByWorkspace.useQuery({ workspaceId: activeWorkspace.id })
-
-  useEffect(() => {
-    const canvasElement = canvasRef.current
-    if (!canvasElement) {
-      return
-    }
-
-    const updateContainerWidth = () => {
-      setContainerWidth(canvasElement.clientWidth)
-    }
-
-    updateContainerWidth()
-
-    if (typeof ResizeObserver !== 'undefined') {
-      const resizeObserver = new ResizeObserver(updateContainerWidth)
-      resizeObserver.observe(canvasElement)
-      return () => {
-        resizeObserver.disconnect()
-      }
-    }
-
-    window.addEventListener('resize', updateContainerWidth)
-    return () => {
-      window.removeEventListener('resize', updateContainerWidth)
-    }
-  }, [])
-
-  const hydratedTree = useMemo(
-    () => buildTreeFromWorkspaceNodes(nodesQuery.data ?? []),
-    [nodesQuery.data],
-  )
-  const tree = useMemo(() => {
-    if (!hydratedTree) {
-      return null
-    }
-
-    return applyLocalUiState(hydratedTree, foldedNodeIds, localMessagesByNodeId)
-  }, [hydratedTree, foldedNodeIds, localMessagesByNodeId])
-  const layout = useMemo(() => (tree ? buildTreeLayout(tree) : null), [tree])
+  const containerWidth = useTreeCanvasWidth(canvasRef)
+  const { tree, layout, isLoading: isTreeLoading, error: treeError } = useWorkspaceTreeData({
+    workspaceId: activeWorkspace.id,
+    foldedNodeIds,
+    localMessagesByNodeId,
+  })
   const conversationNode =
     tree && conversationNodeId ? findNodeById(tree, conversationNodeId) : null
   const isPanelNearFullscreen =
@@ -223,11 +170,11 @@ const WorkspaceTreeCanvas = ({ activeWorkspace }: WorkspaceTreeCanvasProps) => {
             className="relative"
             style={layout ? { width: `${layout.width}px`, height: `${layout.height}px` } : undefined}
           >
-            {nodesQuery.isLoading && !layout ? (
+            {isTreeLoading && !layout ? (
               <p className="m-0 p-6 text-sm text-[#326079]">Loading workspace tree...</p>
-            ) : nodesQuery.error && !layout ? (
+            ) : treeError && !layout ? (
               <p className="m-0 p-6 text-sm text-[#8a3f2b]">
-                Failed to load workspace tree: {nodesQuery.error.message}
+                Failed to load workspace tree: {treeError.message}
               </p>
             ) : !layout ? (
               <p className="m-0 p-6 text-sm text-[#326079]">No nodes in this workspace yet.</p>
