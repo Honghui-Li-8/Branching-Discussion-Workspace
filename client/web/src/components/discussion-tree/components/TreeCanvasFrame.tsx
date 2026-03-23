@@ -6,6 +6,10 @@ type TreeCanvasFrameProps = {
   children: ReactNode
 }
 
+/**
+ * Visual host for the tree canvas.
+ * Owns the canvas background and the root DOM ref used for width measurement.
+ */
 export const TreeCanvasFrame = ({ canvasRef, children }: TreeCanvasFrameProps) => {
   return (
     <div

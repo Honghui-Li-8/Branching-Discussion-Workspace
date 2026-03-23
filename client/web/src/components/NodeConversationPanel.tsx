@@ -31,6 +31,10 @@ const getNodeConclusion = (messages: TreeMessage[] | undefined) => {
   return lastMessage?.content ?? messages[messages.length - 1].content
 }
 
+/**
+ * Conversation side panel for a selected tree node.
+ * Renders node messages, input composer, and resize/fullscreen controls.
+ */
 export const NodeConversationPanel = ({
   node,
   width,

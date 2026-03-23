@@ -14,6 +14,10 @@ type TreeCanvasSceneProps = {
   onOpenFoldedNode: (foldedNodeId: string) => void
 }
 
+/**
+ * Pure renderer for tree geometry and cards.
+ * Draws link paths and node cards using a precomputed layout.
+ */
 export const TreeCanvasScene = ({
   layout,
   conversationNodeId,

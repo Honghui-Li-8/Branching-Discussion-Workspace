@@ -8,6 +8,10 @@ type UseDiscussionTreeUiStateParams = {
   containerWidth: number
 }
 
+/**
+ * Interaction state controller for the discussion tree view.
+ * Centralizes fold/menu/conversation/panel state plus event handlers.
+ */
 export const useDiscussionTreeUiState = ({
   containerWidth,
 }: UseDiscussionTreeUiStateParams) => {

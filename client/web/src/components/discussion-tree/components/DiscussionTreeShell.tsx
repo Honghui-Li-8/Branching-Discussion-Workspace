@@ -6,6 +6,10 @@ type DiscussionTreeShellProps = {
   children: ReactNode
 }
 
+/**
+ * Layout shell for the discussion tree view.
+ * Renders the workspace header chrome and wraps the canvas area.
+ */
 export const DiscussionTreeShell = ({ workspaceTitle, children }: DiscussionTreeShellProps) => {
   return (
     <section

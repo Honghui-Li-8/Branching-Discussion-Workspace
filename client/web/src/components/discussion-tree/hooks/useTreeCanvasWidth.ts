@@ -1,5 +1,8 @@
 import { useEffect, useState, type RefObject } from 'react'
 
+/**
+ * Tracks the current canvas container width using ResizeObserver with a window-resize fallback.
+ */
 export const useTreeCanvasWidth = (canvasRef: RefObject<HTMLDivElement | null>) => {
   const [containerWidth, setContainerWidth] = useState(0)
 

@@ -7,6 +7,10 @@ type TreeCanvasScrollAreaProps = {
   children: ReactNode
 }
 
+/**
+ * Scroll container for tree content.
+ * Applies right padding so the canvas does not render under a docked conversation panel.
+ */
 export const TreeCanvasScrollArea = ({
   hasConversationPanel,
   conversationPanelFullscreen,

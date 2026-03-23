@@ -17,6 +17,10 @@ type TreeCanvasContentProps = {
   onOpenFoldedNode: (foldedNodeId: string) => void
 }
 
+/**
+ * Content-state switch for the canvas body.
+ * Chooses between loading/error/empty messaging and the rendered tree scene.
+ */
 export const TreeCanvasContent = ({
   layout,
   isLoading,

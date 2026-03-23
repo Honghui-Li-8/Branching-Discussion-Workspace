@@ -40,6 +40,10 @@ type UseWorkspaceTreeDataParams = {
   localMessagesByNodeId: LocalMessagesByNodeId
 }
 
+/**
+ * Fetches workspace nodes and returns the render-ready tree model.
+ * Pipeline: query flat rows -> hydrate nested tree -> apply local UI overlays -> build layout.
+ */
 export const useWorkspaceTreeData = ({
   workspaceId,
   foldedNodeIds,
