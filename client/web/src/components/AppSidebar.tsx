@@ -24,20 +24,42 @@ export const AppSidebar = () => {
     logout,
   } = useAuth()
 
+  const invalidateWorkspaceList = async () => {
+    await utils.workspacesList.invalidate()
+  }
+
   const createWorkspaceMutation = trpc.workspaceCreate.useMutation({
     onSuccess: async (workspace) => {
-      await utils.workspacesList.invalidate()
+      await invalidateWorkspaceList()
       dispatch(setActiveWorkspaceId(workspace.id))
     },
   })
 
+  const updateWorkspaceMutation = trpc.workspaceUpdate.useMutation({
+    onSuccess: async () => {
+      await invalidateWorkspaceList()
+    },
+  })
+
+  const deleteWorkspaceMutation = trpc.workspaceDelete.useMutation({
+    onSuccess: async () => {
+      await invalidateWorkspaceList()
+    },
+  })
+
+  const workspaceMutations = {
+    create: createWorkspaceMutation,
+    update: updateWorkspaceMutation,
+    delete: deleteWorkspaceMutation,
+  }
+
   const createWorkspace = () => {
-    if (!authUser?.id || createWorkspaceMutation.isPending) {
+    if (!authUser?.id || workspaceMutations.create.isPending) {
       return
     }
 
     const nextNumber = workspaces.length + 1
-    createWorkspaceMutation.mutate({
+    workspaceMutations.create.mutate({
       authorUserId: authUser.id,
       title: `New Workspace ${nextNumber}`,
       rootNodeTitle: 'Root decision',
@@ -47,8 +69,8 @@ export const AppSidebar = () => {
 
   const currentUserName = isAuthBootstrapPending ? '...' : (authUser?.displayName ?? 'Guest')
   const avatarInitial = currentUserName.trim().slice(0, 1).toUpperCase() || '?'
-  const isCreateWorkspacePending = createWorkspaceMutation.isPending
-  const workspaceActionError = createWorkspaceMutation.error?.message ?? null
+  const isCreateWorkspacePending = workspaceMutations.create.isPending
+  const workspaceActionError = workspaceMutations.create.error?.message ?? null
 
   return (
     <aside
