@@ -16,7 +16,95 @@ describe('treeHydration', () => {
     expect(buildTreeFromWorkspaceNodes([])).toBeNull()
   })
 
-  test('hydrates a root with deterministically sorted children', () => {
+  test('root fallback prefers strict self-parent root', () => {
+    const tree = buildTreeFromWorkspaceNodes([
+      makeNode({
+        id: 'strict-root',
+        parentNodeId: 'strict-root',
+        depth: 0,
+        createdAt: '2026-03-02T00:00:00.000Z',
+      }),
+      makeNode({
+        id: 'depth-only-root',
+        parentNodeId: 'strict-root',
+        depth: 0,
+        createdAt: '2026-03-01T00:00:00.000Z',
+      }),
+    ])
+
+    expect(tree?.id).toBe('strict-root')
+  })
+
+  test('root fallback uses first depth=0 node when strict root is absent', () => {
+    const tree = buildTreeFromWorkspaceNodes([
+      makeNode({
+        id: 'depth-root-first',
+        parentNodeId: 'missing',
+        depth: 0,
+        createdAt: '2026-03-01T00:00:00.000Z',
+      }),
+      makeNode({
+        id: 'depth-root-second',
+        parentNodeId: 'also-missing',
+        depth: 0,
+        createdAt: '2026-03-02T00:00:00.000Z',
+      }),
+    ])
+
+    expect(tree?.id).toBe('depth-root-first')
+  })
+
+  test('root fallback uses first sorted node when no depth=0 root exists', () => {
+    const tree = buildTreeFromWorkspaceNodes([
+      makeNode({
+        id: 'later',
+        parentNodeId: 'missing',
+        depth: 2,
+        createdAt: '2026-03-02T00:00:00.000Z',
+      }),
+      makeNode({
+        id: 'earlier',
+        parentNodeId: 'missing',
+        depth: 1,
+        createdAt: '2026-03-01T00:00:00.000Z',
+      }),
+    ])
+
+    expect(tree?.id).toBe('earlier')
+  })
+
+  test('stable sort tie-breakers use depth then id for identical createdAt', () => {
+    const tree = buildTreeFromWorkspaceNodes([
+      makeNode({
+        id: 'root',
+        parentNodeId: 'root',
+        depth: 0,
+        createdAt: '2026-03-01T00:00:00.000Z',
+      }),
+      makeNode({
+        id: 'depth2-c',
+        parentNodeId: 'missing-parent',
+        depth: 2,
+        createdAt: '2026-03-01T00:00:00.000Z',
+      }),
+      makeNode({
+        id: 'depth1-b',
+        parentNodeId: 'missing-parent',
+        depth: 1,
+        createdAt: '2026-03-01T00:00:00.000Z',
+      }),
+      makeNode({
+        id: 'depth1-a',
+        parentNodeId: 'missing-parent',
+        depth: 1,
+        createdAt: '2026-03-01T00:00:00.000Z',
+      }),
+    ])
+
+    expect(tree?.children?.map((child) => child.id)).toEqual(['depth1-a', 'depth1-b', 'depth2-c'])
+  })
+
+  test('hydrates node statuses and keeps deterministic child order by createdAt', () => {
     const tree = buildTreeFromWorkspaceNodes([
       makeNode({
         id: 'root',
@@ -101,21 +189,38 @@ describe('treeHydration', () => {
     warnSpy.mockRestore()
   })
 
-  test('maps unknown backend status safely to Open', () => {
+  test('unknown status warning is deduped and unknown statuses map to Open', () => {
     const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {})
 
-    const tree = buildTreeFromWorkspaceNodes([
+    const firstTree = buildTreeFromWorkspaceNodes([
       makeNode({
-        id: 'root',
-        parentNodeId: 'root',
+        id: 'root-a',
+        parentNodeId: 'root-a',
         depth: 0,
-        title: 'Root',
-        status: 'unexpected_status' as never,
+        status: 'unknown-alpha' as never,
+      }),
+    ])
+    const secondTree = buildTreeFromWorkspaceNodes([
+      makeNode({
+        id: 'root-b',
+        parentNodeId: 'root-b',
+        depth: 0,
+        status: 'unknown-alpha' as never,
+      }),
+    ])
+    const thirdTree = buildTreeFromWorkspaceNodes([
+      makeNode({
+        id: 'root-c',
+        parentNodeId: 'root-c',
+        depth: 0,
+        status: 'unknown-beta' as never,
       }),
     ])
 
-    expect(tree?.status).toBe('Open')
-    expect(warnSpy).toHaveBeenCalled()
+    expect(firstTree?.status).toBe('Open')
+    expect(secondTree?.status).toBe('Open')
+    expect(thirdTree?.status).toBe('Open')
+    expect(warnSpy).toHaveBeenCalledTimes(2)
 
     warnSpy.mockRestore()
   })

@@ -118,6 +118,8 @@ describe('appRouter', () => {
       sessionUserId: null,
     })
 
+    await expect(caller.usersList()).rejects.toThrow('Authentication required.')
+    await expect(caller.userById({ id: 'u1' })).rejects.toThrow('Authentication required.')
     await expect(caller.workspacesList()).rejects.toThrow('Authentication required.')
     await expect(
       caller.userCreate({
