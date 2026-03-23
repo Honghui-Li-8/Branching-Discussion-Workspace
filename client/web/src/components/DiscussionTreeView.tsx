@@ -2,37 +2,56 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { NodeConversationPanel } from './NodeConversationPanel'
 import { TreeNodeCard } from './tree/TreeNodeCard'
 import { IntroScreen } from './IntroScreen'
-import { mockTree } from '../data/mockTree'
 import { zIndex } from '../theme/zIndex'
-import type { TreeNode } from '../types/tree'
+import type { TreeMessage, TreeNode } from '../types/tree'
 import { useAppSelector } from '../store/hooks'
 import { selectActiveWorkspace } from '../store/slices/appShellSlice'
-import {
-  buildTreeLayout,
-  cloneTree,
-  findNodeById,
-  appendMessagesToNode,
-  setNodeFolded,
-  CARD_WIDTH,
-} from './tree/treeUtils'
+import { trpc } from '../trpc'
+import { buildTreeLayout, findNodeById, CARD_WIDTH } from './tree/treeUtils'
+import { buildTreeFromWorkspaceNodes } from './tree/treeHydration'
 
 const DEFAULT_PANEL_WIDTH = 560
 const MIN_PANEL_WIDTH = 300
 
-export const DiscussionTreeView = () => {
-  const activeWorkspace = useAppSelector(selectActiveWorkspace)
-  const activeWorkspaceId = activeWorkspace?.id ?? null
-  const [tree, setTree] = useState<TreeNode>(() => cloneTree(mockTree))
+type WorkspaceTreeCanvasProps = {
+  activeWorkspace: {
+    id: string
+    title: string
+  }
+}
+
+const applyLocalUiState = (
+  node: TreeNode,
+  foldedNodeIds: Record<string, true>,
+  localMessagesByNodeId: Record<string, TreeMessage[]>,
+): TreeNode => {
+  const children = node.children?.map((child) =>
+    applyLocalUiState(child, foldedNodeIds, localMessagesByNodeId),
+  )
+  const mergedMessages = [...(node.messages ?? []), ...(localMessagesByNodeId[node.id] ?? [])]
+
+  return {
+    ...node,
+    folded: foldedNodeIds[node.id] === true,
+    messages: mergedMessages.length > 0 ? mergedMessages : undefined,
+    children,
+  }
+}
+
+const WorkspaceTreeCanvas = ({ activeWorkspace }: WorkspaceTreeCanvasProps) => {
   const [containerWidth, setContainerWidth] = useState(0)
   const [expandedFoldMenuNodeId, setExpandedFoldMenuNodeId] = useState<string | null>(null)
-  const [expandedCardOptionsNodeId, setExpandedCardOptionsNodeId] = useState<string | null>(
-    null,
-  )
+  const [expandedCardOptionsNodeId, setExpandedCardOptionsNodeId] = useState<string | null>(null)
   const [conversationNodeId, setConversationNodeId] = useState<string | null>(null)
   const [conversationPanelWidth, setConversationPanelWidth] = useState(DEFAULT_PANEL_WIDTH)
   const [conversationPanelFullscreen, setConversationPanelFullscreen] = useState(false)
+  const [foldedNodeIds, setFoldedNodeIds] = useState<Record<string, true>>({})
+  const [localMessagesByNodeId, setLocalMessagesByNodeId] = useState<
+    Record<string, TreeMessage[]>
+  >({})
 
   const canvasRef = useRef<HTMLDivElement | null>(null)
+  const nodesQuery = trpc.nodesByWorkspace.useQuery({ workspaceId: activeWorkspace.id })
 
   useEffect(() => {
     const canvasElement = canvasRef.current
@@ -60,40 +79,50 @@ export const DiscussionTreeView = () => {
     }
   }, [])
 
-  const layout = useMemo(() => buildTreeLayout(tree), [tree])
-  const conversationNode = conversationNodeId ? findNodeById(tree, conversationNodeId) : null
-  const isPanelNearFullscreen = containerWidth > 0 && conversationPanelWidth >= containerWidth * 0.8
+  const hydratedTree = useMemo(
+    () => buildTreeFromWorkspaceNodes(nodesQuery.data ?? []),
+    [nodesQuery.data],
+  )
+  const tree = useMemo(() => {
+    if (!hydratedTree) {
+      return null
+    }
+
+    return applyLocalUiState(hydratedTree, foldedNodeIds, localMessagesByNodeId)
+  }, [hydratedTree, foldedNodeIds, localMessagesByNodeId])
+  const layout = useMemo(() => (tree ? buildTreeLayout(tree) : null), [tree])
+  const conversationNode =
+    tree && conversationNodeId ? findNodeById(tree, conversationNodeId) : null
+  const isPanelNearFullscreen =
+    containerWidth > 0 && conversationPanelWidth >= containerWidth * 0.8
   const isPanelFullscreenLike = conversationPanelFullscreen || isPanelNearFullscreen
 
   const panelWidth = conversationPanelFullscreen
     ? containerWidth || conversationPanelWidth
     : conversationPanelWidth
 
-  useEffect(() => {
-    if (!activeWorkspaceId) {
-      return
-    }
-
-    setTree(cloneTree(mockTree))
-    setExpandedFoldMenuNodeId(null)
-    setExpandedCardOptionsNodeId(null)
-    setConversationNodeId(null)
-    setConversationPanelWidth(DEFAULT_PANEL_WIDTH)
-    setConversationPanelFullscreen(false)
-  }, [activeWorkspaceId])
-
-  if (!activeWorkspace) {
-    return <IntroScreen />
-  }
-
   const foldNode = (nodeId: string) => {
-    setTree((current) => setNodeFolded(current, nodeId, true))
+    setFoldedNodeIds((current) => {
+      if (current[nodeId]) {
+        return current
+      }
+
+      return { ...current, [nodeId]: true }
+    })
     setExpandedFoldMenuNodeId(null)
     setExpandedCardOptionsNodeId(null)
   }
 
   const unfoldNode = (nodeId: string) => {
-    setTree((current) => setNodeFolded(current, nodeId, false))
+    setFoldedNodeIds((current) => {
+      if (!current[nodeId]) {
+        return current
+      }
+
+      const next = { ...current }
+      delete next[nodeId]
+      return next
+    })
   }
 
   const openConversation = (nodeId: string) => {
@@ -116,21 +145,22 @@ export const DiscussionTreeView = () => {
       return
     }
 
-    const userMessage = {
+    const userMessage: TreeMessage = {
       id: `m-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      role: 'user' as const,
+      role: 'user',
       content: trimmed,
     }
 
-    const assistantMessage = {
+    const assistantMessage: TreeMessage = {
       id: `m-${Date.now() + 1}-${Math.random().toString(36).slice(2, 8)}`,
-      role: 'assistant' as const,
+      role: 'assistant',
       content: `echo: ${trimmed}`,
     }
 
-    setTree((current) =>
-      appendMessagesToNode(current, conversationNodeId, [userMessage, assistantMessage]),
-    )
+    setLocalMessagesByNodeId((current) => ({
+      ...current,
+      [conversationNodeId]: [...(current[conversationNodeId] ?? []), userMessage, assistantMessage],
+    }))
   }
 
   const clampPanelWidth = (candidate: number) => {
@@ -168,9 +198,7 @@ export const DiscussionTreeView = () => {
         style={{ zIndex: zIndex.discussionHeader }}
       >
         <p className="m-0 text-[11px] uppercase tracking-[0.11em] text-[#40718a]">Workspace</p>
-        <h1 className="mb-0 mt-1 text-[26px] leading-[1.2] text-[#12384c]">
-          {activeWorkspace.title}
-        </h1>
+        <h1 className="mb-0 mt-1 text-[26px] leading-[1.2] text-[#12384c]">{activeWorkspace.title}</h1>
       </header>
 
       <div
@@ -193,83 +221,95 @@ export const DiscussionTreeView = () => {
         >
           <div
             className="relative"
-            style={{ width: `${layout.width}px`, height: `${layout.height}px` }}
+            style={layout ? { width: `${layout.width}px`, height: `${layout.height}px` } : undefined}
           >
-            <svg
-              className="pointer-events-none absolute inset-0 h-full w-full"
-              viewBox={`0 0 ${layout.width} ${layout.height}`}
-              style={{ zIndex: zIndex.edgeLayer }}
-            >
-              {layout.edges.map((edge) => {
-                const from = layout.nodeById.get(edge.from)
-                const to = layout.nodeById.get(edge.to)
-                if (!from || !to) {
-                  return null
-                }
-
-                const startX = from.x + CARD_WIDTH
-                const startY = from.y
-                const endX = to.x
-                const endY = to.y
-                const controlOffset = Math.max(48, (endX - startX) * 0.45)
-                const path = `M ${startX} ${startY} C ${startX + controlOffset} ${startY}, ${
-                  endX - controlOffset
-                } ${endY}, ${endX} ${endY}`
-
-                return (
-                  <path
-                    key={`${edge.from}-${edge.to}`}
-                    d={path}
-                    className="fill-none stroke-[#8bb8cd] stroke-2"
-                    style={{ strokeLinecap: 'round' }}
-                  />
-                )
-              })}
-            </svg>
-
-            {layout.nodes.map((node) => {
-              const foldMenuOpen = expandedFoldMenuNodeId === node.id
-              const cardOptionsOpen = expandedCardOptionsNodeId === node.id
-              const cardIsElevated = foldMenuOpen || cardOptionsOpen
-              const foldedCount = node.foldedChildren.length
-              const isConversationSelected = conversationNodeId === node.id
-
-              return (
-                <TreeNodeCard
-                  key={node.id}
-                  node={node}
-                  isConversationSelected={isConversationSelected}
-                  isFoldMenuOpen={foldMenuOpen}
-                  isCardOptionsOpen={cardOptionsOpen}
-                  foldedCount={foldedCount}
-                  onOpenConversation={() => openConversation(node.id)}
-                  onCardOptionsOpenChange={(nextOpen) => {
-                    if (nextOpen) {
-                      setExpandedFoldMenuNodeId(null)
+            {nodesQuery.isLoading && !layout ? (
+              <p className="m-0 p-6 text-sm text-[#326079]">Loading workspace tree...</p>
+            ) : nodesQuery.error && !layout ? (
+              <p className="m-0 p-6 text-sm text-[#8a3f2b]">
+                Failed to load workspace tree: {nodesQuery.error.message}
+              </p>
+            ) : !layout ? (
+              <p className="m-0 p-6 text-sm text-[#326079]">No nodes in this workspace yet.</p>
+            ) : (
+              <>
+                <svg
+                  className="pointer-events-none absolute inset-0 h-full w-full"
+                  viewBox={`0 0 ${layout.width} ${layout.height}`}
+                  style={{ zIndex: zIndex.edgeLayer }}
+                >
+                  {layout.edges.map((edge) => {
+                    const from = layout.nodeById.get(edge.from)
+                    const to = layout.nodeById.get(edge.to)
+                    if (!from || !to) {
+                      return null
                     }
-                    setExpandedCardOptionsNodeId(nextOpen ? node.id : null)
-                  }}
-                  onFoldedMenuOpenChange={(nextOpen) => {
-                    if (nextOpen) {
-                      setExpandedCardOptionsNodeId(null)
-                    }
-                    setExpandedFoldMenuNodeId(nextOpen ? node.id : null)
-                  }}
-                  onFoldNode={() => foldNode(node.id)}
-                  onOpenFoldedNode={(foldedNodeId) => {
-                    unfoldNode(foldedNodeId)
-                    setExpandedFoldMenuNodeId(null)
-                  }}
-                  style={{
-                    zIndex: cardIsElevated
-                      ? zIndex.popoverMenu - 1
-                      : isConversationSelected
-                        ? zIndex.popoverMenu
-                        : zIndex.cardLayer,
-                  }}
-                />
-              )
-            })}
+
+                    const startX = from.x + CARD_WIDTH
+                    const startY = from.y
+                    const endX = to.x
+                    const endY = to.y
+                    const controlOffset = Math.max(48, (endX - startX) * 0.45)
+                    const path = `M ${startX} ${startY} C ${startX + controlOffset} ${startY}, ${
+                      endX - controlOffset
+                    } ${endY}, ${endX} ${endY}`
+
+                    return (
+                      <path
+                        key={`${edge.from}-${edge.to}`}
+                        d={path}
+                        className="fill-none stroke-[#8bb8cd] stroke-2"
+                        style={{ strokeLinecap: 'round' }}
+                      />
+                    )
+                  })}
+                </svg>
+
+                {layout.nodes.map((node) => {
+                  const foldMenuOpen = expandedFoldMenuNodeId === node.id
+                  const cardOptionsOpen = expandedCardOptionsNodeId === node.id
+                  const cardIsElevated = foldMenuOpen || cardOptionsOpen
+                  const foldedCount = node.foldedChildren.length
+                  const isConversationSelected = conversationNodeId === node.id
+
+                  return (
+                    <TreeNodeCard
+                      key={node.id}
+                      node={node}
+                      isConversationSelected={isConversationSelected}
+                      isFoldMenuOpen={foldMenuOpen}
+                      isCardOptionsOpen={cardOptionsOpen}
+                      foldedCount={foldedCount}
+                      onOpenConversation={() => openConversation(node.id)}
+                      onCardOptionsOpenChange={(nextOpen) => {
+                        if (nextOpen) {
+                          setExpandedFoldMenuNodeId(null)
+                        }
+                        setExpandedCardOptionsNodeId(nextOpen ? node.id : null)
+                      }}
+                      onFoldedMenuOpenChange={(nextOpen) => {
+                        if (nextOpen) {
+                          setExpandedCardOptionsNodeId(null)
+                        }
+                        setExpandedFoldMenuNodeId(nextOpen ? node.id : null)
+                      }}
+                      onFoldNode={() => foldNode(node.id)}
+                      onOpenFoldedNode={(foldedNodeId) => {
+                        unfoldNode(foldedNodeId)
+                        setExpandedFoldMenuNodeId(null)
+                      }}
+                      style={{
+                        zIndex: cardIsElevated
+                          ? zIndex.popoverMenu - 1
+                          : isConversationSelected
+                            ? zIndex.popoverMenu
+                            : zIndex.cardLayer,
+                      }}
+                    />
+                  )
+                })}
+              </>
+            )}
           </div>
         </div>
 
@@ -290,4 +330,14 @@ export const DiscussionTreeView = () => {
       </div>
     </section>
   )
+}
+
+export const DiscussionTreeView = () => {
+  const activeWorkspace = useAppSelector(selectActiveWorkspace)
+
+  if (!activeWorkspace) {
+    return <IntroScreen />
+  }
+
+  return <WorkspaceTreeCanvas key={activeWorkspace.id} activeWorkspace={activeWorkspace} />
 }
