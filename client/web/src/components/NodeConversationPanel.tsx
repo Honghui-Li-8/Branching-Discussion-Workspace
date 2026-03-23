@@ -8,6 +8,9 @@ import {
 } from 'react'
 import { zIndex } from '../theme/zIndex'
 import type { TreeMessage, TreeNode } from '../types/tree'
+import { useAppSelector } from '../store/hooks'
+import { selectAuthUser } from '../store/slices/authSlice'
+import { useNodeConversation } from './discussion-tree/hooks/useNodeConversation'
 import { ConversationComposer, CHAT_INPUT_MAX_HEIGHT, CHAT_INPUT_MIN_HEIGHT, CHAT_MODELS } from './conversation/ConversationComposer'
 import { ConversationMessageList } from './conversation/ConversationMessageList'
 import { ConversationPanelHeader } from './conversation/ConversationPanelHeader'
@@ -17,7 +20,6 @@ type NodeConversationPanelProps = {
   width: number
   isFullscreen: boolean
   onClose: () => void
-  onSendMessage: (message: string) => void
   onWidthChange: (nextWidth: number) => void
   onToggleFullScreen: () => void
 }
@@ -40,10 +42,14 @@ export const NodeConversationPanel = ({
   width,
   isFullscreen,
   onClose,
-  onSendMessage,
   onWidthChange,
   onToggleFullScreen,
 }: NodeConversationPanelProps) => {
+  const authUser = useAppSelector(selectAuthUser)
+  const conversation = useNodeConversation({
+    nodeId: node.id,
+    authorUserId: authUser?.id ?? null,
+  })
   const [conversationInputText, setConversationInputText] = useState('')
   const [conversationModel, setConversationModel] = useState(CHAT_MODELS[0])
   const [isResizing, setIsResizing] = useState(false)
@@ -53,7 +59,7 @@ export const NodeConversationPanel = ({
   const conversationScrollRef = useRef<HTMLDivElement | null>(null)
   const conversationInputRef = useRef<HTMLTextAreaElement | null>(null)
 
-  const messages = node.messages ?? []
+  const messages = conversation.messages
 
   const adjustConversationInputHeight = () => {
     const input = conversationInputRef.current
@@ -70,7 +76,6 @@ export const NodeConversationPanel = ({
   }
 
   useEffect(() => {
-    setConversationInputText('')
     if (conversationInputRef.current) {
       conversationInputRef.current.style.height = `${CHAT_INPUT_MIN_HEIGHT}px`
       conversationInputRef.current.style.overflowY = 'hidden'
@@ -133,7 +138,7 @@ export const NodeConversationPanel = ({
       return
     }
 
-    onSendMessage(text)
+    conversation.sendMessage(text)
     setConversationInputText('')
 
     if (conversationInputRef.current) {
@@ -172,7 +177,12 @@ export const NodeConversationPanel = ({
         onToggleFullScreen={onToggleFullScreen}
         onClose={onClose}
       />
-      <ConversationMessageList messages={messages} conversationScrollRef={conversationScrollRef} />
+      <ConversationMessageList
+        messages={messages}
+        isLoading={conversation.isLoadingMessages}
+        errorMessage={conversation.messagesError}
+        conversationScrollRef={conversationScrollRef}
+      />
       <ConversationComposer
         conversationModel={conversationModel}
         setConversationModel={setConversationModel}

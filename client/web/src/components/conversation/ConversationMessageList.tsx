@@ -3,11 +3,15 @@ import type { TreeMessage } from '../../types/tree'
 
 type ConversationMessageListProps = {
   messages: TreeMessage[]
+  isLoading: boolean
+  errorMessage: string | null
   conversationScrollRef: RefObject<HTMLDivElement | null>
 }
 
 export const ConversationMessageList = ({
   messages,
+  isLoading,
+  errorMessage,
   conversationScrollRef,
 }: ConversationMessageListProps) => {
   return (
@@ -17,7 +21,15 @@ export const ConversationMessageList = ({
       style={{ minHeight: 0 }}
     >
       <div className="flex min-h-full flex-col justify-end gap-2">
-        {messages.length ? (
+        {isLoading ? (
+          <p className="m-0 self-stretch rounded-lg border border-dashed border-[#bdd7eb] bg-white p-3 text-sm text-[#40657d]">
+            Loading messages...
+          </p>
+        ) : errorMessage ? (
+          <p className="m-0 self-stretch rounded-lg border border-[#f1cabd] bg-[#fff6f3] p-3 text-sm text-[#8a3f2b]">
+            Failed to load messages: {errorMessage}
+          </p>
+        ) : messages.length ? (
           messages.map((message) => (
             <div
               key={message.id}

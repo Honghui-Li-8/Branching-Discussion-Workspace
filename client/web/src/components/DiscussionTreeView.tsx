@@ -26,7 +26,6 @@ const WorkspaceTreeCanvas = ({ activeWorkspace }: WorkspaceTreeCanvasProps) => {
   const { tree, layout, isLoading: isTreeLoading, error: treeError } = useWorkspaceTreeData({
     workspaceId: activeWorkspace.id,
     foldedNodeIds: ui.foldedNodeIds,
-    localMessagesByNodeId: ui.localMessagesByNodeId,
   })
   const conversationNode =
     tree && ui.conversationNodeId ? findNodeById(tree, ui.conversationNodeId) : null
@@ -64,7 +63,6 @@ const WorkspaceTreeCanvas = ({ activeWorkspace }: WorkspaceTreeCanvasProps) => {
             width={ui.panelWidth}
             isFullscreen={ui.isPanelFullscreenLike}
             onClose={ui.closeConversation}
-            onSendMessage={ui.sendConversationMessage}
             onWidthChange={ui.handlePanelResize}
             onToggleFullScreen={ui.togglePanelFullScreen}
           />

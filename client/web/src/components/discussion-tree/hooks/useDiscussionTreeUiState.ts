@@ -1,6 +1,4 @@
 import { useMemo, useState } from 'react'
-import type { TreeMessage } from '../../../types/tree'
-
 const DEFAULT_PANEL_WIDTH = 560
 const MIN_PANEL_WIDTH = 300
 
@@ -21,9 +19,6 @@ export const useDiscussionTreeUiState = ({
   const [conversationPanelWidth, setConversationPanelWidth] = useState(DEFAULT_PANEL_WIDTH)
   const [conversationPanelFullscreen, setConversationPanelFullscreen] = useState(false)
   const [foldedNodeIds, setFoldedNodeIds] = useState<Record<string, true>>({})
-  const [localMessagesByNodeId, setLocalMessagesByNodeId] = useState<
-    Record<string, TreeMessage[]>
-  >({})
 
   const clampPanelWidth = (candidate: number) => {
     if (!containerWidth) {
@@ -71,34 +66,6 @@ export const useDiscussionTreeUiState = ({
 
   const closeConversation = () => {
     setConversationNodeId(null)
-  }
-
-  const sendConversationMessage = (text: string) => {
-    if (!conversationNodeId) {
-      return
-    }
-
-    const trimmed = text.trim()
-    if (!trimmed.length) {
-      return
-    }
-
-    const userMessage: TreeMessage = {
-      id: `m-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      role: 'user',
-      content: trimmed,
-    }
-
-    const assistantMessage: TreeMessage = {
-      id: `m-${Date.now() + 1}-${Math.random().toString(36).slice(2, 8)}`,
-      role: 'assistant',
-      content: `echo: ${trimmed}`,
-    }
-
-    setLocalMessagesByNodeId((current) => ({
-      ...current,
-      [conversationNodeId]: [...(current[conversationNodeId] ?? []), userMessage, assistantMessage],
-    }))
   }
 
   const handlePanelResize = (nextWidth: number) => {
@@ -154,7 +121,6 @@ export const useDiscussionTreeUiState = ({
 
   return {
     foldedNodeIds,
-    localMessagesByNodeId,
     expandedFoldMenuNodeId,
     expandedCardOptionsNodeId,
     conversationNodeId,
@@ -166,7 +132,6 @@ export const useDiscussionTreeUiState = ({
     unfoldNode,
     openConversation,
     closeConversation,
-    sendConversationMessage,
     handlePanelResize,
     togglePanelFullScreen,
     onCardOptionsOpenChange,
