@@ -93,13 +93,6 @@ export const createAppRouterContext = (req: ContextRequest): AppRouterContext =>
 
       return getUserById(id)
     },
-    createUser: async () => {
-      requireSessionUserId()
-      throw new TRPCError({
-        code: 'FORBIDDEN',
-        message: 'User creation is managed by the auth flow.',
-      })
-    },
     listWorkspaces: async () => listWorkspacesByAuthorRecord(requireSessionUserId()),
     getWorkspaceById: async (id) => getWorkspaceByIdForSessionUser(id),
     createWorkspace: async (input) => {

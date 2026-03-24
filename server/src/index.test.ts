@@ -212,32 +212,6 @@ describe('tRPC user authorization integration', () => {
       'Authentication required.',
     )
   })
-
-  test('userCreate with valid session returns FORBIDDEN', async () => {
-    const caller = makeCaller(selfSessionUser)
-    await expectTrpcError(
-      caller.userCreate({
-        authUserId: 'auth:new-user',
-        email: 'new@example.com',
-        displayName: 'New User',
-      }),
-      'FORBIDDEN',
-      'User creation is managed by the auth flow.',
-    )
-  })
-
-  test('userCreate without session returns UNAUTHORIZED', async () => {
-    const caller = makeCaller(null)
-    await expectTrpcError(
-      caller.userCreate({
-        authUserId: 'auth:new-user',
-        email: 'new@example.com',
-        displayName: 'New User',
-      }),
-      'UNAUTHORIZED',
-      'Authentication required.',
-    )
-  })
 })
 
 describe('tRPC ownership integration', () => {

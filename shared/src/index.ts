@@ -47,12 +47,6 @@ const messageSchema = z.object({
   createdAt: z.string(),
 })
 
-const createUserInputSchema = z.object({
-  authUserId: z.string(),
-  email: z.string().email().nullable().optional(),
-  displayName: z.string().nullable().optional(),
-})
-
 const createWorkspaceInputSchema = z.object({
   title: z.string(),
   rootNodeTitle: z.string().optional(),
@@ -132,7 +126,6 @@ type User = z.infer<typeof userSchema>
 type Workspace = z.infer<typeof workspaceSchema>
 type Node = z.infer<typeof nodeSchema>
 type Message = z.infer<typeof messageSchema>
-type CreateUserInput = z.infer<typeof createUserInputSchema>
 type CreateWorkspaceInput = z.infer<typeof createWorkspaceInputSchema>
 type UpdateWorkspaceInput = z.infer<typeof updateWorkspaceInputSchema>
 type CreateNodeInput = z.infer<typeof createNodeInputSchema>
@@ -144,7 +137,6 @@ export type AppRouterContext = {
   sessionUserId: string | null
   listUsers: () => Promise<User[]>
   getUserById: (id: string) => Promise<User | null>
-  createUser: (input: CreateUserInput) => Promise<User>
   listWorkspaces: () => Promise<Workspace[]>
   getWorkspaceById: (id: string) => Promise<Workspace | null>
   createWorkspace: (input: CreateWorkspaceInput) => Promise<Workspace>
@@ -202,9 +194,6 @@ export const appRouter = t.router({
   userById: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(({ ctx, input }) => ctx.getUserById(input.id)),
-  userCreate: protectedProcedure
-    .input(createUserInputSchema)
-    .mutation(({ ctx, input }) => ctx.createUser(input)),
 
   workspacesList: protectedProcedure.query(({ ctx }) => ctx.listWorkspaces()),
   workspaceById: protectedProcedure

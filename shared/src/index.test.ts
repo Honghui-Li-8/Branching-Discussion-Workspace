@@ -53,7 +53,6 @@ const makeContext = (): AppRouterContext => {
     sessionUserId: 'u1',
     listUsers: jest.fn(async () => [user]),
     getUserById: jest.fn(async (id: string) => (id === user.id ? user : null)),
-    createUser: jest.fn(async () => user),
     listWorkspaces: jest.fn(async () => [workspace]),
     getWorkspaceById: jest.fn(async (id: string) => (id === workspace.id ? workspace : null)),
     createWorkspace: jest.fn(async () => workspace),
@@ -90,17 +89,6 @@ describe('appRouter', () => {
     expect(typeof result.uptime).toBe('number')
   })
 
-  test('userCreate delegates to context', async () => {
-    const ctx = makeContext()
-    const caller = appRouter.createCaller(ctx)
-    const input = { authUserId: 'auth-u1', email: 'u1@example.com', displayName: 'User One' }
-
-    const result = await caller.userCreate(input)
-
-    expect(ctx.createUser).toHaveBeenCalledWith(input)
-    expect(result.authUserId).toBe('auth-u1')
-  })
-
   test('workspaceCreate delegates to context', async () => {
     const ctx = makeContext()
     const caller = appRouter.createCaller(ctx)
@@ -121,13 +109,6 @@ describe('appRouter', () => {
     await expect(caller.usersList()).rejects.toThrow('Authentication required.')
     await expect(caller.userById({ id: 'u1' })).rejects.toThrow('Authentication required.')
     await expect(caller.workspacesList()).rejects.toThrow('Authentication required.')
-    await expect(
-      caller.userCreate({
-        authUserId: 'auth-u1',
-        email: 'u1@example.com',
-        displayName: 'User One',
-      }),
-    ).rejects.toThrow('Authentication required.')
   })
 
   test('nodeCreate validates input', async () => {
