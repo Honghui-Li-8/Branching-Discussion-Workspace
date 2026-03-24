@@ -27,6 +27,7 @@ import {
 } from './db/queries/internal.js'
 
 type ContextRequest = Pick<Request, 'headers'>
+type ExistsById = (id: string) => Promise<boolean>
 
 export const createAppRouterContext = (req: ContextRequest): AppRouterContext => {
   const sessionId = getSessionIdFromCookieHeader(req.headers.cookie)
@@ -49,32 +50,59 @@ export const createAppRouterContext = (req: ContextRequest): AppRouterContext =>
     })
   }
 
-  const getWorkspaceByIdForSessionUser = async (workspaceId: string) => {
-    const currentUserId = requireSessionUserId()
-    const workspace = await getWorkspaceByIdForAuthorRecord(workspaceId, currentUserId)
-    if (workspace) {
-      return workspace
+  const throwNotFound = (message: string): never => {
+    throw new TRPCError({
+      code: 'NOT_FOUND',
+      message,
+    })
+  }
+
+  const resolveOwnedRecordOrNull = async <T>(
+    record: T | null,
+    resourceId: string,
+    existsById: ExistsById,
+  ): Promise<T | null> => {
+    if (record) {
+      return record
     }
 
-    if (await workspaceExistsRecord(workspaceId)) {
+    if (await existsById(resourceId)) {
       throwWorkspaceForbidden()
     }
 
     return null
   }
 
+  const resolveOwnedRecordOrNotFound = async <T>(
+    record: T | null,
+    resourceId: string,
+    existsById: ExistsById,
+    notFoundMessage: string,
+  ): Promise<T> => {
+    const resolvedRecord = await resolveOwnedRecordOrNull(record, resourceId, existsById)
+    if (resolvedRecord) {
+      return resolvedRecord
+    }
+
+    return throwNotFound(notFoundMessage)
+  }
+
+  const getWorkspaceByIdForSessionUser = async (workspaceId: string) => {
+    const currentUserId = requireSessionUserId()
+    return resolveOwnedRecordOrNull(
+      await getWorkspaceByIdForAuthorRecord(workspaceId, currentUserId),
+      workspaceId,
+      workspaceExistsRecord,
+    )
+  }
+
   const getNodeByIdForSessionUser = async (nodeId: string) => {
     const currentUserId = requireSessionUserId()
-    const node = await getNodeByIdForAuthorRecord(nodeId, currentUserId)
-    if (node) {
-      return node
-    }
-
-    if (await nodeExistsRecord(nodeId)) {
-      throwWorkspaceForbidden()
-    }
-
-    return null
+    return resolveOwnedRecordOrNull(
+      await getNodeByIdForAuthorRecord(nodeId, currentUserId),
+      nodeId,
+      nodeExistsRecord,
+    )
   }
 
   return {
@@ -106,29 +134,19 @@ export const createAppRouterContext = (req: ContextRequest): AppRouterContext =>
     },
     updateWorkspace: async (input) => {
       const currentUserId = requireSessionUserId()
-      const updatedWorkspace = await updateWorkspaceForAuthorRecord(input, currentUserId)
-      if (updatedWorkspace) {
-        return updatedWorkspace
-      }
-
-      if (await workspaceExistsRecord(input.id)) {
-        throwWorkspaceForbidden()
-      }
-
-      return null
+      return resolveOwnedRecordOrNull(
+        await updateWorkspaceForAuthorRecord(input, currentUserId),
+        input.id,
+        workspaceExistsRecord,
+      )
     },
     deleteWorkspace: async (id) => {
       const currentUserId = requireSessionUserId()
-      const deleteResult = await deleteWorkspaceForAuthorRecord(id, currentUserId)
-      if (deleteResult) {
-        return deleteResult
-      }
-
-      if (await workspaceExistsRecord(id)) {
-        throwWorkspaceForbidden()
-      }
-
-      return null
+      return resolveOwnedRecordOrNull(
+        await deleteWorkspaceForAuthorRecord(id, currentUserId),
+        id,
+        workspaceExistsRecord,
+      )
     },
     listNodesByWorkspace: async (workspaceId) => {
       const currentUserId = requireSessionUserId()
@@ -142,48 +160,40 @@ export const createAppRouterContext = (req: ContextRequest): AppRouterContext =>
     getNodeById: async (id) => getNodeByIdForSessionUser(id),
     createNode: async (input) => {
       const currentUserId = requireSessionUserId()
-      const workspace = await getWorkspaceByIdForSessionUser(input.workspaceId)
-      if (!workspace) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Workspace not found.',
-        })
-      }
+      await resolveOwnedRecordOrNotFound(
+        await getWorkspaceByIdForAuthorRecord(input.workspaceId, currentUserId),
+        input.workspaceId,
+        workspaceExistsRecord,
+        'Workspace not found.',
+      )
 
       const node = await createNodeForAuthorRecord({
         ...input,
         authorUserId: currentUserId,
       })
-      if (!node) {
-        throw new Error('Parent node not found in workspace')
+      if (node === null) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Parent node not found in workspace.',
+        })
       }
       return node
     },
     updateNode: async (input) => {
       const currentUserId = requireSessionUserId()
-      const updatedNode = await updateNodeForAuthorRecord(input, currentUserId)
-      if (updatedNode) {
-        return updatedNode
-      }
-
-      if (await nodeExistsRecord(input.id)) {
-        throwWorkspaceForbidden()
-      }
-
-      return null
+      return resolveOwnedRecordOrNull(
+        await updateNodeForAuthorRecord(input, currentUserId),
+        input.id,
+        nodeExistsRecord,
+      )
     },
     deleteNode: async (id) => {
       const currentUserId = requireSessionUserId()
-      const deleteResult = await deleteNodeForAuthorRecord(id, currentUserId)
-      if (deleteResult) {
-        return deleteResult
-      }
-
-      if (await nodeExistsRecord(id)) {
-        throwWorkspaceForbidden()
-      }
-
-      return null
+      return resolveOwnedRecordOrNull(
+        await deleteNodeForAuthorRecord(id, currentUserId),
+        id,
+        nodeExistsRecord,
+      )
     },
     listMessagesForNode: async (nodeId) => {
       const currentUserId = requireSessionUserId()
@@ -196,19 +206,18 @@ export const createAppRouterContext = (req: ContextRequest): AppRouterContext =>
     },
     createMessage: async (input) => {
       const currentUserId = requireSessionUserId()
-      const node = await getNodeByIdForSessionUser(input.nodeId)
-      if (!node) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Node not found.',
-        })
-      }
+      await resolveOwnedRecordOrNotFound(
+        await getNodeByIdForAuthorRecord(input.nodeId, currentUserId),
+        input.nodeId,
+        nodeExistsRecord,
+        'Node not found.',
+      )
 
       const message = await createMessageForAuthorRecord({
         ...input,
         authorUserId: currentUserId,
       })
-      if (!message) {
+      if (message === null) {
         throw new TRPCError({
           code: 'NOT_FOUND',
           message: 'Node not found.',
@@ -218,29 +227,19 @@ export const createAppRouterContext = (req: ContextRequest): AppRouterContext =>
     },
     updateMessage: async (input) => {
       const currentUserId = requireSessionUserId()
-      const updatedMessage = await updateMessageForAuthorRecord(input, currentUserId)
-      if (updatedMessage) {
-        return updatedMessage
-      }
-
-      if (await messageExistsRecord(input.id)) {
-        throwWorkspaceForbidden()
-      }
-
-      return null
+      return resolveOwnedRecordOrNull(
+        await updateMessageForAuthorRecord(input, currentUserId),
+        input.id,
+        messageExistsRecord,
+      )
     },
     deleteMessage: async (id) => {
       const currentUserId = requireSessionUserId()
-      const deleteResult = await deleteMessageForAuthorRecord(id, currentUserId)
-      if (deleteResult) {
-        return deleteResult
-      }
-
-      if (await messageExistsRecord(id)) {
-        throwWorkspaceForbidden()
-      }
-
-      return null
+      return resolveOwnedRecordOrNull(
+        await deleteMessageForAuthorRecord(id, currentUserId),
+        id,
+        messageExistsRecord,
+      )
     },
   }
 }

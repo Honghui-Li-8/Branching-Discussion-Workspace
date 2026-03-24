@@ -155,7 +155,7 @@ const makeCaller = (sessionUser: SessionUser | null) => {
 
 const expectTrpcError = async (
   promise: Promise<unknown>,
-  code: 'UNAUTHORIZED' | 'FORBIDDEN',
+  code: 'UNAUTHORIZED' | 'FORBIDDEN' | 'NOT_FOUND',
   message: string,
 ) => {
   await expect(promise).rejects.toMatchObject({
@@ -322,6 +322,89 @@ describe('tRPC ownership integration', () => {
       caller.messagesByNode({ nodeId: ownedNodeRecord.id }),
       'UNAUTHORIZED',
       'Authentication required.',
+    )
+  })
+
+  test('cross-user workspace update is denied with FORBIDDEN', async () => {
+    const caller = makeCaller(selfSessionUser)
+    updateWorkspaceForAuthorMock.mockResolvedValueOnce(null)
+    workspaceExistsMock.mockResolvedValueOnce(true)
+
+    await expectTrpcError(
+      caller.workspaceUpdate({
+        id: ownedWorkspaceRecord.id,
+        title: 'Renamed',
+      }),
+      'FORBIDDEN',
+      'Workspace access is forbidden.',
+    )
+  })
+
+  test('nodeCreate with missing workspace returns NOT_FOUND', async () => {
+    const caller = makeCaller(selfSessionUser)
+    getWorkspaceByIdForAuthorMock.mockResolvedValueOnce(null)
+    workspaceExistsMock.mockResolvedValueOnce(false)
+
+    await expectTrpcError(
+      caller.nodeCreate({
+        workspaceId: ownedWorkspaceRecord.id,
+        parentNodeId: ownedNodeRecord.id,
+        type: 'question',
+        title: 'Follow-up',
+        summary: 'Need more data',
+      }),
+      'NOT_FOUND',
+      'Workspace not found.',
+    )
+  })
+
+  test('nodeCreate with missing parent returns NOT_FOUND', async () => {
+    const caller = makeCaller(selfSessionUser)
+    getWorkspaceByIdForAuthorMock.mockResolvedValueOnce(ownedWorkspaceRecord)
+    createNodeForAuthorMock.mockResolvedValueOnce(null)
+
+    await expectTrpcError(
+      caller.nodeCreate({
+        workspaceId: ownedWorkspaceRecord.id,
+        parentNodeId: 'missing-parent-node',
+        type: 'question',
+        title: 'Follow-up',
+        summary: 'Need more data',
+      }),
+      'NOT_FOUND',
+      'Parent node not found in workspace.',
+    )
+  })
+
+  test('messageCreate with missing node returns NOT_FOUND', async () => {
+    const caller = makeCaller(selfSessionUser)
+    getNodeByIdForAuthorMock.mockResolvedValueOnce(null)
+    nodeExistsMock.mockResolvedValueOnce(false)
+
+    await expectTrpcError(
+      caller.messageCreate({
+        nodeId: ownedNodeRecord.id,
+        role: 'user',
+        content: 'Hello',
+      }),
+      'NOT_FOUND',
+      'Node not found.',
+    )
+  })
+
+  test('messageCreate race where insert returns no row returns NOT_FOUND', async () => {
+    const caller = makeCaller(selfSessionUser)
+    getNodeByIdForAuthorMock.mockResolvedValueOnce(ownedNodeRecord)
+    createMessageForAuthorMock.mockResolvedValueOnce(null)
+
+    await expectTrpcError(
+      caller.messageCreate({
+        nodeId: ownedNodeRecord.id,
+        role: 'user',
+        content: 'Hello',
+      }),
+      'NOT_FOUND',
+      'Node not found.',
     )
   })
 })
