@@ -1,6 +1,17 @@
 import { beforeEach, describe, expect, jest, test } from '@jest/globals'
 import { query } from '../client.js'
-import { createNode, deleteNode, getNodeById, listNodesByWorkspace, updateNode } from './node'
+import {
+  createNode,
+  createNodeForAuthor,
+  deleteNode,
+  deleteNodeForAuthor,
+  getNodeById,
+  getNodeByIdForAuthor,
+  listNodesByWorkspace,
+  listNodesByWorkspaceForAuthor,
+  updateNode,
+  updateNodeForAuthor,
+} from './node'
 
 jest.mock('../client.js', () => ({
   query: jest.fn(),
@@ -44,12 +55,52 @@ describe('node queries', () => {
     })
   })
 
+  test('listNodesByWorkspaceForAuthor returns rows for owner and empty for non-owner', async () => {
+    queryMock.mockResolvedValueOnce({ rows: [nodeRow] } as never)
+    const ownedResult = await listNodesByWorkspaceForAuthor('w1', 'u1')
+    expect(ownedResult).toHaveLength(1)
+    expect(queryMock).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining('AND w.author_user_id = $2'),
+      ['w1', 'u1'],
+    )
+
+    queryMock.mockResolvedValueOnce({ rows: [] } as never)
+    const nonOwnerResult = await listNodesByWorkspaceForAuthor('w1', 'u2')
+    expect(nonOwnerResult).toEqual([])
+    expect(queryMock).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining('AND w.author_user_id = $2'),
+      ['w1', 'u2'],
+    )
+  })
+
   test('getNodeById returns null when not found', async () => {
     queryMock.mockResolvedValueOnce({ rows: [] } as never)
 
     const result = await getNodeById('missing')
 
     expect(result).toBeNull()
+  })
+
+  test('getNodeByIdForAuthor returns null for non-owner', async () => {
+    queryMock.mockResolvedValueOnce({ rows: [nodeRow] } as never)
+    const ownedResult = await getNodeByIdForAuthor('n1', 'u1')
+    expect(ownedResult?.id).toBe('n1')
+    expect(queryMock).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining('AND w.author_user_id = $2'),
+      ['n1', 'u1'],
+    )
+
+    queryMock.mockResolvedValueOnce({ rows: [] } as never)
+    const nonOwnerResult = await getNodeByIdForAuthor('n1', 'u2')
+    expect(nonOwnerResult).toBeNull()
+    expect(queryMock).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining('AND w.author_user_id = $2'),
+      ['n1', 'u2'],
+    )
   })
 
   test('createNode enforces parent in same workspace and returns mapped row', async () => {
@@ -67,6 +118,42 @@ describe('node queries', () => {
     expect(result.id).toBe('n1')
     expect(queryMock).toHaveBeenCalledWith(
       expect.stringContaining('FROM nodes AS parent'),
+      expect.any(Array),
+    )
+  })
+
+  test('createNodeForAuthor returns null for non-owner', async () => {
+    queryMock.mockResolvedValueOnce({ rows: [nodeRow] } as never)
+
+    const ownedResult = await createNodeForAuthor({
+      workspaceId: 'w1',
+      authorUserId: 'u1',
+      parentNodeId: 'n1',
+      type: 'decision',
+      title: 'Child',
+      summary: 'child summary',
+    })
+
+    expect(ownedResult?.id).toBe('n1')
+    expect(queryMock).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining('AND w.author_user_id = $2'),
+      expect.any(Array),
+    )
+
+    queryMock.mockResolvedValueOnce({ rows: [] } as never)
+    const nonOwnerResult = await createNodeForAuthor({
+      workspaceId: 'w1',
+      authorUserId: 'u2',
+      parentNodeId: 'n1',
+      type: 'decision',
+      title: 'Child',
+      summary: 'child summary',
+    })
+    expect(nonOwnerResult).toBeNull()
+    expect(queryMock).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining('AND w.author_user_id = $2'),
       expect.any(Array),
     )
   })
@@ -95,6 +182,38 @@ describe('node queries', () => {
     })
 
     expect(result).toBeNull()
+  })
+
+  test('updateNodeForAuthor returns null for non-owner', async () => {
+    queryMock.mockResolvedValueOnce({ rows: [nodeRow] } as never)
+    const ownedResult = await updateNodeForAuthor(
+      {
+        id: 'n1',
+        summary: 'updated',
+      },
+      'u1',
+    )
+    expect(ownedResult?.id).toBe('n1')
+    expect(queryMock).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining('w.author_user_id = $16'),
+      expect.any(Array),
+    )
+
+    queryMock.mockResolvedValueOnce({ rows: [] } as never)
+    const nonOwnerResult = await updateNodeForAuthor(
+      {
+        id: 'n1',
+        summary: 'updated',
+      },
+      'u2',
+    )
+    expect(nonOwnerResult).toBeNull()
+    expect(queryMock).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining('w.author_user_id = $16'),
+      expect.any(Array),
+    )
   })
 
   test('deleteNode returns null when target node does not exist', async () => {
@@ -156,6 +275,42 @@ describe('node queries', () => {
       2,
       expect.stringContaining('target_messages'),
       ['n2'],
+    )
+  })
+
+  test('deleteNodeForAuthor returns null for non-owner', async () => {
+    queryMock.mockResolvedValueOnce({ rows: [] } as never)
+    const nonOwnerResult = await deleteNodeForAuthor('n2', 'u2')
+    expect(nonOwnerResult).toBeNull()
+    expect(queryMock).toHaveBeenCalledWith(
+      expect.stringContaining('AND w.author_user_id = $2'),
+      ['n2', 'u2'],
+    )
+
+    queryMock
+      .mockResolvedValueOnce({
+        rows: [{ id: 'n2', workspace_id: 'w1', is_workspace_root: false }],
+      } as never)
+      .mockResolvedValueOnce({
+        rows: [{ deleted_node_count: 3, deleted_message_count: 7 }],
+      } as never)
+
+    const ownedResult = await deleteNodeForAuthor('n2', 'u1')
+    expect(ownedResult).toEqual({
+      id: 'n2',
+      deletedWorkspace: false,
+      deletedNodeCount: 3,
+      deletedMessageCount: 7,
+    })
+    expect(queryMock).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining('AND w.author_user_id = $2'),
+      ['n2', 'u1'],
+    )
+    expect(queryMock).toHaveBeenNthCalledWith(
+      3,
+      expect.stringContaining('AND w.author_user_id = $2'),
+      ['n2', 'u1'],
     )
   })
 })

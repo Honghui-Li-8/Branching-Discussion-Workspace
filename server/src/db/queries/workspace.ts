@@ -43,6 +43,27 @@ export const listWorkspaces = async (): Promise<WorkspaceRecord[]> => {
   return result.rows.map(mapWorkspaceRow)
 }
 
+export const listWorkspacesByAuthor = async (authorUserId: string): Promise<WorkspaceRecord[]> => {
+  const result = await query<WorkspaceRow>(
+    `
+    SELECT
+      w.id,
+      w.title,
+      NULLIF(BTRIM(rn.summary), '') AS summary,
+      w.author_user_id,
+      w.root_node_id,
+      w.created_at,
+      w.updated_at
+    FROM workspaces w
+    LEFT JOIN nodes rn ON rn.id = w.root_node_id
+    WHERE w.author_user_id = $1
+    ORDER BY w.created_at DESC
+    `,
+    [authorUserId],
+  )
+  return result.rows.map(mapWorkspaceRow)
+}
+
 export const getWorkspaceById = async (id: string): Promise<WorkspaceRecord | null> => {
   const result = await query<WorkspaceRow>(
     `
@@ -66,6 +87,48 @@ export const getWorkspaceById = async (id: string): Promise<WorkspaceRecord | nu
   }
 
   return mapWorkspaceRow(result.rows[0])
+}
+
+export const getWorkspaceByIdForAuthor = async (
+  id: string,
+  authorUserId: string,
+): Promise<WorkspaceRecord | null> => {
+  const result = await query<WorkspaceRow>(
+    `
+    SELECT
+      w.id,
+      w.title,
+      NULLIF(BTRIM(rn.summary), '') AS summary,
+      w.author_user_id,
+      w.root_node_id,
+      w.created_at,
+      w.updated_at
+    FROM workspaces w
+    LEFT JOIN nodes rn ON rn.id = w.root_node_id
+    WHERE w.id = $1
+      AND w.author_user_id = $2
+    `,
+    [id, authorUserId],
+  )
+
+  if (result.rows.length === 0) {
+    return null
+  }
+
+  return mapWorkspaceRow(result.rows[0])
+}
+
+export const workspaceExists = async (id: string): Promise<boolean> => {
+  const result = await query<{ id: string }>(
+    `
+    SELECT id
+    FROM workspaces
+    WHERE id = $1
+    LIMIT 1
+    `,
+    [id],
+  )
+  return result.rows.length > 0
 }
 
 export const createWorkspace = async (input: CreateWorkspaceInput): Promise<WorkspaceRecord> => {
@@ -165,6 +228,40 @@ export const updateWorkspace = async (input: UpdateWorkspaceInput): Promise<Work
   return mapWorkspaceRow(result.rows[0])
 }
 
+export const updateWorkspaceForAuthor = async (
+  input: UpdateWorkspaceInput,
+  authorUserId: string,
+): Promise<WorkspaceRecord | null> => {
+  const result = await query<WorkspaceRow>(
+    `
+    WITH updated_workspace AS (
+      UPDATE workspaces
+      SET title = $2
+      WHERE id = $1
+        AND author_user_id = $3
+      RETURNING id, title, author_user_id, root_node_id, created_at, updated_at
+    )
+    SELECT
+      uw.id,
+      uw.title,
+      NULLIF(BTRIM(rn.summary), '') AS summary,
+      uw.author_user_id,
+      uw.root_node_id,
+      uw.created_at,
+      uw.updated_at
+    FROM updated_workspace uw
+    LEFT JOIN nodes rn ON rn.id = uw.root_node_id
+    `,
+    [input.id, input.title, authorUserId],
+  )
+
+  if (result.rows.length === 0) {
+    return null
+  }
+
+  return mapWorkspaceRow(result.rows[0])
+}
+
 type DeleteWorkspaceRow = {
   id: string
   deleted_node_count: number
@@ -196,6 +293,55 @@ export const deleteWorkspace = async (id: string): Promise<DeleteWorkspaceResult
     FROM deleted_workspace dw
     `,
     [id],
+  )
+
+  if (result.rows.length === 0) {
+    return null
+  }
+
+  const row = result.rows[0]
+  return {
+    id: row.id,
+    deletedNodeCount: row.deleted_node_count,
+    deletedMessageCount: row.deleted_message_count,
+  }
+}
+
+export const deleteWorkspaceForAuthor = async (
+  id: string,
+  authorUserId: string,
+): Promise<DeleteWorkspaceResult | null> => {
+  const result = await query<DeleteWorkspaceRow>(
+    `
+    WITH target_workspace AS (
+      SELECT id
+      FROM workspaces
+      WHERE id = $1
+        AND author_user_id = $2
+    ),
+    target_nodes AS (
+      SELECT n.id
+      FROM nodes n
+      JOIN target_workspace tw ON tw.id = n.workspace_id
+    ),
+    target_messages AS (
+      SELECT m.id
+      FROM messages m
+      JOIN target_nodes tn ON tn.id = m.node_id
+    ),
+    deleted_workspace AS (
+      DELETE FROM workspaces w
+      USING target_workspace tw
+      WHERE w.id = tw.id
+      RETURNING w.id
+    )
+    SELECT
+      dw.id,
+      (SELECT COUNT(*)::int FROM target_nodes) AS deleted_node_count,
+      (SELECT COUNT(*)::int FROM target_messages) AS deleted_message_count
+    FROM deleted_workspace dw
+    `,
+    [id, authorUserId],
   )
 
   if (result.rows.length === 0) {
