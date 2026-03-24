@@ -3,6 +3,7 @@ import type { inferRouterOutputs } from '@trpc/server'
 import type { AppRouter } from '@branching/shared'
 import { trpc } from '../../../trpc'
 import type { TreeMessage } from '../../../types/tree'
+import { invalidateMessagesByNode } from './mutationInvalidation'
 
 type RouterOutputs = inferRouterOutputs<AppRouter>
 type NodeMessage = RouterOutputs['messagesByNode'][number]
@@ -37,6 +38,11 @@ type UseNodeConversationParams = {
   canSendMessages: boolean
 }
 
+type MessageUpdatePatch = {
+  role?: NodeMessage['role']
+  content?: string
+}
+
 type PendingMessage = {
   id: string
   role: 'user'
@@ -50,9 +56,15 @@ type UseNodeConversationResult = {
   failedMessageIds: Set<string>
   isLoadingMessages: boolean
   isSendingMessage: boolean
+  isUpdatingMessage: boolean
+  isDeletingMessage: boolean
   messagesLoadError: string | null
   messageSendError: string | null
+  messageUpdateError: string | null
+  messageDeleteError: string | null
   sendMessage: (text: string) => boolean
+  updateMessage: (messageId: string, patch: MessageUpdatePatch) => boolean
+  deleteMessage: (messageId: string) => boolean
   retryFailedMessage: (messageId: string) => boolean
   dismissFailedMessage: (messageId: string) => void
 }
@@ -70,10 +82,34 @@ export const useNodeConversation = ({ nodeId, canSendMessages }: UseNodeConversa
   )
 
   const invalidateNodeMessages = async (targetNodeId: string) => {
-    await utils.messagesByNode.invalidate({ nodeId: targetNodeId })
+    await invalidateMessagesByNode(utils.messagesByNode.invalidate, targetNodeId)
   }
 
   const createMessageMutation = trpc.messageCreate.useMutation()
+  const updateMessageMutation = trpc.messageUpdate.useMutation({
+    onMutate: () => ({
+      targetNodeId: nodeId,
+    }),
+    onSuccess: async (_updatedMessage, _input, context) => {
+      if (!context?.targetNodeId) {
+        return
+      }
+
+      await invalidateNodeMessages(context.targetNodeId)
+    },
+  })
+  const deleteMessageMutation = trpc.messageDelete.useMutation({
+    onMutate: () => ({
+      targetNodeId: nodeId,
+    }),
+    onSuccess: async (_deletedMessage, _input, context) => {
+      if (!context?.targetNodeId) {
+        return
+      }
+
+      await invalidateNodeMessages(context.targetNodeId)
+    },
+  })
 
   const messages = useMemo<TreeMessage[]>(() => {
     const persistedMessages = (messagesQuery.data ?? []).map((message) => ({
@@ -190,6 +226,36 @@ export const useNodeConversation = ({ nodeId, canSendMessages }: UseNodeConversa
     return queueMessage(failedMessage)
   }
 
+  const updateMessage = (messageId: string, patch: MessageUpdatePatch): boolean => {
+    if (
+      !nodeId ||
+      !canSendMessages ||
+      updateMessageMutation.isPending ||
+      (patch.content === undefined && patch.role === undefined)
+    ) {
+      return false
+    }
+
+    updateMessageMutation.reset()
+    updateMessageMutation.mutate({
+      id: messageId,
+      ...patch,
+    })
+    return true
+  }
+
+  const deleteMessage = (messageId: string): boolean => {
+    if (!nodeId || !canSendMessages || deleteMessageMutation.isPending) {
+      return false
+    }
+
+    deleteMessageMutation.reset()
+    deleteMessageMutation.mutate({
+      id: messageId,
+    })
+    return true
+  }
+
   const dismissFailedMessage = (messageId: string) => {
     setPendingMessages((current) =>
       current.filter((message) => message.id !== messageId),
@@ -202,9 +268,15 @@ export const useNodeConversation = ({ nodeId, canSendMessages }: UseNodeConversa
     failedMessageIds,
     isLoadingMessages: messagesQuery.isLoading,
     isSendingMessage: createMessageMutation.isPending,
+    isUpdatingMessage: updateMessageMutation.isPending,
+    isDeletingMessage: deleteMessageMutation.isPending,
     messagesLoadError: messagesQuery.error?.message ?? null,
     messageSendError: createMessageMutation.error?.message ?? null,
+    messageUpdateError: updateMessageMutation.error?.message ?? null,
+    messageDeleteError: deleteMessageMutation.error?.message ?? null,
     sendMessage,
+    updateMessage,
+    deleteMessage,
     retryFailedMessage,
     dismissFailedMessage,
   }
