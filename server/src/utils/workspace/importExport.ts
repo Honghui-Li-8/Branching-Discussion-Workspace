@@ -6,8 +6,7 @@ import { getClient, query } from '../../db/client.js'
 import type { MessageRole } from '../../db/models/message.js'
 import type { NodeConfidence, NodeStatus, NodeType } from '../../db/models/node.js'
 import type { WorkspaceRecord } from '../../db/models/workspace.js'
-import { listNodesByWorkspace } from '../../db/queries/node.js'
-import { getWorkspaceById } from '../../db/queries/workspace.js'
+import { getWorkspaceById, listNodesByWorkspace } from '../../db/queries/internal.js'
 
 const nodeTypeSchema = z.enum(['decision', 'question', 'option', 'constraint'])
 const nodeStatusSchema = z.enum([

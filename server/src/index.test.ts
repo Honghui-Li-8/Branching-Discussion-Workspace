@@ -5,7 +5,7 @@ import type { SessionUser } from './auth/types.js'
 import {
   createMessageForAuthor,
   createNodeForAuthor,
-  createWorkspace,
+  createWorkspaceForAuthor,
   deleteMessageForAuthor,
   deleteNodeForAuthor,
   deleteWorkspaceForAuthor,
@@ -15,19 +15,21 @@ import {
   listMessagesForNodeForAuthor,
   listNodesByWorkspaceForAuthor,
   listWorkspacesByAuthor,
-  messageExists,
-  nodeExists,
   updateMessageForAuthor,
   updateNodeForAuthor,
   updateWorkspaceForAuthor,
-  workspaceExists,
 } from './db/index.js'
+import {
+  messageExists,
+  nodeExists,
+  workspaceExists,
+} from './db/queries/internal.js'
 import { createAppRouterContext } from './trpcContext.js'
 
 jest.mock('./db/index.js', () => ({
   createMessageForAuthor: jest.fn(),
   createNodeForAuthor: jest.fn(),
-  createWorkspace: jest.fn(),
+  createWorkspaceForAuthor: jest.fn(),
   deleteMessageForAuthor: jest.fn(),
   deleteNodeForAuthor: jest.fn(),
   deleteWorkspaceForAuthor: jest.fn(),
@@ -37,11 +39,14 @@ jest.mock('./db/index.js', () => ({
   listMessagesForNodeForAuthor: jest.fn(),
   listNodesByWorkspaceForAuthor: jest.fn(),
   listWorkspacesByAuthor: jest.fn(),
-  messageExists: jest.fn(),
-  nodeExists: jest.fn(),
   updateMessageForAuthor: jest.fn(),
   updateNodeForAuthor: jest.fn(),
   updateWorkspaceForAuthor: jest.fn(),
+}))
+
+jest.mock('./db/queries/internal.js', () => ({
+  messageExists: jest.fn(),
+  nodeExists: jest.fn(),
   workspaceExists: jest.fn(),
 }))
 
@@ -64,7 +69,9 @@ const listMessagesForNodeForAuthorMock = listMessagesForNodeForAuthor as jest.Mo
   typeof listMessagesForNodeForAuthor
 >
 const messageExistsMock = messageExists as jest.MockedFunction<typeof messageExists>
-const createWorkspaceMock = createWorkspace as jest.MockedFunction<typeof createWorkspace>
+const createWorkspaceForAuthorMock = createWorkspaceForAuthor as jest.MockedFunction<
+  typeof createWorkspaceForAuthor
+>
 const createNodeForAuthorMock = createNodeForAuthor as jest.MockedFunction<typeof createNodeForAuthor>
 const createMessageForAuthorMock = createMessageForAuthor as jest.MockedFunction<typeof createMessageForAuthor>
 const updateWorkspaceForAuthorMock = updateWorkspaceForAuthor as jest.MockedFunction<
@@ -239,7 +246,7 @@ describe('tRPC ownership integration', () => {
     )
     messageExistsMock.mockResolvedValue(false)
 
-    createWorkspaceMock.mockResolvedValue(ownedWorkspaceRecord)
+    createWorkspaceForAuthorMock.mockResolvedValue(ownedWorkspaceRecord)
     createNodeForAuthorMock.mockResolvedValue(ownedNodeRecord)
     createMessageForAuthorMock.mockResolvedValue(ownedMessageRecord)
     updateWorkspaceForAuthorMock.mockResolvedValue(null)

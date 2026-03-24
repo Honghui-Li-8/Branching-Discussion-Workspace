@@ -6,7 +6,7 @@ import { getSessionUser } from './auth/sessionStore.js'
 import {
   createMessageForAuthor as createMessageForAuthorRecord,
   createNodeForAuthor as createNodeForAuthorRecord,
-  createWorkspace as createWorkspaceRecord,
+  createWorkspaceForAuthor as createWorkspaceForAuthorRecord,
   deleteMessageForAuthor as deleteMessageForAuthorRecord,
   deleteNodeForAuthor as deleteNodeForAuthorRecord,
   deleteWorkspaceForAuthor as deleteWorkspaceForAuthorRecord,
@@ -16,13 +16,15 @@ import {
   listMessagesForNodeForAuthor as listMessagesForNodeForAuthorRecord,
   listNodesByWorkspaceForAuthor as listNodesByWorkspaceForAuthorRecord,
   listWorkspacesByAuthor as listWorkspacesByAuthorRecord,
-  messageExists as messageExistsRecord,
-  nodeExists as nodeExistsRecord,
   updateMessageForAuthor as updateMessageForAuthorRecord,
   updateNodeForAuthor as updateNodeForAuthorRecord,
   updateWorkspaceForAuthor as updateWorkspaceForAuthorRecord,
-  workspaceExists as workspaceExistsRecord,
 } from './db/index.js'
+import {
+  messageExists as messageExistsRecord,
+  nodeExists as nodeExistsRecord,
+  workspaceExists as workspaceExistsRecord,
+} from './db/queries/internal.js'
 
 type ContextRequest = Pick<Request, 'headers'>
 
@@ -97,7 +99,7 @@ export const createAppRouterContext = (req: ContextRequest): AppRouterContext =>
     getWorkspaceById: async (id) => getWorkspaceByIdForSessionUser(id),
     createWorkspace: async (input) => {
       const currentUserId = requireSessionUserId()
-      return createWorkspaceRecord({
+      return createWorkspaceForAuthorRecord({
         ...input,
         authorUserId: currentUserId,
       })
