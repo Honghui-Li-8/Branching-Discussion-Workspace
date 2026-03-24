@@ -4,6 +4,7 @@ set -u
 
 TASKS=(
   "unit tests|yarn test:unit"
+  "ownership import boundary|yarn check:ownership-boundary"
   "type check|yarn check:type"
   "spell check|yarn spellcheck"
 )
