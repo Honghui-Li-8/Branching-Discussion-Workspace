@@ -5,13 +5,10 @@ import {
   listMessagesForNodeForAuthor as listMessagesForNodeForAuthorRecord,
   updateConversationTurnForAuthor as updateConversationTurnForAuthorRecord,
 } from '../db/index.js'
-
-type SendConversationTurnInput = {
-  nodeId: string
-  text: string
-  model: string
-  idempotencyKey: string
-}
+import type {
+  SendConversationTurnInput,
+  SendConversationTurnResult,
+} from './types.js'
 
 type SendConversationTurnParams = {
   input: SendConversationTurnInput
@@ -33,7 +30,7 @@ const findRecoverableUserMessage = (
 export const sendConversationTurn = async ({
   input,
   currentUserId,
-}: SendConversationTurnParams) => {
+}: SendConversationTurnParams): Promise<SendConversationTurnResult> => {
   const turnResult = await createOrGetConversationTurnForAuthorRecord({
     nodeId: input.nodeId,
     authorUserId: currentUserId,
