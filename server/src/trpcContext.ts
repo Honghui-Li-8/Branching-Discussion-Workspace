@@ -257,5 +257,12 @@ export const createAppRouterContext = (req: ContextRequest): AppRouterContext =>
         messageExistsRecord,
       )
     },
+    conversationSend: async (_input) => {
+      requireSessionUserId()
+      throw new TRPCError({
+        code: 'METHOD_NOT_SUPPORTED',
+        message: 'conversationSend is not implemented yet.',
+      })
+    },
   }
 }

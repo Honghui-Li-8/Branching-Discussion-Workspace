@@ -122,6 +122,28 @@ const deleteMessageInputSchema = z.object({
   id: z.string(),
 })
 
+const conversationTurnStatusSchema = z.enum([
+  'pending',
+  'processing',
+  'completed',
+  'failed',
+])
+
+const conversationSendInputSchema = z.object({
+  nodeId: z.string(),
+  text: z.string().min(1),
+  model: z.string().min(1),
+  idempotencyKey: z.string().min(1),
+})
+
+const conversationSendResultSchema = z.object({
+  turnId: z.string(),
+  status: conversationTurnStatusSchema,
+  userMessage: messageSchema,
+  assistantMessage: messageSchema.nullable(),
+  error: z.string().nullable(),
+})
+
 type User = z.infer<typeof userSchema>
 type Workspace = z.infer<typeof workspaceSchema>
 type Node = z.infer<typeof nodeSchema>
@@ -132,6 +154,8 @@ type CreateNodeInput = z.infer<typeof createNodeInputSchema>
 type UpdateNodeInput = z.infer<typeof updateNodeInputSchema>
 type CreateMessageInput = z.infer<typeof createMessageInputSchema>
 type UpdateMessageInput = z.infer<typeof updateMessageInputSchema>
+type ConversationSendInput = z.infer<typeof conversationSendInputSchema>
+type ConversationSendResult = z.infer<typeof conversationSendResultSchema>
 
 export type AppRouterContext = {
   sessionUserId: string | null
@@ -166,6 +190,9 @@ export type AppRouterContext = {
   createMessage: (input: CreateMessageInput) => Promise<Message>
   updateMessage: (input: UpdateMessageInput) => Promise<Message | null>
   deleteMessage: (id: string) => Promise<{ id: string } | null>
+  conversationSend: (
+    input: ConversationSendInput,
+  ) => Promise<ConversationSendResult>
 }
 
 const t = initTRPC.context<AppRouterContext>().create()
@@ -237,6 +264,9 @@ export const appRouter = t.router({
   messageDelete: protectedProcedure
     .input(deleteMessageInputSchema)
     .mutation(({ ctx, input }) => ctx.deleteMessage(input.id)),
+  conversationSend: protectedProcedure
+    .input(conversationSendInputSchema)
+    .mutation(({ ctx, input }) => ctx.conversationSend(input)),
 })
 
 export type AppRouter = typeof appRouter
