@@ -3,6 +3,7 @@ import { appRouter } from './router.js'
 import { clearAllSessions, createSession } from './auth/sessionStore.js'
 import type { SessionUser } from './auth/types.js'
 import {
+  createOrGetConversationTurnForAuthor,
   createMessageForAuthor,
   createNodeForAuthor,
   createWorkspaceForAuthor,
@@ -15,6 +16,7 @@ import {
   listMessagesForNodeForAuthor,
   listNodesByWorkspaceForAuthor,
   listWorkspacesByAuthor,
+  updateConversationTurnForAuthor,
   updateMessageForAuthor,
   updateNodeForAuthor,
   updateWorkspaceForAuthor,
@@ -27,6 +29,7 @@ import {
 import { createAppRouterContext } from './trpcContext.js'
 
 jest.mock('./db/index.js', () => ({
+  createOrGetConversationTurnForAuthor: jest.fn(),
   createMessageForAuthor: jest.fn(),
   createNodeForAuthor: jest.fn(),
   createWorkspaceForAuthor: jest.fn(),
@@ -39,6 +42,7 @@ jest.mock('./db/index.js', () => ({
   listMessagesForNodeForAuthor: jest.fn(),
   listNodesByWorkspaceForAuthor: jest.fn(),
   listWorkspacesByAuthor: jest.fn(),
+  updateConversationTurnForAuthor: jest.fn(),
   updateMessageForAuthor: jest.fn(),
   updateNodeForAuthor: jest.fn(),
   updateWorkspaceForAuthor: jest.fn(),
@@ -69,6 +73,9 @@ const listMessagesForNodeForAuthorMock = listMessagesForNodeForAuthor as jest.Mo
   typeof listMessagesForNodeForAuthor
 >
 const messageExistsMock = messageExists as jest.MockedFunction<typeof messageExists>
+const createOrGetConversationTurnForAuthorMock = createOrGetConversationTurnForAuthor as jest.MockedFunction<
+  typeof createOrGetConversationTurnForAuthor
+>
 const createWorkspaceForAuthorMock = createWorkspaceForAuthor as jest.MockedFunction<
   typeof createWorkspaceForAuthor
 >
@@ -80,6 +87,9 @@ const updateWorkspaceForAuthorMock = updateWorkspaceForAuthor as jest.MockedFunc
 const updateNodeForAuthorMock = updateNodeForAuthor as jest.MockedFunction<typeof updateNodeForAuthor>
 const updateMessageForAuthorMock = updateMessageForAuthor as jest.MockedFunction<
   typeof updateMessageForAuthor
+>
+const updateConversationTurnForAuthorMock = updateConversationTurnForAuthor as jest.MockedFunction<
+  typeof updateConversationTurnForAuthor
 >
 const deleteWorkspaceForAuthorMock = deleteWorkspaceForAuthor as jest.MockedFunction<
   typeof deleteWorkspaceForAuthor
@@ -142,6 +152,19 @@ const ownedMessageRecord = {
   createdAt: '2026-03-20T00:00:00.000Z',
 }
 
+const ownedConversationTurnRecord = {
+  id: '44444444-4444-4444-8444-444444444444',
+  nodeId: ownedNodeRecord.id,
+  authorUserId: selfSessionUser.id,
+  status: 'processing' as const,
+  model: 'gpt-5',
+  idempotencyKey: 'idempotency-key-1',
+  error: null,
+  completedAt: null,
+  createdAt: '2026-03-20T00:00:00.000Z',
+  updatedAt: '2026-03-20T00:00:00.000Z',
+}
+
 const makeCaller = (sessionUser: SessionUser | null) => {
   const cookie =
     sessionUser === null ? undefined : `bdw_session=${createSession(sessionUser)}`
@@ -155,7 +178,7 @@ const makeCaller = (sessionUser: SessionUser | null) => {
 
 const expectTrpcError = async (
   promise: Promise<unknown>,
-  code: 'UNAUTHORIZED' | 'FORBIDDEN' | 'NOT_FOUND',
+  code: 'UNAUTHORIZED' | 'FORBIDDEN' | 'NOT_FOUND' | 'CONFLICT',
   message: string,
 ) => {
   await expect(promise).rejects.toMatchObject({
@@ -249,9 +272,14 @@ describe('tRPC ownership integration', () => {
     createWorkspaceForAuthorMock.mockResolvedValue(ownedWorkspaceRecord)
     createNodeForAuthorMock.mockResolvedValue(ownedNodeRecord)
     createMessageForAuthorMock.mockResolvedValue(ownedMessageRecord)
+    createOrGetConversationTurnForAuthorMock.mockResolvedValue({
+      turn: ownedConversationTurnRecord,
+      wasCreated: true,
+    })
     updateWorkspaceForAuthorMock.mockResolvedValue(null)
     updateNodeForAuthorMock.mockResolvedValue(null)
     updateMessageForAuthorMock.mockResolvedValue(null)
+    updateConversationTurnForAuthorMock.mockResolvedValue(null)
     deleteWorkspaceForAuthorMock.mockResolvedValue(null)
     deleteNodeForAuthorMock.mockResolvedValue(null)
     deleteMessageForAuthorMock.mockResolvedValue(null)
@@ -390,6 +418,153 @@ describe('tRPC ownership integration', () => {
       }),
       'NOT_FOUND',
       'Node not found.',
+    )
+  })
+
+  test('conversationSend persists idempotent turn + user message for owner', async () => {
+    const caller = makeCaller(selfSessionUser)
+    createOrGetConversationTurnForAuthorMock.mockResolvedValueOnce({
+      turn: ownedConversationTurnRecord,
+      wasCreated: true,
+    })
+    createMessageForAuthorMock.mockResolvedValueOnce(ownedMessageRecord)
+
+    const result = await caller.conversationSend({
+      nodeId: ownedNodeRecord.id,
+      text: 'hello',
+      model: 'gpt-5',
+      idempotencyKey: 'idempotency-key-1',
+    })
+
+    expect(createOrGetConversationTurnForAuthorMock).toHaveBeenCalledWith({
+      nodeId: ownedNodeRecord.id,
+      authorUserId: selfSessionUser.id,
+      model: 'gpt-5',
+      idempotencyKey: 'idempotency-key-1',
+      status: 'processing',
+    })
+    expect(createMessageForAuthorMock).toHaveBeenCalledWith({
+      nodeId: ownedNodeRecord.id,
+      authorUserId: selfSessionUser.id,
+      role: 'user',
+      content: 'hello',
+    })
+    expect(result).toEqual({
+      turnId: ownedConversationTurnRecord.id,
+      status: 'processing',
+      userMessage: ownedMessageRecord,
+      assistantMessage: null,
+      error: null,
+    })
+  })
+
+  test('conversationSend duplicate idempotency key returns existing message without reinsert', async () => {
+    const caller = makeCaller(selfSessionUser)
+    createOrGetConversationTurnForAuthorMock.mockResolvedValueOnce({
+      turn: {
+        ...ownedConversationTurnRecord,
+        status: 'processing',
+        createdAt: '2026-03-20T00:00:00.000Z',
+      },
+      wasCreated: false,
+    })
+    listMessagesForNodeForAuthorMock.mockResolvedValueOnce([ownedMessageRecord])
+
+    const result = await caller.conversationSend({
+      nodeId: ownedNodeRecord.id,
+      text: 'hello',
+      model: 'gpt-5',
+      idempotencyKey: 'idempotency-key-1',
+    })
+
+    expect(createMessageForAuthorMock).not.toHaveBeenCalled()
+    expect(result.userMessage.id).toBe(ownedMessageRecord.id)
+    expect(result.turnId).toBe(ownedConversationTurnRecord.id)
+  })
+
+  test('conversationSend duplicate idempotency key without recoverable message returns CONFLICT', async () => {
+    const caller = makeCaller(selfSessionUser)
+    createOrGetConversationTurnForAuthorMock.mockResolvedValueOnce({
+      turn: {
+        ...ownedConversationTurnRecord,
+        createdAt: '2026-03-21T00:00:00.000Z',
+      },
+      wasCreated: false,
+    })
+    listMessagesForNodeForAuthorMock.mockResolvedValueOnce([ownedMessageRecord])
+
+    await expectTrpcError(
+      caller.conversationSend({
+        nodeId: ownedNodeRecord.id,
+        text: 'hello',
+        model: 'gpt-5',
+        idempotencyKey: 'idempotency-key-1',
+      }),
+      'CONFLICT',
+      'A turn already exists for this idempotency key.',
+    )
+  })
+
+  test('conversationSend with missing node returns NOT_FOUND', async () => {
+    const caller = makeCaller(selfSessionUser)
+    getNodeByIdForAuthorMock.mockResolvedValueOnce(null)
+    nodeExistsMock.mockResolvedValueOnce(false)
+
+    await expectTrpcError(
+      caller.conversationSend({
+        nodeId: ownedNodeRecord.id,
+        text: 'hello',
+        model: 'gpt-5',
+        idempotencyKey: 'idempotency-key-1',
+      }),
+      'NOT_FOUND',
+      'Node not found.',
+    )
+  })
+
+  test('conversationSend with cross-user node returns FORBIDDEN', async () => {
+    const caller = makeCaller(selfSessionUser)
+    getNodeByIdForAuthorMock.mockResolvedValueOnce(null)
+    nodeExistsMock.mockResolvedValueOnce(true)
+
+    await expectTrpcError(
+      caller.conversationSend({
+        nodeId: ownedNodeRecord.id,
+        text: 'hello',
+        model: 'gpt-5',
+        idempotencyKey: 'idempotency-key-1',
+      }),
+      'FORBIDDEN',
+      'Workspace access is forbidden.',
+    )
+  })
+
+  test('conversationSend marks turn failed when user message insert returns no row', async () => {
+    const caller = makeCaller(selfSessionUser)
+    createOrGetConversationTurnForAuthorMock.mockResolvedValueOnce({
+      turn: ownedConversationTurnRecord,
+      wasCreated: true,
+    })
+    createMessageForAuthorMock.mockResolvedValueOnce(null)
+
+    await expectTrpcError(
+      caller.conversationSend({
+        nodeId: ownedNodeRecord.id,
+        text: 'hello',
+        model: 'gpt-5',
+        idempotencyKey: 'idempotency-key-1',
+      }),
+      'NOT_FOUND',
+      'Node not found.',
+    )
+
+    expect(updateConversationTurnForAuthorMock).toHaveBeenCalledWith(
+      {
+        id: ownedConversationTurnRecord.id,
+        status: 'failed',
+        error: 'Node not found.',
+      },
+      selfSessionUser.id,
     )
   })
 
@@ -634,6 +809,16 @@ describe('tRPC ownership integration', () => {
     )
     await expectTrpcError(
       caller.messageDelete({ id: ownedMessageRecord.id }),
+      'UNAUTHORIZED',
+      'Authentication required.',
+    )
+    await expectTrpcError(
+      caller.conversationSend({
+        nodeId: ownedNodeRecord.id,
+        text: 'hello',
+        model: 'gpt-5',
+        idempotencyKey: 'idempotency-key-1',
+      }),
       'UNAUTHORIZED',
       'Authentication required.',
     )
