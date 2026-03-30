@@ -3,11 +3,23 @@ import type { TreeMessage } from '../../types/tree'
 
 type ConversationMessageListProps = {
   messages: TreeMessage[]
+  isLoading: boolean
+  errorMessage: string | null
+  pendingMessageIds: Set<string>
+  failedMessageIds: Set<string>
+  onRetryFailedMessage: (messageId: string) => void
+  onDismissFailedMessage: (messageId: string) => void
   conversationScrollRef: RefObject<HTMLDivElement | null>
 }
 
 export const ConversationMessageList = ({
   messages,
+  isLoading,
+  errorMessage,
+  pendingMessageIds,
+  failedMessageIds,
+  onRetryFailedMessage,
+  onDismissFailedMessage,
   conversationScrollRef,
 }: ConversationMessageListProps) => {
   return (
@@ -17,24 +29,65 @@ export const ConversationMessageList = ({
       style={{ minHeight: 0 }}
     >
       <div className="flex min-h-full flex-col justify-end gap-2">
-        {messages.length ? (
-          messages.map((message) => (
-            <div
-              key={message.id}
-              className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
+        {isLoading ? (
+          <p className="m-0 self-stretch rounded-lg border border-dashed border-[#bdd7eb] bg-white p-3 text-sm text-[#40657d]">
+            Loading messages...
+          </p>
+        ) : errorMessage ? (
+          <p className="m-0 self-stretch rounded-lg border border-[#f1cabd] bg-[#fff6f3] p-3 text-sm text-[#8a3f2b]">
+            Failed to load messages: {errorMessage}
+          </p>
+        ) : messages.length ? (
+          messages.map((message) => {
+            const isPending = pendingMessageIds.has(message.id)
+            const isFailed = failedMessageIds.has(message.id)
+
+            return (
               <div
-                className={`max-w-[82%] rounded-[14px] px-3 py-2 text-sm leading-relaxed ${
-                  message.role === 'user'
-                    ? 'bg-[#e8f4fd] text-[#12384c]'
-                    : 'border border-[#b5deef] bg-white text-[#1f4f68]'
-                }`}
-                style={{ overflowWrap: 'anywhere' }}
+                key={message.id}
+                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
-                {message.content}
+                <div className="max-w-[82%]">
+                  <div
+                    className={`rounded-[14px] px-3 py-2 text-sm leading-relaxed ${
+                      message.role === 'user'
+                        ? isFailed
+                          ? 'border border-[#f1cabd] bg-[#fff6f3] text-[#8a3f2b]'
+                          : 'bg-[#e8f4fd] text-[#12384c]'
+                        : 'border border-[#b5deef] bg-white text-[#1f4f68]'
+                    }`}
+                    style={{ overflowWrap: 'anywhere' }}
+                  >
+                    {message.content}
+                  </div>
+
+                  {isPending ? (
+                    <p className="mt-1 mb-0 text-[11px] text-[#3f6a81]">Sending...</p>
+                  ) : null}
+
+                  {isFailed ? (
+                    <div className="mt-1 flex items-center justify-end gap-2">
+                      <p className="m-0 text-[11px] text-[#8a3f2b]">Not sent</p>
+                      <button
+                        type="button"
+                        className="rounded border border-[#e8b8a8] bg-white px-2 py-0.5 text-[11px] text-[#8a3f2b] hover:bg-[#fff3ee]"
+                        onClick={() => onRetryFailedMessage(message.id)}
+                      >
+                        Retry
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded border border-[#e8b8a8] bg-white px-2 py-0.5 text-[11px] text-[#8a3f2b] hover:bg-[#fff3ee]"
+                        onClick={() => onDismissFailedMessage(message.id)}
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
               </div>
-            </div>
-          ))
+            )
+          })
         ) : (
           <p className="m-0 self-stretch rounded-lg border border-dashed border-[#bdd7eb] bg-white p-3 text-sm text-[#40657d]">
             No messages yet for this node. Start with your first thought below.

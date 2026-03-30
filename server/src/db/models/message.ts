@@ -15,3 +15,9 @@ export interface CreateMessageInput {
   role: MessageRole
   content: string
 }
+
+export interface UpdateMessageInput {
+  id: string
+  role?: MessageRole
+  content?: string
+}

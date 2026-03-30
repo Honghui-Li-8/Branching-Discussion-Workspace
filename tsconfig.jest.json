@@ -8,5 +8,5 @@
     "skipLibCheck": true,
     "types": ["node", "jest"]
   },
-  "include": ["shared/src/**/*.ts", "client/web/src/**/*.ts", "client/web/src/**/*.tsx"]
+  "include": ["shared/src/**/*.ts", "client/web/src/**/*.ts", "client/web/src/**/*.tsx", "server/src/**/*.ts"]
 }

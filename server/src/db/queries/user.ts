@@ -64,11 +64,61 @@ export const getUserById = async (id: string): Promise<UserRecord | null> => {
   return mapUserRow(result.rows[0])
 }
 
+export const getUserByAuthUserId = async (authUserId: string): Promise<UserRecord | null> => {
+  const result = await query<UserRow>(
+    `
+    SELECT
+      id,
+      auth_user_id,
+      email,
+      display_name,
+      credit_balance,
+      created_at,
+      updated_at
+    FROM users
+    WHERE auth_user_id = $1
+    `,
+    [authUserId],
+  )
+
+  if (result.rows.length === 0) {
+    return null
+  }
+
+  return mapUserRow(result.rows[0])
+}
+
 export const createUser = async (input: CreateUserInput): Promise<UserRecord> => {
   const result = await query<UserRow>(
     `
     INSERT INTO users (auth_user_id, email, display_name)
     VALUES ($1, $2, $3)
+    RETURNING
+      id,
+      auth_user_id,
+      email,
+      display_name,
+      credit_balance,
+      created_at,
+      updated_at
+    `,
+    [input.authUserId, input.email ?? null, input.displayName ?? null],
+  )
+
+  return mapUserRow(result.rows[0])
+}
+
+export const getOrCreateUserByAuthIdentity = async (
+  input: CreateUserInput,
+): Promise<UserRecord> => {
+  const result = await query<UserRow>(
+    `
+    INSERT INTO users (auth_user_id, email, display_name)
+    VALUES ($1, $2, $3)
+    ON CONFLICT (auth_user_id) DO UPDATE
+    SET
+      email = COALESCE(users.email, EXCLUDED.email),
+      display_name = COALESCE(users.display_name, EXCLUDED.display_name)
     RETURNING
       id,
       auth_user_id,

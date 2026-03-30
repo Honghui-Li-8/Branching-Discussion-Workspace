@@ -20,6 +20,7 @@
     "**/*.{ts,tsx,js,cjs,mjs,json,md,sql,sh,yml,yaml,css}"
   ],
   "words": [
+    "Avenir",
     "Nodenext",
     "tsconfig",
     "TRPC",

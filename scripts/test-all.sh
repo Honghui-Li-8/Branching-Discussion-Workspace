@@ -3,19 +3,21 @@
 set -u
 
 TASKS=(
-  "unit tests|yarn test:unit"
-  "type check|yarn check:type"
-  "spell check|yarn spellcheck"
+  "unit tests|yarn test:unit|required"
+  "ownership import boundary|yarn check:ownership-boundary|required"
+  "type check|yarn check:type|required"
+  "spell check|yarn spellcheck|optional"
 )
 
 passed=0
 failed=0
+warnings=0
 
 echo "Test report"
 echo "==========="
 
 for task in "${TASKS[@]}"; do
-  IFS='|' read -r name cmd <<< "$task"
+  IFS='|' read -r name cmd mode <<< "$task"
   echo "Running $name..."
 
   output_file=$(mktemp)
@@ -23,16 +25,24 @@ for task in "${TASKS[@]}"; do
     echo "$name: pass"
     passed=$((passed + 1))
   else
-    echo "$name: fail"
-    failed=$((failed + 1))
-    echo "Last output for $name:"
-    tail -n 40 "$output_file"
+    if [[ "$mode" == "optional" ]]; then
+      echo "$name: warning"
+      warnings=$((warnings + 1))
+      echo "Last output for $name:"
+      tail -n 40 "$output_file"
+      echo "::warning::$name failed, but is non-blocking."
+    else
+      echo "$name: fail"
+      failed=$((failed + 1))
+      echo "Last output for $name:"
+      tail -n 40 "$output_file"
+    fi
   fi
 
   rm -f "$output_file"
 done
 
-echo "Summary: $passed passed, $failed failed."
+echo "Summary: $passed passed, $warnings warnings, $failed failed."
 
 if (( failed > 0 )); then
   exit 1

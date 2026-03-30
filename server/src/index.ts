@@ -1,24 +1,12 @@
 import cors from 'cors'
 import express from 'express'
 import { createExpressMiddleware } from '@trpc/server/adapters/express'
-
-import { appRouter } from './router.js'
 import type { Request, Response } from 'express'
-import type { AppRouterContext } from '@branching/shared'
+import { appRouter } from './router.js'
+import { registerAuthRoutes } from './auth/routes.js'
+import { startSessionCleanup } from './auth/sessionStore.js'
 import { closePool, testConnection } from './db/client.js'
-import {
-  createMessage,
-  createNode,
-  createUser,
-  createWorkspace,
-  getNodeById,
-  getUserById,
-  getWorkspaceById,
-  listMessagesForNode,
-  listNodesByWorkspace,
-  listUsers,
-  listWorkspaces,
-} from './db/index.js'
+import { createAppRouterContext } from './trpcContext.js'
 
 const app = express()
 const PORT = Number(process.env.PORT) || 3001
@@ -29,26 +17,16 @@ app.use(
     credentials: true,
   }),
 )
+app.use(express.json())
+registerAuthRoutes(app)
+
+const sessionCleanupTimer = startSessionCleanup()
 
 app.use(
   '/trpc',
   createExpressMiddleware({
     router: appRouter,
-    createContext(): AppRouterContext {
-      return {
-        listUsers,
-        getUserById,
-        createUser,
-        listWorkspaces,
-        getWorkspaceById,
-        createWorkspace,
-        listNodesByWorkspace,
-        getNodeById,
-        createNode,
-        listMessagesForNode,
-        createMessage,
-      }
-    },
+    createContext: ({ req }) => createAppRouterContext(req),
   }),
 )
 
@@ -72,6 +50,7 @@ const server = app.listen(PORT, async () => {
 
 const shutdown = async (signal: string): Promise<void> => {
   console.log(`${signal} received. Shutting down...`)
+  clearInterval(sessionCleanupTimer)
   server.close(async () => {
     await closePool()
     process.exit(0)
@@ -93,3 +72,4 @@ process.on('SIGINT', () => {
       process.exit(1)
     })
 })
+

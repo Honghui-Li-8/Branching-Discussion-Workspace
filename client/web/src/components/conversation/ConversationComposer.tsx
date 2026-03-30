@@ -1,20 +1,21 @@
-import { type KeyboardEvent, type RefObject, type SubmitEvent } from 'react'
+import { type KeyboardEvent, type RefObject, type SubmitEvent } from "react";
 
-export const CHAT_INPUT_MIN_HEIGHT = 24
-export const CHAT_INPUT_MAX_LINES = 10
-export const CHAT_INPUT_MAX_HEIGHT = CHAT_INPUT_MIN_HEIGHT * CHAT_INPUT_MAX_LINES
-export const CHAT_MODELS = ['gpt-5', 'gpt-4o', 'gpt-4.1', 'gpt-4']
+export const CHAT_INPUT_MIN_HEIGHT = 24;
+export const CHAT_INPUT_MAX_LINES = 10;
+export const CHAT_INPUT_MAX_HEIGHT =
+  CHAT_INPUT_MIN_HEIGHT * CHAT_INPUT_MAX_LINES;
+export const CHAT_MODELS = ["gpt-5", "gpt-4o", "gpt-4.1", "gpt-4"];
 
 type ConversationComposerProps = {
-  conversationModel: string
-  setConversationModel: (nextModel: string) => void
-  conversationInputText: string
-  onConversationInputChange: (nextValue: string) => void
-  onInputResize: () => void
-  onConversationKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void
-  onConversationSubmit: (event: SubmitEvent<HTMLFormElement>) => void
-  conversationInputRef: RefObject<HTMLTextAreaElement | null>
-}
+  conversationModel: string;
+  setConversationModel: (nextModel: string) => void;
+  conversationInputText: string;
+  onConversationInputChange: (nextValue: string) => void;
+  onInputResize: () => void;
+  onConversationKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
+  onConversationSubmit: (event: SubmitEvent<HTMLFormElement>) => void;
+  conversationInputRef: RefObject<HTMLTextAreaElement | null>;
+};
 
 export const ConversationComposer = ({
   conversationModel,
@@ -26,11 +27,17 @@ export const ConversationComposer = ({
   onConversationSubmit,
   conversationInputRef,
 }: ConversationComposerProps) => {
+  // Model picker UI is intentionally disabled for initial plumbing.
+  // Keep these references to preserve wiring and satisfy strict TS no-unused checks.
+  void conversationModel;
+  void setConversationModel;
+
   return (
     <form
       className="border-t border-[#c2dfef] bg-white px-4 py-3"
       onSubmit={onConversationSubmit}
     >
+      {/*
       <div className="mb-2 flex items-center justify-between gap-3">
         <label className="flex items-center gap-2 text-xs text-[#2a6082]" htmlFor="chat-model">
           Model
@@ -49,6 +56,7 @@ export const ConversationComposer = ({
         </label>
         <span className="text-[11px] text-[#5f89a1]">Model: {conversationModel}</span>
       </div>
+      */}
 
       <div className="flex items-end gap-2">
         <textarea
@@ -75,5 +83,5 @@ export const ConversationComposer = ({
         </button>
       </div>
     </form>
-  )
-}
+  );
+};

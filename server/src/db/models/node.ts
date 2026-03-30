@@ -37,3 +37,21 @@ export interface CreateNodeInput {
   conclusion?: string | null
   rationale?: string | null
 }
+
+export interface UpdateNodeInput {
+  id: string
+  type?: NodeType
+  title?: string
+  status?: NodeStatus
+  confidence?: NodeConfidence
+  summary?: string
+  conclusion?: string | null
+  rationale?: string | null
+}
+
+export interface DeleteNodeResult {
+  id: string
+  deletedWorkspace: boolean
+  deletedNodeCount: number
+  deletedMessageCount: number
+}

@@ -1,0 +1,659 @@
+import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globals'
+import { appRouter } from './router.js'
+import { clearAllSessions, createSession } from './auth/sessionStore.js'
+import type { SessionUser } from './auth/types.js'
+import {
+  createMessageForAuthor,
+  createNodeForAuthor,
+  createWorkspaceForAuthor,
+  deleteMessageForAuthor,
+  deleteNodeForAuthor,
+  deleteWorkspaceForAuthor,
+  getNodeByIdForAuthor,
+  getUserById,
+  getWorkspaceByIdForAuthor,
+  listMessagesForNodeForAuthor,
+  listNodesByWorkspaceForAuthor,
+  listWorkspacesByAuthor,
+  updateMessageForAuthor,
+  updateNodeForAuthor,
+  updateWorkspaceForAuthor,
+} from './db/index.js'
+import {
+  messageExists,
+  nodeExists,
+  workspaceExists,
+} from './db/queries/internal.js'
+import { createAppRouterContext } from './trpcContext.js'
+
+jest.mock('./db/index.js', () => ({
+  createMessageForAuthor: jest.fn(),
+  createNodeForAuthor: jest.fn(),
+  createWorkspaceForAuthor: jest.fn(),
+  deleteMessageForAuthor: jest.fn(),
+  deleteNodeForAuthor: jest.fn(),
+  deleteWorkspaceForAuthor: jest.fn(),
+  getNodeByIdForAuthor: jest.fn(),
+  getUserById: jest.fn(),
+  getWorkspaceByIdForAuthor: jest.fn(),
+  listMessagesForNodeForAuthor: jest.fn(),
+  listNodesByWorkspaceForAuthor: jest.fn(),
+  listWorkspacesByAuthor: jest.fn(),
+  updateMessageForAuthor: jest.fn(),
+  updateNodeForAuthor: jest.fn(),
+  updateWorkspaceForAuthor: jest.fn(),
+}))
+
+jest.mock('./db/queries/internal.js', () => ({
+  messageExists: jest.fn(),
+  nodeExists: jest.fn(),
+  workspaceExists: jest.fn(),
+}))
+
+const getUserByIdMock = getUserById as jest.MockedFunction<typeof getUserById>
+const listWorkspacesByAuthorMock = listWorkspacesByAuthor as jest.MockedFunction<
+  typeof listWorkspacesByAuthor
+>
+const getWorkspaceByIdForAuthorMock = getWorkspaceByIdForAuthor as jest.MockedFunction<
+  typeof getWorkspaceByIdForAuthor
+>
+const workspaceExistsMock = workspaceExists as jest.MockedFunction<typeof workspaceExists>
+const listNodesByWorkspaceForAuthorMock = listNodesByWorkspaceForAuthor as jest.MockedFunction<
+  typeof listNodesByWorkspaceForAuthor
+>
+const getNodeByIdForAuthorMock = getNodeByIdForAuthor as jest.MockedFunction<
+  typeof getNodeByIdForAuthor
+>
+const nodeExistsMock = nodeExists as jest.MockedFunction<typeof nodeExists>
+const listMessagesForNodeForAuthorMock = listMessagesForNodeForAuthor as jest.MockedFunction<
+  typeof listMessagesForNodeForAuthor
+>
+const messageExistsMock = messageExists as jest.MockedFunction<typeof messageExists>
+const createWorkspaceForAuthorMock = createWorkspaceForAuthor as jest.MockedFunction<
+  typeof createWorkspaceForAuthor
+>
+const createNodeForAuthorMock = createNodeForAuthor as jest.MockedFunction<typeof createNodeForAuthor>
+const createMessageForAuthorMock = createMessageForAuthor as jest.MockedFunction<typeof createMessageForAuthor>
+const updateWorkspaceForAuthorMock = updateWorkspaceForAuthor as jest.MockedFunction<
+  typeof updateWorkspaceForAuthor
+>
+const updateNodeForAuthorMock = updateNodeForAuthor as jest.MockedFunction<typeof updateNodeForAuthor>
+const updateMessageForAuthorMock = updateMessageForAuthor as jest.MockedFunction<
+  typeof updateMessageForAuthor
+>
+const deleteWorkspaceForAuthorMock = deleteWorkspaceForAuthor as jest.MockedFunction<
+  typeof deleteWorkspaceForAuthor
+>
+const deleteNodeForAuthorMock = deleteNodeForAuthor as jest.MockedFunction<typeof deleteNodeForAuthor>
+const deleteMessageForAuthorMock = deleteMessageForAuthor as jest.MockedFunction<
+  typeof deleteMessageForAuthor
+>
+
+const selfSessionUser: SessionUser = {
+  id: '00000000-0000-4000-8000-000000000001',
+  authUserId: 'auth:self',
+  email: 'self@example.com',
+  displayName: 'Self User',
+}
+
+const selfUserRecord = {
+  id: selfSessionUser.id,
+  authUserId: selfSessionUser.authUserId,
+  email: selfSessionUser.email,
+  displayName: selfSessionUser.displayName,
+  creditBalance: 42,
+  createdAt: '2026-03-20T00:00:00.000Z',
+  updatedAt: '2026-03-20T00:00:00.000Z',
+}
+
+const ownedWorkspaceRecord = {
+  id: '11111111-1111-4111-8111-111111111111',
+  title: 'Owned Workspace',
+  summary: 'root summary',
+  authorUserId: selfSessionUser.id,
+  rootNodeId: '22222222-2222-4222-8222-222222222222',
+  createdAt: '2026-03-20T00:00:00.000Z',
+  updatedAt: '2026-03-20T00:00:00.000Z',
+}
+
+const ownedNodeRecord = {
+  id: ownedWorkspaceRecord.rootNodeId,
+  workspaceId: ownedWorkspaceRecord.id,
+  authorUserId: selfSessionUser.id,
+  parentNodeId: ownedWorkspaceRecord.rootNodeId,
+  depth: 0,
+  type: 'decision' as const,
+  title: 'Root',
+  status: 'open' as const,
+  confidence: 'medium' as const,
+  summary: 'summary',
+  conclusion: null,
+  rationale: null,
+  createdAt: '2026-03-20T00:00:00.000Z',
+  updatedAt: '2026-03-20T00:00:00.000Z',
+}
+
+const ownedMessageRecord = {
+  id: '33333333-3333-4333-8333-333333333333',
+  authorUserId: selfSessionUser.id,
+  nodeId: ownedNodeRecord.id,
+  role: 'user' as const,
+  content: 'hello',
+  createdAt: '2026-03-20T00:00:00.000Z',
+}
+
+const makeCaller = (sessionUser: SessionUser | null) => {
+  const cookie =
+    sessionUser === null ? undefined : `bdw_session=${createSession(sessionUser)}`
+
+  const context = createAppRouterContext({
+    headers: cookie ? { cookie } : {},
+  })
+
+  return appRouter.createCaller(context)
+}
+
+const expectTrpcError = async (
+  promise: Promise<unknown>,
+  code: 'UNAUTHORIZED' | 'FORBIDDEN' | 'NOT_FOUND',
+  message: string,
+) => {
+  await expect(promise).rejects.toMatchObject({
+    code,
+    message,
+  })
+}
+
+describe('tRPC user authorization integration', () => {
+  beforeEach(() => {
+    clearAllSessions()
+    jest.clearAllMocks()
+    getUserByIdMock.mockResolvedValue(selfUserRecord)
+  })
+
+  afterEach(() => {
+    clearAllSessions()
+    jest.restoreAllMocks()
+  })
+
+  test('usersList with valid session returns exactly one self user', async () => {
+    const caller = makeCaller(selfSessionUser)
+
+    const result = await caller.usersList()
+
+    expect(result).toEqual([selfUserRecord])
+    expect(getUserByIdMock).toHaveBeenCalledTimes(1)
+    expect(getUserByIdMock).toHaveBeenCalledWith(selfSessionUser.id)
+  })
+
+  test('usersList without session returns UNAUTHORIZED', async () => {
+    const caller = makeCaller(null)
+    await expectTrpcError(caller.usersList(), 'UNAUTHORIZED', 'Authentication required.')
+  })
+
+  test('userById(self) returns user', async () => {
+    const caller = makeCaller(selfSessionUser)
+
+    const result = await caller.userById({ id: selfSessionUser.id })
+
+    expect(result).toEqual(selfUserRecord)
+    expect(getUserByIdMock).toHaveBeenCalledTimes(1)
+    expect(getUserByIdMock).toHaveBeenCalledWith(selfSessionUser.id)
+  })
+
+  test('userById(otherUserId) returns FORBIDDEN', async () => {
+    const caller = makeCaller(selfSessionUser)
+
+    await expectTrpcError(
+      caller.userById({ id: '00000000-0000-4000-8000-000000000999' }),
+      'FORBIDDEN',
+      'User access is forbidden.',
+    )
+  })
+
+  test('userById without session returns UNAUTHORIZED', async () => {
+    const caller = makeCaller(null)
+    await expectTrpcError(
+      caller.userById({ id: selfSessionUser.id }),
+      'UNAUTHORIZED',
+      'Authentication required.',
+    )
+  })
+})
+
+describe('tRPC ownership integration', () => {
+  beforeEach(() => {
+    clearAllSessions()
+    jest.clearAllMocks()
+
+    getUserByIdMock.mockResolvedValue(selfUserRecord)
+    listWorkspacesByAuthorMock.mockResolvedValue([ownedWorkspaceRecord])
+    getWorkspaceByIdForAuthorMock.mockImplementation(async (id: string, authorUserId: string) =>
+      id === ownedWorkspaceRecord.id && authorUserId === selfSessionUser.id ? ownedWorkspaceRecord : null,
+    )
+    workspaceExistsMock.mockResolvedValue(false)
+
+    listNodesByWorkspaceForAuthorMock.mockImplementation(async (workspaceId: string, authorUserId: string) =>
+      workspaceId === ownedWorkspaceRecord.id && authorUserId === selfSessionUser.id ? [ownedNodeRecord] : [],
+    )
+    getNodeByIdForAuthorMock.mockImplementation(async (id: string, authorUserId: string) =>
+      id === ownedNodeRecord.id && authorUserId === selfSessionUser.id ? ownedNodeRecord : null,
+    )
+    nodeExistsMock.mockResolvedValue(false)
+
+    listMessagesForNodeForAuthorMock.mockImplementation(async (nodeId: string, authorUserId: string) =>
+      nodeId === ownedNodeRecord.id && authorUserId === selfSessionUser.id ? [ownedMessageRecord] : [],
+    )
+    messageExistsMock.mockResolvedValue(false)
+
+    createWorkspaceForAuthorMock.mockResolvedValue(ownedWorkspaceRecord)
+    createNodeForAuthorMock.mockResolvedValue(ownedNodeRecord)
+    createMessageForAuthorMock.mockResolvedValue(ownedMessageRecord)
+    updateWorkspaceForAuthorMock.mockResolvedValue(null)
+    updateNodeForAuthorMock.mockResolvedValue(null)
+    updateMessageForAuthorMock.mockResolvedValue(null)
+    deleteWorkspaceForAuthorMock.mockResolvedValue(null)
+    deleteNodeForAuthorMock.mockResolvedValue(null)
+    deleteMessageForAuthorMock.mockResolvedValue(null)
+  })
+
+  afterEach(() => {
+    clearAllSessions()
+    jest.restoreAllMocks()
+  })
+
+  test('owner succeeds on scoped list/read procedures', async () => {
+    const caller = makeCaller(selfSessionUser)
+
+    await expect(caller.workspacesList()).resolves.toEqual([ownedWorkspaceRecord])
+    await expect(caller.workspaceById({ id: ownedWorkspaceRecord.id })).resolves.toEqual(ownedWorkspaceRecord)
+    await expect(caller.nodesByWorkspace({ workspaceId: ownedWorkspaceRecord.id })).resolves.toEqual([
+      ownedNodeRecord,
+    ])
+    await expect(caller.messagesByNode({ nodeId: ownedNodeRecord.id })).resolves.toEqual([ownedMessageRecord])
+  })
+
+  test('cross-user workspace read is denied with FORBIDDEN', async () => {
+    const caller = makeCaller(selfSessionUser)
+    getWorkspaceByIdForAuthorMock.mockResolvedValueOnce(null)
+    workspaceExistsMock.mockResolvedValueOnce(true)
+
+    await expectTrpcError(
+      caller.workspaceById({ id: '99999999-9999-4999-8999-999999999999' }),
+      'FORBIDDEN',
+      'Workspace access is forbidden.',
+    )
+  })
+
+  test('cross-user workspace node listing is denied with FORBIDDEN', async () => {
+    const caller = makeCaller(selfSessionUser)
+    getWorkspaceByIdForAuthorMock.mockResolvedValueOnce(null)
+    workspaceExistsMock.mockResolvedValueOnce(true)
+
+    await expectTrpcError(
+      caller.nodesByWorkspace({ workspaceId: '99999999-9999-4999-8999-999999999999' }),
+      'FORBIDDEN',
+      'Workspace access is forbidden.',
+    )
+  })
+
+  test('cross-user node message listing is denied with FORBIDDEN', async () => {
+    const caller = makeCaller(selfSessionUser)
+    getNodeByIdForAuthorMock.mockResolvedValueOnce(null)
+    nodeExistsMock.mockResolvedValueOnce(true)
+
+    await expectTrpcError(
+      caller.messagesByNode({ nodeId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }),
+      'FORBIDDEN',
+      'Workspace access is forbidden.',
+    )
+  })
+
+  test('scoped procedures without session are denied with UNAUTHORIZED', async () => {
+    const caller = makeCaller(null)
+
+    await expectTrpcError(caller.workspacesList(), 'UNAUTHORIZED', 'Authentication required.')
+    await expectTrpcError(
+      caller.nodesByWorkspace({ workspaceId: ownedWorkspaceRecord.id }),
+      'UNAUTHORIZED',
+      'Authentication required.',
+    )
+    await expectTrpcError(
+      caller.messagesByNode({ nodeId: ownedNodeRecord.id }),
+      'UNAUTHORIZED',
+      'Authentication required.',
+    )
+  })
+
+  test('nodeCreate with missing workspace returns NOT_FOUND', async () => {
+    const caller = makeCaller(selfSessionUser)
+    getWorkspaceByIdForAuthorMock.mockResolvedValueOnce(null)
+    workspaceExistsMock.mockResolvedValueOnce(false)
+
+    await expectTrpcError(
+      caller.nodeCreate({
+        workspaceId: ownedWorkspaceRecord.id,
+        parentNodeId: ownedNodeRecord.id,
+        type: 'question',
+        title: 'Follow-up',
+        summary: 'Need more data',
+      }),
+      'NOT_FOUND',
+      'Workspace not found.',
+    )
+  })
+
+  test('nodeCreate with missing parent returns NOT_FOUND', async () => {
+    const caller = makeCaller(selfSessionUser)
+    getWorkspaceByIdForAuthorMock.mockResolvedValueOnce(ownedWorkspaceRecord)
+    createNodeForAuthorMock.mockResolvedValueOnce(null)
+
+    await expectTrpcError(
+      caller.nodeCreate({
+        workspaceId: ownedWorkspaceRecord.id,
+        parentNodeId: 'missing-parent-node',
+        type: 'question',
+        title: 'Follow-up',
+        summary: 'Need more data',
+      }),
+      'NOT_FOUND',
+      'Parent node not found in workspace.',
+    )
+  })
+
+  test('messageCreate with missing node returns NOT_FOUND', async () => {
+    const caller = makeCaller(selfSessionUser)
+    getNodeByIdForAuthorMock.mockResolvedValueOnce(null)
+    nodeExistsMock.mockResolvedValueOnce(false)
+
+    await expectTrpcError(
+      caller.messageCreate({
+        nodeId: ownedNodeRecord.id,
+        role: 'user',
+        content: 'Hello',
+      }),
+      'NOT_FOUND',
+      'Node not found.',
+    )
+  })
+
+  test('messageCreate race where insert returns no row returns NOT_FOUND', async () => {
+    const caller = makeCaller(selfSessionUser)
+    getNodeByIdForAuthorMock.mockResolvedValueOnce(ownedNodeRecord)
+    createMessageForAuthorMock.mockResolvedValueOnce(null)
+
+    await expectTrpcError(
+      caller.messageCreate({
+        nodeId: ownedNodeRecord.id,
+        role: 'user',
+        content: 'Hello',
+      }),
+      'NOT_FOUND',
+      'Node not found.',
+    )
+  })
+
+  test('owner succeeds on scoped write procedures', async () => {
+    const caller = makeCaller(selfSessionUser)
+    updateWorkspaceForAuthorMock.mockResolvedValueOnce({
+      ...ownedWorkspaceRecord,
+      title: 'Renamed Workspace',
+    })
+    updateNodeForAuthorMock.mockResolvedValueOnce({
+      ...ownedNodeRecord,
+      summary: 'Updated summary',
+    })
+    updateMessageForAuthorMock.mockResolvedValueOnce({
+      ...ownedMessageRecord,
+      content: 'Updated message',
+    })
+    deleteWorkspaceForAuthorMock.mockResolvedValueOnce({
+      id: ownedWorkspaceRecord.id,
+      deletedNodeCount: 3,
+      deletedMessageCount: 8,
+    })
+    deleteNodeForAuthorMock.mockResolvedValueOnce({
+      id: ownedNodeRecord.id,
+      deletedWorkspace: false,
+      deletedNodeCount: 2,
+      deletedMessageCount: 4,
+    })
+    deleteMessageForAuthorMock.mockResolvedValueOnce({ id: ownedMessageRecord.id })
+
+    await expect(
+      caller.workspaceCreate({
+        title: 'New Workspace',
+        rootNodeTitle: 'Root',
+        rootNodeSummary: '',
+      }),
+    ).resolves.toEqual(ownedWorkspaceRecord)
+    await expect(
+      caller.nodeCreate({
+        workspaceId: ownedWorkspaceRecord.id,
+        parentNodeId: ownedNodeRecord.id,
+        type: 'question',
+        title: 'Follow-up',
+        summary: 'Need more data',
+      }),
+    ).resolves.toEqual(ownedNodeRecord)
+    await expect(
+      caller.messageCreate({
+        nodeId: ownedNodeRecord.id,
+        role: 'user',
+        content: 'Hello',
+      }),
+    ).resolves.toEqual(ownedMessageRecord)
+
+    await expect(
+      caller.workspaceUpdate({
+        id: ownedWorkspaceRecord.id,
+        title: 'Renamed Workspace',
+      }),
+    ).resolves.toMatchObject({ title: 'Renamed Workspace' })
+    await expect(
+      caller.nodeUpdate({
+        id: ownedNodeRecord.id,
+        summary: 'Updated summary',
+      }),
+    ).resolves.toMatchObject({ summary: 'Updated summary' })
+    await expect(
+      caller.messageUpdate({
+        id: ownedMessageRecord.id,
+        content: 'Updated message',
+      }),
+    ).resolves.toMatchObject({ content: 'Updated message' })
+
+    await expect(caller.workspaceDelete({ id: ownedWorkspaceRecord.id })).resolves.toEqual({
+      id: ownedWorkspaceRecord.id,
+      deletedNodeCount: 3,
+      deletedMessageCount: 8,
+    })
+    await expect(caller.nodeDelete({ id: ownedNodeRecord.id })).resolves.toEqual({
+      id: ownedNodeRecord.id,
+      deletedWorkspace: false,
+      deletedNodeCount: 2,
+      deletedMessageCount: 4,
+    })
+    await expect(caller.messageDelete({ id: ownedMessageRecord.id })).resolves.toEqual({
+      id: ownedMessageRecord.id,
+    })
+  })
+
+  test('cross-user write procedures are denied with FORBIDDEN', async () => {
+    const caller = makeCaller(selfSessionUser)
+
+    updateWorkspaceForAuthorMock.mockResolvedValueOnce(null)
+    workspaceExistsMock.mockResolvedValueOnce(true)
+    await expectTrpcError(
+      caller.workspaceUpdate({
+        id: ownedWorkspaceRecord.id,
+        title: 'Renamed',
+      }),
+      'FORBIDDEN',
+      'Workspace access is forbidden.',
+    )
+
+    deleteWorkspaceForAuthorMock.mockResolvedValueOnce(null)
+    workspaceExistsMock.mockResolvedValueOnce(true)
+    await expectTrpcError(
+      caller.workspaceDelete({ id: ownedWorkspaceRecord.id }),
+      'FORBIDDEN',
+      'Workspace access is forbidden.',
+    )
+
+    updateNodeForAuthorMock.mockResolvedValueOnce(null)
+    nodeExistsMock.mockResolvedValueOnce(true)
+    await expectTrpcError(
+      caller.nodeUpdate({
+        id: ownedNodeRecord.id,
+        summary: 'cross user write',
+      }),
+      'FORBIDDEN',
+      'Workspace access is forbidden.',
+    )
+
+    deleteNodeForAuthorMock.mockResolvedValueOnce(null)
+    nodeExistsMock.mockResolvedValueOnce(true)
+    await expectTrpcError(
+      caller.nodeDelete({ id: ownedNodeRecord.id }),
+      'FORBIDDEN',
+      'Workspace access is forbidden.',
+    )
+
+    updateMessageForAuthorMock.mockResolvedValueOnce(null)
+    messageExistsMock.mockResolvedValueOnce(true)
+    await expectTrpcError(
+      caller.messageUpdate({
+        id: ownedMessageRecord.id,
+        content: 'cross user write',
+      }),
+      'FORBIDDEN',
+      'Workspace access is forbidden.',
+    )
+
+    deleteMessageForAuthorMock.mockResolvedValueOnce(null)
+    messageExistsMock.mockResolvedValueOnce(true)
+    await expectTrpcError(
+      caller.messageDelete({ id: ownedMessageRecord.id }),
+      'FORBIDDEN',
+      'Workspace access is forbidden.',
+    )
+
+    getWorkspaceByIdForAuthorMock.mockResolvedValueOnce(null)
+    workspaceExistsMock.mockResolvedValueOnce(true)
+    await expectTrpcError(
+      caller.nodeCreate({
+        workspaceId: ownedWorkspaceRecord.id,
+        parentNodeId: ownedNodeRecord.id,
+        type: 'question',
+        title: 'Follow-up',
+        summary: 'Need more data',
+      }),
+      'FORBIDDEN',
+      'Workspace access is forbidden.',
+    )
+
+    getNodeByIdForAuthorMock.mockResolvedValueOnce(null)
+    nodeExistsMock.mockResolvedValueOnce(true)
+    await expectTrpcError(
+      caller.messageCreate({
+        nodeId: ownedNodeRecord.id,
+        role: 'user',
+        content: 'Hello',
+      }),
+      'FORBIDDEN',
+      'Workspace access is forbidden.',
+    )
+  })
+
+  test('write procedures without session are denied with UNAUTHORIZED', async () => {
+    const caller = makeCaller(null)
+
+    await expectTrpcError(
+      caller.workspaceCreate({
+        title: 'New Workspace',
+      }),
+      'UNAUTHORIZED',
+      'Authentication required.',
+    )
+    await expectTrpcError(
+      caller.workspaceUpdate({
+        id: ownedWorkspaceRecord.id,
+        title: 'Renamed',
+      }),
+      'UNAUTHORIZED',
+      'Authentication required.',
+    )
+    await expectTrpcError(
+      caller.workspaceDelete({ id: ownedWorkspaceRecord.id }),
+      'UNAUTHORIZED',
+      'Authentication required.',
+    )
+
+    await expectTrpcError(
+      caller.nodeCreate({
+        workspaceId: ownedWorkspaceRecord.id,
+        parentNodeId: ownedNodeRecord.id,
+        type: 'question',
+        title: 'Follow-up',
+        summary: 'Need more data',
+      }),
+      'UNAUTHORIZED',
+      'Authentication required.',
+    )
+    await expectTrpcError(
+      caller.nodeUpdate({
+        id: ownedNodeRecord.id,
+        summary: 'Updated summary',
+      }),
+      'UNAUTHORIZED',
+      'Authentication required.',
+    )
+    await expectTrpcError(
+      caller.nodeDelete({ id: ownedNodeRecord.id }),
+      'UNAUTHORIZED',
+      'Authentication required.',
+    )
+
+    await expectTrpcError(
+      caller.messageCreate({
+        nodeId: ownedNodeRecord.id,
+        role: 'user',
+        content: 'Hello',
+      }),
+      'UNAUTHORIZED',
+      'Authentication required.',
+    )
+    await expectTrpcError(
+      caller.messageUpdate({
+        id: ownedMessageRecord.id,
+        content: 'Updated message',
+      }),
+      'UNAUTHORIZED',
+      'Authentication required.',
+    )
+    await expectTrpcError(
+      caller.messageDelete({ id: ownedMessageRecord.id }),
+      'UNAUTHORIZED',
+      'Authentication required.',
+    )
+  })
+
+  test('nodesByWorkspace returns empty list for missing workspace and skips node list query', async () => {
+    const caller = makeCaller(selfSessionUser)
+    getWorkspaceByIdForAuthorMock.mockResolvedValueOnce(null)
+    workspaceExistsMock.mockResolvedValueOnce(false)
+
+    await expect(caller.nodesByWorkspace({ workspaceId: 'missing-workspace' })).resolves.toEqual([])
+    expect(listNodesByWorkspaceForAuthorMock).not.toHaveBeenCalled()
+  })
+
+  test('messagesByNode returns empty list for missing node and skips message list query', async () => {
+    const caller = makeCaller(selfSessionUser)
+    getNodeByIdForAuthorMock.mockResolvedValueOnce(null)
+    nodeExistsMock.mockResolvedValueOnce(false)
+
+    await expect(caller.messagesByNode({ nodeId: 'missing-node' })).resolves.toEqual([])
+    expect(listMessagesForNodeForAuthorMock).not.toHaveBeenCalled()
+  })
+})

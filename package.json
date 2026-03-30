@@ -15,6 +15,7 @@
     "test": "bash ./scripts/test-all.sh",
     "test:all": "bash ./scripts/test-all.sh",
     "test:unit": "jest --config jest.config.cjs --watchman=false",
+    "check:ownership-boundary": "yarn test:unit --runInBand server/src/ownershipImportBoundary.test.ts",
     "spellcheck": "cspell lint --config cspell.json",
     "db:init": "yarn workspace server db:migrate",
     "db:seed": "yarn workspace server db:seed",
