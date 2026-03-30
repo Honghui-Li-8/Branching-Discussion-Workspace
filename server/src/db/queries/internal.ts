@@ -24,3 +24,11 @@ export {
   messageExists,
   updateMessage,
 } from './message.js'
+
+export {
+  conversationTurnExists,
+  createOrGetConversationTurn,
+  getConversationTurnById,
+  getConversationTurnByIdempotencyKey,
+  updateConversationTurn,
+} from './conversationTurn.js'

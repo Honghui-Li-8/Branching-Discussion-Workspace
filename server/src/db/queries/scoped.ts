@@ -21,3 +21,10 @@ export {
   listMessagesForNodeForAuthor,
   updateMessageForAuthor,
 } from './message.js'
+
+export {
+  createOrGetConversationTurnForAuthor,
+  getConversationTurnByIdForAuthor,
+  getConversationTurnByIdempotencyKeyForAuthor,
+  updateConversationTurnForAuthor,
+} from './conversationTurn.js'
