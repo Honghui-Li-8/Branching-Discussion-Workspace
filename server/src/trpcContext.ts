@@ -4,7 +4,6 @@ import type { AppRouterContext } from '@branching/shared'
 import { getSessionIdFromCookieHeader } from './auth/cookies.js'
 import { getSessionUser } from './auth/sessionStore.js'
 import {
-  createOrGetConversationTurnForAuthor as createOrGetConversationTurnForAuthorRecord,
   createMessageForAuthor as createMessageForAuthorRecord,
   createNodeForAuthor as createNodeForAuthorRecord,
   createWorkspaceForAuthor as createWorkspaceForAuthorRecord,
@@ -17,7 +16,6 @@ import {
   listMessagesForNodeForAuthor as listMessagesForNodeForAuthorRecord,
   listNodesByWorkspaceForAuthor as listNodesByWorkspaceForAuthorRecord,
   listWorkspacesByAuthor as listWorkspacesByAuthorRecord,
-  updateConversationTurnForAuthor as updateConversationTurnForAuthorRecord,
   updateMessageForAuthor as updateMessageForAuthorRecord,
   updateNodeForAuthor as updateNodeForAuthorRecord,
   updateWorkspaceForAuthor as updateWorkspaceForAuthorRecord,
@@ -28,6 +26,7 @@ import {
   workspaceExists as workspaceExistsRecord,
 } from './db/queries/internal.js'
 import { buildPlaceholderAssistantReply } from './utils/placeholderModelReply.js'
+import { sendConversationTurn } from './chat/sendConversationTurn.js'
 
 type ContextRequest = Pick<Request, 'headers'>
 type ExistsById = (id: string) => Promise<boolean>
@@ -268,79 +267,10 @@ export const createAppRouterContext = (req: ContextRequest): AppRouterContext =>
         'Node not found.',
       )
 
-      const turnResult = await createOrGetConversationTurnForAuthorRecord({
-        nodeId: input.nodeId,
-        authorUserId: currentUserId,
-        model: input.model,
-        idempotencyKey: input.idempotencyKey,
-        status: 'processing',
+      return sendConversationTurn({
+        input,
+        currentUserId,
       })
-
-      if (!turnResult) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Node not found.',
-        })
-      }
-
-      if (!turnResult.wasCreated) {
-        const existingNodeMessages = await listMessagesForNodeForAuthorRecord(
-          input.nodeId,
-          currentUserId,
-        )
-        const existingUserMessage =
-          existingNodeMessages.find(
-            (message) =>
-              message.role === 'user' &&
-              message.content === input.text &&
-              Date.parse(message.createdAt) >= Date.parse(turnResult.turn.createdAt),
-          ) ?? null
-
-        if (!existingUserMessage) {
-          throw new TRPCError({
-            code: 'CONFLICT',
-            message: 'A turn already exists for this idempotency key.',
-          })
-        }
-
-        return {
-          turnId: turnResult.turn.id,
-          status: turnResult.turn.status,
-          userMessage: existingUserMessage,
-          assistantMessage: null,
-          error: turnResult.turn.error,
-        }
-      }
-
-      const userMessage = await createMessageForAuthorRecord({
-        nodeId: input.nodeId,
-        authorUserId: currentUserId,
-        role: 'user',
-        content: input.text,
-      })
-
-      if (userMessage === null) {
-        await updateConversationTurnForAuthorRecord(
-          {
-            id: turnResult.turn.id,
-            status: 'failed',
-            error: 'Node not found.',
-          },
-          currentUserId,
-        )
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Node not found.',
-        })
-      }
-
-      return {
-        turnId: turnResult.turn.id,
-        status: turnResult.turn.status,
-        userMessage,
-        assistantMessage: null,
-        error: turnResult.turn.error,
-      }
     },
   }
 }
