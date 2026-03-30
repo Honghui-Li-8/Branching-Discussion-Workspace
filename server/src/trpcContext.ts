@@ -25,6 +25,7 @@ import {
   nodeExists as nodeExistsRecord,
   workspaceExists as workspaceExistsRecord,
 } from './db/queries/internal.js'
+import { buildPlaceholderAssistantReply } from './utils/placeholderModelReply.js'
 
 type ContextRequest = Pick<Request, 'headers'>
 type ExistsById = (id: string) => Promise<boolean>
@@ -223,6 +224,21 @@ export const createAppRouterContext = (req: ContextRequest): AppRouterContext =>
           message: 'Node not found.',
         })
       }
+
+      if (input.role === 'user') {
+        try {
+          const response = buildPlaceholderAssistantReply(input.content);
+          await createMessageForAuthorRecord({
+            nodeId: input.nodeId,
+            authorUserId: currentUserId,
+            role: "assistant",
+            content: response,
+          });
+        } catch (error) {
+          console.warn('[placeholder-model] Failed to persist assistant echo reply.', error)
+        }
+      }
+
       return message
     },
     updateMessage: async (input) => {
