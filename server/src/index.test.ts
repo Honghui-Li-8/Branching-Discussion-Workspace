@@ -522,6 +522,22 @@ describe('tRPC ownership integration', () => {
     )
   })
 
+  test('conversationSend turn creation race returns NOT_FOUND', async () => {
+    const caller = makeCaller(selfSessionUser)
+    createOrGetConversationTurnForAuthorMock.mockResolvedValueOnce(null)
+
+    await expectTrpcError(
+      caller.conversationSend({
+        nodeId: ownedNodeRecord.id,
+        text: 'hello',
+        model: 'gpt-5',
+        idempotencyKey: 'idempotency-key-1',
+      }),
+      'NOT_FOUND',
+      'Node not found.',
+    )
+  })
+
   test('conversationSend with cross-user node returns FORBIDDEN', async () => {
     const caller = makeCaller(selfSessionUser)
     getNodeByIdForAuthorMock.mockResolvedValueOnce(null)

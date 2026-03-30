@@ -211,4 +211,35 @@ describe('appRouter', () => {
     expect(result.turnId).toBe('t1')
     expect(result.status).toBe('completed')
   })
+
+  test('conversationSend validates required input fields', async () => {
+    const caller = appRouter.createCaller(makeContext())
+
+    await expect(
+      caller.conversationSend({
+        nodeId: 'n1',
+        text: '',
+        model: 'gpt-5',
+        idempotencyKey: 'idempotency-key-1',
+      }),
+    ).rejects.toThrow()
+
+    await expect(
+      caller.conversationSend({
+        nodeId: 'n1',
+        text: 'hello',
+        model: '',
+        idempotencyKey: 'idempotency-key-1',
+      }),
+    ).rejects.toThrow()
+
+    await expect(
+      caller.conversationSend({
+        nodeId: 'n1',
+        text: 'hello',
+        model: 'gpt-5',
+        idempotencyKey: '',
+      }),
+    ).rejects.toThrow()
+  })
 })
