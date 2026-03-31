@@ -28,3 +28,7 @@ export {
   getConversationTurnByIdempotencyKeyForAuthor,
   updateConversationTurnForAuthor,
 } from './conversationTurn.js'
+
+export {
+  createOrGetConversationPostprocessJobForAuthor,
+} from './conversationPostprocessJob.js'

@@ -32,3 +32,19 @@ export {
   getConversationTurnByIdempotencyKey,
   updateConversationTurn,
 } from './conversationTurn.js'
+
+export {
+  createOrGetConversationPostprocessJob,
+  findDueConversationPostprocessJobs,
+  getConversationPostprocessJobById,
+  leaseDueConversationPostprocessJobs,
+  markConversationPostprocessJobFailed,
+  markConversationPostprocessJobSucceeded,
+  requeueConversationPostprocessJobWithBackoff,
+} from './conversationPostprocessJob.js'
+
+export {
+  appendConversationTurnEvent,
+  getMaxConversationTurnEventSeq,
+  listConversationTurnEventsAfterId,
+} from './conversationTurnEvent.js'
