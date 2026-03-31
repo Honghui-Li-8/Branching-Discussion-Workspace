@@ -4,6 +4,7 @@ import type {
   GenerateAssistantInput,
   GenerateAssistantResult,
 } from '../types.js'
+import { emitTokenDeltas } from './tokenDeltas.js'
 
 type OpenAIProviderOptions = {
   apiKey?: string
@@ -116,6 +117,7 @@ export const createOpenAIProvider = (
       if (content.length === 0) {
         throw new Error('OpenAI response did not include output text.')
       }
+      await emitTokenDeltas(content, input.onTokenDelta)
 
       return {
         content,

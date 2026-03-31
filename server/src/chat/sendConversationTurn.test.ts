@@ -9,6 +9,8 @@ import { buildConversationContext } from './buildConversationContext.js'
 import { selectProvider } from './providers/selectProvider.js'
 import { sendConversationTurn } from './sendConversationTurn'
 import type { AssistantProvider } from './providers/provider.js'
+import { turnEventBroker } from './stream/broker.js'
+import type { ChatTurnStreamEvent } from './stream/events.js'
 
 jest.mock('../db/index.js', () => ({
   createMessageForAuthor: jest.fn(),
@@ -112,6 +114,7 @@ const makeProvider = (impl: AssistantProvider['generate']): AssistantProvider =>
 describe('sendConversationTurn', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    turnEventBroker.clear()
     process.env.OPENAI_API_KEY = 'test-openai-key'
     delete process.env.CHAT_ALLOWED_MODELS
     createOrGetConversationTurnForAuthorMock.mockResolvedValue({
@@ -122,15 +125,28 @@ describe('sendConversationTurn', () => {
     buildConversationContextMock.mockResolvedValue(context)
     updateConversationTurnForAuthorMock.mockResolvedValue(completedTurn)
     selectProviderMock.mockReturnValue(
-      makeProvider(async () => ({
-        content: assistantMessage.content,
-        finishReason: 'stop',
-        providerResponseId: 'resp-1',
-      })),
+      makeProvider(async (input) => {
+        await input.onTokenDelta?.('assistant ')
+        await input.onTokenDelta?.('reply')
+        return {
+          content: assistantMessage.content,
+          finishReason: 'stop',
+          providerResponseId: 'resp-1',
+        }
+      }),
     )
   })
 
   test('creates user+assistant messages and completes turn on success', async () => {
+    const emittedEvents: ChatTurnStreamEvent[] = []
+    const unsubscribe = turnEventBroker.subscribe({
+      turnId: processingTurn.id,
+      authorUserId: processingTurn.authorUserId,
+      onEvent: (event) => {
+        emittedEvents.push(event)
+      },
+    })
+
     createMessageForAuthorMock
       .mockResolvedValueOnce(userMessage)
       .mockResolvedValueOnce(assistantMessage)
@@ -144,6 +160,7 @@ describe('sendConversationTurn', () => {
       },
       currentUserId: 'u1',
     })
+    unsubscribe()
 
     expect(buildConversationContextMock).toHaveBeenCalledWith({
       nodeId: 'n1',
@@ -179,6 +196,23 @@ describe('sendConversationTurn', () => {
       assistantMessage,
       error: null,
     })
+
+    expect(emittedEvents.map((event) => event.type)).toEqual([
+      'turn.started',
+      'turn.status',
+      'turn.status',
+      'token.delta',
+      'token.delta',
+      'turn.status',
+      'message.completed',
+    ])
+    expect(emittedEvents.map((event) => event.seq)).toEqual([1, 2, 3, 4, 5, 6, 7])
+    expect(
+      emittedEvents
+        .filter((event) => event.type === 'token.delta')
+        .map((event) => event.payload.delta)
+        .join(''),
+    ).toBe('assistant reply')
   })
 
   test('duplicate idempotency replay does not regenerate and recovers existing messages', async () => {
@@ -245,6 +279,15 @@ describe('sendConversationTurn', () => {
   })
 
   test('provider failure marks turn failed and returns INTERNAL_SERVER_ERROR', async () => {
+    const emittedEvents: ChatTurnStreamEvent[] = []
+    const unsubscribe = turnEventBroker.subscribe({
+      turnId: processingTurn.id,
+      authorUserId: processingTurn.authorUserId,
+      onEvent: (event) => {
+        emittedEvents.push(event)
+      },
+    })
+
     createMessageForAuthorMock.mockResolvedValueOnce(userMessage)
     selectProviderMock.mockReturnValueOnce(
       makeProvider(async () => {
@@ -266,6 +309,7 @@ describe('sendConversationTurn', () => {
       code: 'INTERNAL_SERVER_ERROR',
       message: 'Assistant generation failed.',
     })
+    unsubscribe()
 
     expect(updateConversationTurnForAuthorMock).toHaveBeenCalledWith(
       {
@@ -275,6 +319,13 @@ describe('sendConversationTurn', () => {
       },
       'u1',
     )
+    expect(emittedEvents[emittedEvents.length - 1]).toMatchObject({
+      type: 'turn.error',
+      payload: {
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Assistant generation failed.',
+      },
+    })
   })
 
   test('assistant insert race marks turn failed and returns NOT_FOUND', async () => {

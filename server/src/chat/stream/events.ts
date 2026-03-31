@@ -63,7 +63,7 @@ export const chatTurnStreamEventSchema = z.discriminatedUnion('type', [
 export type TurnStage = z.infer<typeof turnStageSchema>
 export type ChatTurnStreamEvent = z.infer<typeof chatTurnStreamEventSchema>
 
-type StreamEventWithoutEnvelope = Omit<
+export type ChatTurnStreamEventInput = Omit<
   ChatTurnStreamEvent,
   'turnId' | 'seq' | 'ts'
 >
@@ -100,7 +100,7 @@ export class TurnEventSequencer {
 
 export const createTurnStreamEvent = (
   sequencer: TurnEventSequencer,
-  event: StreamEventWithoutEnvelope,
+  event: ChatTurnStreamEventInput,
   options: CreateEventOptions = {},
 ): ChatTurnStreamEvent => {
   const createdEvent = {

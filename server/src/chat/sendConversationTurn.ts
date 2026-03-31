@@ -11,6 +11,12 @@ import {
 } from './config.js'
 import { buildConversationContext } from './buildConversationContext.js'
 import { selectProvider } from './providers/selectProvider.js'
+import { turnEventBroker } from './stream/broker.js'
+import {
+  createTurnStreamEvent,
+  type ChatTurnStreamEventInput,
+  TurnEventSequencer,
+} from './stream/events.js'
 import type {
   SendConversationTurnInput,
   SendConversationTurnResult,
@@ -111,31 +117,92 @@ export const sendConversationTurn = async ({
     }
   }
 
-  const userMessage = await createMessageForAuthorRecord({
-    nodeId: input.nodeId,
-    authorUserId: currentUserId,
-    role: 'user',
-    content: input.text,
+  const eventSequencer = new TurnEventSequencer(turnResult.turn.id)
+  const publishTurnEvent = (event: ChatTurnStreamEventInput): void => {
+    try {
+      turnEventBroker.publish({
+        turnId: turnResult.turn.id,
+        authorUserId: currentUserId,
+        event: createTurnStreamEvent(eventSequencer, event),
+      })
+    } catch (error) {
+      console.warn('[chat-stream] Failed to publish turn event.', error)
+    }
+  }
+
+  publishTurnEvent({
+    type: 'turn.started',
+    payload: {
+      status: 'loading_context',
+    },
+  })
+  publishTurnEvent({
+    type: 'turn.status',
+    payload: {
+      status: 'loading_context',
+      detail: 'Building conversation context.',
+    },
   })
 
-  if (userMessage === null) {
-    await markTurnFailed(turnResult.turn.id, currentUserId, 'Node not found.')
-    throw new TRPCError({
-      code: 'NOT_FOUND',
-      message: 'Node not found.',
-    })
+  let hasMarkedTurnFailed = false
+  const markTurnFailedOnce = async (errorMessage: string): Promise<void> => {
+    if (hasMarkedTurnFailed) {
+      return
+    }
+    hasMarkedTurnFailed = true
+    await markTurnFailed(turnResult.turn.id, currentUserId, errorMessage)
   }
 
   try {
+    const userMessage = await createMessageForAuthorRecord({
+      nodeId: input.nodeId,
+      authorUserId: currentUserId,
+      role: 'user',
+      content: input.text,
+    })
+
+    if (userMessage === null) {
+      await markTurnFailedOnce('Node not found.')
+      throw new TRPCError({
+        code: 'NOT_FOUND',
+        message: 'Node not found.',
+      })
+    }
+
     const context = await buildConversationContext({
       nodeId: input.nodeId,
       currentUserId,
       userInput: input.text,
     })
+    publishTurnEvent({
+      type: 'turn.status',
+      payload: {
+        status: 'generating',
+        detail: 'Generating assistant response.',
+      },
+    })
     const provider = selectProvider({ model: input.model })
     const assistantOutput = await provider.generate({
       model: input.model,
       context,
+      onTokenDelta: (delta) => {
+        if (delta.length === 0) {
+          return
+        }
+        publishTurnEvent({
+          type: 'token.delta',
+          payload: {
+            delta,
+          },
+        })
+      },
+    })
+    publishTurnEvent({
+      type: 'turn.status',
+      payload: {
+        status: 'persisting',
+        detail: 'Persisting assistant response.',
+      },
     })
     const assistantMessage = await createMessageForAuthorRecord({
       nodeId: input.nodeId,
@@ -145,7 +212,7 @@ export const sendConversationTurn = async ({
     })
 
     if (assistantMessage === null) {
-      await markTurnFailed(turnResult.turn.id, currentUserId, 'Node not found.')
+      await markTurnFailedOnce('Node not found.')
       throw new TRPCError({
         code: 'NOT_FOUND',
         message: 'Node not found.',
@@ -170,6 +237,14 @@ export const sendConversationTurn = async ({
       })
     }
 
+    publishTurnEvent({
+      type: 'message.completed',
+      payload: {
+        messageId: assistantMessage.id,
+        content: assistantMessage.content,
+      },
+    })
+
     return {
       turnId: finalizedTurn.id,
       status: finalizedTurn.status,
@@ -179,13 +254,28 @@ export const sendConversationTurn = async ({
     }
   } catch (error) {
     if (error instanceof TRPCError) {
+      await markTurnFailedOnce(error.message)
+      publishTurnEvent({
+        type: 'turn.error',
+        payload: {
+          code: error.code,
+          message: error.message,
+        },
+      })
       throw error
     }
 
     const errorMessage = error instanceof Error
       ? error.message
       : 'Assistant generation failed.'
-    await markTurnFailed(turnResult.turn.id, currentUserId, errorMessage)
+    await markTurnFailedOnce(errorMessage)
+    publishTurnEvent({
+      type: 'turn.error',
+      payload: {
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Assistant generation failed.',
+      },
+    })
     throw new TRPCError({
       code: 'INTERNAL_SERVER_ERROR',
       message: 'Assistant generation failed.',

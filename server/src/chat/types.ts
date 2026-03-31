@@ -38,6 +38,7 @@ export interface ConversationContext {
 export interface GenerateAssistantInput {
   model: string
   context: ConversationContext
+  onTokenDelta?: (delta: string) => void | Promise<void>
 }
 
 export interface GenerateAssistantResult {
