@@ -1,12 +1,20 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import type { inferRouterOutputs } from '@trpc/server'
 import type { AppRouter } from '@branching/shared'
 import { trpc } from '../../../trpc'
 import type { TreeMessage } from '../../../types/tree'
 import { invalidateMessagesByNode } from './mutationInvalidation'
+import {
+  conversationStreamReducer,
+  getConversationStreamStatusLabel,
+  initialConversationStreamState,
+  parseConversationStreamEvent,
+} from './conversationStreamState'
 
 type RouterOutputs = inferRouterOutputs<AppRouter>
 type NodeMessage = RouterOutputs['messagesByNode'][number]
+
+const STREAM_COMPLETE_FALLBACK_MS = 750
 
 const loggedUnknownMessageRoles = new Set<string>()
 
@@ -33,9 +41,33 @@ const mapMessageRoleToTreeRole = (role: NodeMessage['role']): TreeMessage['role'
   }
 }
 
+const createIdempotencyKey = (): string => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+
+  return `idem-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+}
+
+const upsertNodeMessage = (
+  current: NodeMessage[] | undefined,
+  incomingMessage: NodeMessage,
+): NodeMessage[] => {
+  if (!current || current.length === 0) {
+    return [incomingMessage]
+  }
+
+  if (current.some((message) => message.id === incomingMessage.id)) {
+    return current
+  }
+
+  return [...current, incomingMessage]
+}
+
 type UseNodeConversationParams = {
   nodeId: string | null
   canSendMessages: boolean
+  conversationModel: string
 }
 
 type MessageUpdatePatch = {
@@ -58,6 +90,8 @@ type UseNodeConversationResult = {
   isSendingMessage: boolean
   isUpdatingMessage: boolean
   isDeletingMessage: boolean
+  isGeneratingResponse: boolean
+  streamStatusLabel: string | null
   messagesLoadError: string | null
   messageSendError: string | null
   messageUpdateError: string | null
@@ -71,11 +105,24 @@ type UseNodeConversationResult = {
 
 /**
  * Loads and writes node discussion messages via tRPC.
- * Maps backend roles to UI-safe roles and invalidates node message cache after writes.
+ * Uses conversationSend + SSE stream events for progressive status/output updates.
  */
-export const useNodeConversation = ({ nodeId, canSendMessages }: UseNodeConversationParams) => {
+export const useNodeConversation = ({
+  nodeId,
+  canSendMessages,
+  conversationModel,
+}: UseNodeConversationParams) => {
   const utils = trpc.useUtils()
   const [pendingMessages, setPendingMessages] = useState<PendingMessage[]>([])
+  const [streamState, dispatchStreamAction] = useReducer(
+    conversationStreamReducer,
+    initialConversationStreamState,
+  )
+  const streamStateRef = useRef(streamState)
+  const streamSourceRef = useRef<EventSource | null>(null)
+  const streamTurnIdRef = useRef<string | null>(null)
+  const fallbackTimerRef = useRef<number | null>(null)
+
   const messagesQuery = trpc.messagesByNode.useQuery(
     { nodeId: nodeId ?? '' },
     { enabled: Boolean(nodeId) },
@@ -85,7 +132,95 @@ export const useNodeConversation = ({ nodeId, canSendMessages }: UseNodeConversa
     await invalidateMessagesByNode(utils.messagesByNode.invalidate, targetNodeId)
   }
 
-  const createMessageMutation = trpc.messageCreate.useMutation()
+  const clearFallbackTimer = () => {
+    if (fallbackTimerRef.current === null) {
+      return
+    }
+
+    window.clearTimeout(fallbackTimerRef.current)
+    fallbackTimerRef.current = null
+  }
+
+  const closeTurnStream = useCallback(() => {
+    clearFallbackTimer()
+    if (!streamSourceRef.current) {
+      streamTurnIdRef.current = null
+      return
+    }
+
+    streamSourceRef.current.close()
+    streamSourceRef.current = null
+    streamTurnIdRef.current = null
+  }, [])
+
+  const connectTurnStream = useCallback((turnId: string) => {
+    if (streamTurnIdRef.current === turnId && streamSourceRef.current) {
+      return
+    }
+
+    closeTurnStream()
+
+    const apiBaseUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:3001'
+    const streamUrl = `${apiBaseUrl}/chat/turns/${encodeURIComponent(turnId)}/stream`
+    const source = new EventSource(streamUrl, { withCredentials: true })
+    streamSourceRef.current = source
+    streamTurnIdRef.current = turnId
+
+    const bindEvent = (
+      eventType:
+        | 'turn.started'
+        | 'turn.status'
+        | 'token.delta'
+        | 'message.completed'
+        | 'turn.error',
+    ) => {
+      source.addEventListener(eventType, (event) => {
+        if (!(event instanceof MessageEvent)) {
+          return
+        }
+
+        const parsedEvent = parseConversationStreamEvent(event.data)
+        if (!parsedEvent) {
+          return
+        }
+
+        dispatchStreamAction({
+          type: 'eventReceived',
+          event: parsedEvent,
+        })
+
+        if (parsedEvent.type === 'message.completed' || parsedEvent.type === 'turn.error') {
+          closeTurnStream()
+        }
+      })
+    }
+
+    bindEvent('turn.started')
+    bindEvent('turn.status')
+    bindEvent('token.delta')
+    bindEvent('message.completed')
+    bindEvent('turn.error')
+  }, [closeTurnStream])
+
+  useEffect(() => {
+    streamStateRef.current = streamState
+  }, [streamState])
+
+  useEffect(() => {
+    dispatchStreamAction({ type: 'reset' })
+    setPendingMessages([])
+    closeTurnStream()
+  }, [closeTurnStream, nodeId])
+
+  useEffect(
+    () => () => {
+      closeTurnStream()
+    },
+    [closeTurnStream],
+  )
+
+  const conversationSendMutation = trpc.conversationSend.useMutation()
+
   const updateMessageMutation = trpc.messageUpdate.useMutation({
     onMutate: () => ({
       targetNodeId: nodeId,
@@ -123,8 +258,17 @@ export const useNodeConversation = ({ nodeId, canSendMessages }: UseNodeConversa
       content: message.content,
     }))
 
-    return [...persistedMessages, ...localPendingMessages]
-  }, [messagesQuery.data, pendingMessages])
+    const activeStreamingDraft =
+      streamState.assistantDraft.length > 0
+        ? [{
+            id: `stream-${streamState.turnId ?? 'draft'}`,
+            role: 'assistant' as const,
+            content: streamState.assistantDraft,
+          }]
+        : []
+
+    return [...persistedMessages, ...localPendingMessages, ...activeStreamingDraft]
+  }, [messagesQuery.data, pendingMessages, streamState.assistantDraft, streamState.turnId])
 
   const pendingMessageIds = useMemo(
     () =>
@@ -146,7 +290,7 @@ export const useNodeConversation = ({ nodeId, canSendMessages }: UseNodeConversa
   )
 
   const queueMessage = (pendingMessage: PendingMessage): boolean => {
-    if (!nodeId || !canSendMessages || createMessageMutation.isPending) {
+    if (!nodeId || !canSendMessages || conversationSendMutation.isPending) {
       return false
     }
 
@@ -159,34 +303,69 @@ export const useNodeConversation = ({ nodeId, canSendMessages }: UseNodeConversa
           )
         : [...current, pendingMessage],
     )
-    createMessageMutation.reset()
-    createMessageMutation.mutate(
+
+    conversationSendMutation.reset()
+    dispatchStreamAction({ type: 'sendRequested' })
+
+    const idempotencyKey = createIdempotencyKey()
+    conversationSendMutation.mutate(
       {
         nodeId,
-        role: 'user',
-        content: pendingMessage.content,
+        text: pendingMessage.content,
+        model: conversationModel,
+        idempotencyKey,
       },
       {
-        onSuccess: async (createdMessage, input) => {
-          utils.messagesByNode.setData({ nodeId: input.nodeId }, (current) => {
-            if (!current) {
-              return [createdMessage]
-            }
-
-            if (current.some((message) => message.id === createdMessage.id)) {
-              return current
-            }
-
-            return [...current, createdMessage]
+        onSuccess: async (result, input) => {
+          connectTurnStream(result.turnId)
+          dispatchStreamAction({
+            type: 'turnBound',
+            turnId: result.turnId,
           })
+
+          utils.messagesByNode.setData({ nodeId: input.nodeId }, (current) =>
+            upsertNodeMessage(current, result.userMessage),
+          )
+          const assistantMessage = result.assistantMessage
+          if (assistantMessage) {
+            utils.messagesByNode.setData({ nodeId: input.nodeId }, (current) =>
+              upsertNodeMessage(current, assistantMessage),
+            )
+          }
 
           setPendingMessages((current) =>
             current.filter((message) => message.id !== pendingMessage.id),
           )
 
+          if (result.error) {
+            dispatchStreamAction({
+              type: 'sendFailed',
+              errorMessage: result.error,
+            })
+            closeTurnStream()
+          } else if (result.status === 'completed') {
+            clearFallbackTimer()
+            fallbackTimerRef.current = window.setTimeout(() => {
+              if (streamTurnIdRef.current !== result.turnId) {
+                return
+              }
+
+              const latestState = streamStateRef.current
+              if (latestState.phase !== 'done' && latestState.phase !== 'error') {
+                dispatchStreamAction({ type: 'sendCompleted' })
+              }
+              closeTurnStream()
+            }, STREAM_COMPLETE_FALLBACK_MS)
+          }
+
           await invalidateNodeMessages(input.nodeId)
         },
-        onError: () => {
+        onError: (error) => {
+          closeTurnStream()
+          dispatchStreamAction({
+            type: 'sendFailed',
+            errorMessage: error.message,
+          })
           setPendingMessages((current) =>
             current.map((message) =>
               message.id === pendingMessage.id
@@ -267,11 +446,15 @@ export const useNodeConversation = ({ nodeId, canSendMessages }: UseNodeConversa
     pendingMessageIds,
     failedMessageIds,
     isLoadingMessages: messagesQuery.isLoading,
-    isSendingMessage: createMessageMutation.isPending,
+    isSendingMessage:
+      conversationSendMutation.isPending || streamState.phase === 'sending',
     isUpdatingMessage: updateMessageMutation.isPending,
     isDeletingMessage: deleteMessageMutation.isPending,
+    isGeneratingResponse: streamState.phase === 'generating',
+    streamStatusLabel: getConversationStreamStatusLabel(streamState),
     messagesLoadError: messagesQuery.error?.message ?? null,
-    messageSendError: createMessageMutation.error?.message ?? null,
+    messageSendError:
+      streamState.errorMessage ?? conversationSendMutation.error?.message ?? null,
     messageUpdateError: updateMessageMutation.error?.message ?? null,
     messageDeleteError: deleteMessageMutation.error?.message ?? null,
     sendMessage,
