@@ -51,6 +51,7 @@ export const buildConversationContext = async ({
   return {
     node: {
       id: node.id,
+      workspaceId: node.workspaceId,
       title: node.title,
       summary: node.summary,
       status: node.status,

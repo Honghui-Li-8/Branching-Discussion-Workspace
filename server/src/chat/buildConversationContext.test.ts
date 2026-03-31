@@ -42,24 +42,30 @@ const messages = [
     id: 'm1',
     authorUserId: 'u1',
     nodeId: 'n1',
+    turnId: null,
     role: 'system' as const,
     content: 'system',
+    metadata: {},
     createdAt: '2026-03-30T00:00:00.000Z',
   },
   {
     id: 'm2',
     authorUserId: 'u1',
     nodeId: 'n1',
+    turnId: null,
     role: 'user' as const,
     content: 'hello',
+    metadata: {},
     createdAt: '2026-03-30T00:01:00.000Z',
   },
   {
     id: 'm3',
     authorUserId: 'u1',
     nodeId: 'n1',
+    turnId: null,
     role: 'assistant' as const,
     content: 'hi',
+    metadata: {},
     createdAt: '2026-03-30T00:02:00.000Z',
   },
 ]
@@ -81,6 +87,7 @@ describe('buildConversationContext', () => {
 
     expect(result.node).toEqual({
       id: 'n1',
+      workspaceId: 'w1',
       title: 'Root Decision',
       summary: 'Root summary',
       status: 'open',
@@ -112,8 +119,10 @@ describe('buildConversationContext', () => {
       id: `m-${index + 1}`,
       authorUserId: 'u1',
       nodeId: 'n1',
+      turnId: null,
       role: 'user' as const,
       content: `msg ${index + 1}`,
+      metadata: {},
       createdAt: `2026-03-30T00:${String(index).padStart(2, '0')}:00.000Z`,
     }))
     listMessagesForNodeForAuthorMock.mockResolvedValueOnce(manyMessages)

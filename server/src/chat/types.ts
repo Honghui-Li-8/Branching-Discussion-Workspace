@@ -14,6 +14,7 @@ export type SendConversationTurnInput = {
 export type ConversationContextNode = Pick<
   NodeRecord,
   | 'id'
+  | 'workspaceId'
   | 'title'
   | 'summary'
   | 'status'

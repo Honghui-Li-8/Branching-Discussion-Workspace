@@ -29,11 +29,15 @@ export const buildConversationTurnMetadata = ({
   diagnostics,
 }: {
   existing?: ConversationTurnMetadata
-  snapshot: ContextSnapshot
+  snapshot?: ContextSnapshot
   diagnostics?: RetrieverDiagnostics
 }): ConversationTurnMetadata => ({
   ...existing,
-  contextSnapshotId: snapshot.id,
-  contextSnapshot: snapshot,
+  ...(snapshot
+    ? {
+        contextSnapshotId: snapshot.id,
+        contextSnapshot: snapshot,
+      }
+    : {}),
   ...(diagnostics ? { retrievalDiagnostics: diagnostics } : {}),
 })

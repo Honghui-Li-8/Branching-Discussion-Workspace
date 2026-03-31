@@ -67,4 +67,23 @@ describe('rag persistence helpers', () => {
       },
     })
   })
+
+  test('buildConversationTurnMetadata can persist diagnostics without a snapshot', () => {
+    expect(
+      buildConversationTurnMetadata({
+        existing: {},
+        diagnostics: {
+          retriever: 'vector_v1',
+          query: 'hello',
+          fallbackReason: 'retrieval_failed',
+        },
+      }),
+    ).toEqual({
+      retrievalDiagnostics: {
+        retriever: 'vector_v1',
+        query: 'hello',
+        fallbackReason: 'retrieval_failed',
+      },
+    })
+  })
 })

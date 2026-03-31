@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, jest, test } from '@jest/globals'
+import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globals'
 import {
   createOrGetConversationPostprocessJobForAuthor,
   createMessageForAuthor,
@@ -8,6 +8,7 @@ import {
 } from '../db/index.js'
 import { buildConversationContext } from './buildConversationContext.js'
 import { selectProvider } from './providers/selectProvider.js'
+import { resolveRetriever } from './rag/retriever.js'
 import { sendConversationTurn } from './sendConversationTurn'
 import type { AssistantProvider } from './providers/provider.js'
 import { turnEventBroker } from './stream/broker.js'
@@ -27,6 +28,10 @@ jest.mock('./buildConversationContext.js', () => ({
 
 jest.mock('./providers/selectProvider.js', () => ({
   selectProvider: jest.fn(),
+}))
+
+jest.mock('./rag/retriever.js', () => ({
+  resolveRetriever: jest.fn(),
 }))
 
 const createOrGetConversationPostprocessJobForAuthorMock =
@@ -50,6 +55,9 @@ const buildConversationContextMock = buildConversationContext as jest.MockedFunc
   typeof buildConversationContext
 >
 const selectProviderMock = selectProvider as jest.MockedFunction<typeof selectProvider>
+const resolveRetrieverMock = resolveRetriever as jest.MockedFunction<
+  typeof resolveRetriever
+>
 
 const processingTurn = {
   id: 't1',
@@ -114,6 +122,7 @@ const queuedPostprocessJob = {
 const context = {
   node: {
     id: 'n1',
+    workspaceId: 'w1',
     title: 'Root',
     summary: 'summary',
     status: 'open' as const,
@@ -140,11 +149,19 @@ const makeProvider = (impl: AssistantProvider['generate']): AssistantProvider =>
 })
 
 describe('sendConversationTurn', () => {
+  afterEach(() => {
+    jest.restoreAllMocks()
+  })
+
   beforeEach(() => {
     jest.clearAllMocks()
     turnEventBroker.clear()
     process.env.OPENAI_API_KEY = 'test-openai-key'
     delete process.env.CHAT_ALLOWED_MODELS
+    delete process.env.RAG_ENABLED
+    delete process.env.RAG_RETRIEVER
+    delete process.env.RAG_ALLOWED_USER_IDS
+    delete process.env.RAG_ALLOWED_WORKSPACE_IDS
     createOrGetConversationTurnForAuthorMock.mockResolvedValue({
       turn: processingTurn,
       wasCreated: true,
@@ -167,6 +184,18 @@ describe('sendConversationTurn', () => {
         }
       }),
     )
+    resolveRetrieverMock.mockReturnValue({
+      id: 'noop',
+      retrieve: jest.fn(async () => ({
+        chunks: [],
+        diagnostics: {
+          retriever: 'noop',
+          totalChunks: 0,
+          selectedChunks: 0,
+          fallbackReason: 'retrieval_disabled',
+        },
+      })),
+    })
   })
 
   test('creates user+assistant messages and completes turn on success', async () => {
@@ -265,6 +294,221 @@ describe('sendConversationTurn', () => {
         .map((event) => event.payload.delta)
         .join(''),
     ).toBe('assistant reply')
+  })
+
+  test('retrieves context, enriches the prompt, and persists citations when RAG is enabled', async () => {
+    process.env.RAG_ENABLED = 'true'
+    process.env.RAG_RETRIEVER = 'vector_v1'
+    process.env.RAG_ALLOWED_WORKSPACE_IDS = 'w1'
+
+    const generatedPrompts: string[] = []
+    selectProviderMock.mockReturnValueOnce(
+      makeProvider(async (input) => {
+        generatedPrompts.push(input.prompt.input)
+        return {
+          content: assistantMessage.content,
+          finishReason: 'stop',
+          providerResponseId: 'resp-rag',
+        }
+      }),
+    )
+    resolveRetrieverMock.mockReturnValueOnce({
+      id: 'vector_v1',
+      retrieve: jest.fn(async () => ({
+        chunks: [
+          {
+            messageId: 'm-source',
+            nodeId: 'n1',
+            chunkIndex: 0,
+            content: 'retrieved evidence',
+            tokenCount: 12,
+            score: 0.91,
+          },
+        ],
+        diagnostics: {
+          retriever: 'vector_v1',
+          totalChunks: 1,
+          selectedChunks: 1,
+        },
+      })),
+    })
+    createMessageForAuthorMock
+      .mockResolvedValueOnce(userMessage)
+      .mockResolvedValueOnce({
+        ...assistantMessage,
+        metadata: {
+          citations: [
+            {
+              messageId: 'm-source',
+              nodeId: 'n1',
+              chunkIndex: 0,
+              excerpt: 'retrieved evidence',
+              score: 0.91,
+            },
+          ],
+        },
+      })
+
+    const emittedEvents: ChatTurnStreamEvent[] = []
+    const unsubscribe = turnEventBroker.subscribe({
+      turnId: processingTurn.id,
+      authorUserId: processingTurn.authorUserId,
+      onEvent: (event) => {
+        emittedEvents.push(event)
+      },
+    })
+
+    const result = await sendConversationTurn({
+      input: {
+        nodeId: 'n1',
+        text: 'hello',
+        model: 'gpt-5',
+        idempotencyKey: 'idem-1',
+      },
+      currentUserId: 'u1',
+    })
+    unsubscribe()
+
+    expect(resolveRetrieverMock).toHaveBeenCalledTimes(1)
+    expect(generatedPrompts[0]).toContain('Retrieved context:')
+    expect(generatedPrompts[0]).toContain('retrieved evidence')
+    expect(createMessageForAuthorMock).toHaveBeenNthCalledWith(2, {
+      nodeId: 'n1',
+      authorUserId: 'u1',
+      turnId: 't1',
+      role: 'assistant',
+      content: 'assistant reply',
+      metadata: {
+        citations: [
+          {
+            messageId: 'm-source',
+            nodeId: 'n1',
+            chunkIndex: 0,
+            excerpt: 'retrieved evidence',
+            score: 0.91,
+          },
+        ],
+      },
+    })
+    expect(updateConversationTurnForAuthorMock).toHaveBeenCalledWith(
+      {
+        id: 't1',
+        status: 'completed',
+        error: null,
+        completedAt: expect.any(String),
+        metadata: {
+          contextSnapshotId: expect.any(String),
+          contextSnapshot: {
+            id: expect.any(String),
+            chunks: [
+              {
+                messageId: 'm-source',
+                nodeId: 'n1',
+                chunkIndex: 0,
+                content: 'retrieved evidence',
+                tokenCount: 12,
+                score: 0.91,
+              },
+            ],
+            totalTokenCount: 12,
+            createdAt: expect.any(String),
+          },
+          retrievalDiagnostics: {
+            retriever: 'vector_v1',
+            totalChunks: 1,
+            selectedChunks: 1,
+          },
+        },
+      },
+      'u1',
+    )
+    const emittedStatuses = emittedEvents.flatMap((event) =>
+      'status' in event.payload ? [event.payload.status] : [],
+    )
+    expect(emittedStatuses).toContain('retrieving')
+    expect(result.assistantMessage?.metadata).toEqual({
+      citations: [
+        {
+          messageId: 'm-source',
+          nodeId: 'n1',
+          chunkIndex: 0,
+          excerpt: 'retrieved evidence',
+          score: 0.91,
+        },
+      ],
+    })
+  })
+
+  test('retrieval failure falls back to the base prompt and still completes the turn', async () => {
+    process.env.RAG_ENABLED = 'true'
+    process.env.RAG_RETRIEVER = 'vector_v1'
+    process.env.RAG_ALLOWED_WORKSPACE_IDS = 'w1'
+
+    const generatedPrompts: string[] = []
+    selectProviderMock.mockReturnValueOnce(
+      makeProvider(async (input) => {
+        generatedPrompts.push(input.prompt.input)
+        return {
+          content: assistantMessage.content,
+          finishReason: 'stop',
+          providerResponseId: 'resp-fallback',
+        }
+      }),
+    )
+    resolveRetrieverMock.mockReturnValueOnce({
+      id: 'vector_v1',
+      retrieve: jest.fn(async () => {
+        throw new Error('retriever boom')
+      }),
+    })
+    createMessageForAuthorMock
+      .mockResolvedValueOnce(userMessage)
+      .mockResolvedValueOnce(assistantMessage)
+    const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {})
+
+    const result = await sendConversationTurn({
+      input: {
+        nodeId: 'n1',
+        text: 'hello',
+        model: 'gpt-5',
+        idempotencyKey: 'idem-1',
+      },
+      currentUserId: 'u1',
+    })
+
+    expect(generatedPrompts[0]).not.toContain('Retrieved context:')
+    expect(createMessageForAuthorMock).toHaveBeenNthCalledWith(2, {
+      nodeId: 'n1',
+      authorUserId: 'u1',
+      turnId: 't1',
+      role: 'assistant',
+      content: 'assistant reply',
+    })
+    expect(updateConversationTurnForAuthorMock).toHaveBeenCalledWith(
+      {
+        id: 't1',
+        status: 'completed',
+        error: null,
+        completedAt: expect.any(String),
+        metadata: {
+          retrievalDiagnostics: {
+            retriever: 'vector_v1',
+            query: 'hello',
+            fallbackReason: 'retrieval_failed',
+          },
+        },
+      },
+      'u1',
+    )
+    expect(consoleWarnSpy).toHaveBeenCalledWith(
+      '[rag] Retrieval failed; continuing with base prompt.',
+      expect.objectContaining({
+        turnId: 't1',
+        nodeId: 'n1',
+        currentUserId: 'u1',
+      }),
+    )
+    expect(result.assistantMessage?.metadata).toEqual({})
   })
 
   test('duplicate idempotency replay does not regenerate and recovers existing messages', async () => {

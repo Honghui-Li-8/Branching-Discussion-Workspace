@@ -1,3 +1,4 @@
+import type { RetrievedChunk } from '@branching/shared'
 import type { AssistantPrompt, ConversationContext } from './types.js'
 
 const formatRecentMessages = (context: ConversationContext): string => {
@@ -10,17 +11,38 @@ const formatRecentMessages = (context: ConversationContext): string => {
     .join('\n')
 }
 
+const formatRetrievedChunks = (chunks: RetrievedChunk[]): string =>
+  chunks
+    .map(
+      (chunk, index) =>
+        `[source ${index + 1} | message=${chunk.messageId} | chunk=${chunk.chunkIndex}] ${chunk.content}`,
+    )
+    .join('\n\n')
+
 export const buildAssistantPrompt = (
   context: ConversationContext,
-): AssistantPrompt => ({
-  input: [
+  options: {
+    retrievedChunks?: RetrievedChunk[]
+  } = {},
+): AssistantPrompt => {
+  const sections = [
     `Node title: ${context.node.title}`,
     `Node summary: ${context.node.summary}`,
     `Node status: ${context.node.status}`,
     `Node confidence: ${context.node.confidence}`,
     'Recent messages:',
     formatRecentMessages(context),
-    `User input: ${context.userInput}`,
-  ].join('\n'),
-  userInput: context.userInput,
-})
+  ]
+
+  if ((options.retrievedChunks?.length ?? 0) > 0) {
+    sections.push('Retrieved context:')
+    sections.push(formatRetrievedChunks(options.retrievedChunks ?? []))
+  }
+
+  sections.push(`User input: ${context.userInput}`)
+
+  return {
+    input: sections.join('\n'),
+    userInput: context.userInput,
+  }
+}

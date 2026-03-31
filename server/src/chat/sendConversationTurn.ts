@@ -7,12 +7,20 @@ import {
   updateConversationTurnForAuthor as updateConversationTurnForAuthorRecord,
 } from '../db/index.js'
 import {
+  getRagConfig,
+  isRagAllowedForTarget,
   validateAllowedModelOrThrow,
   validateProviderRuntimeConfigOrThrow,
 } from './config.js'
 import { buildConversationContext } from './buildConversationContext.js'
 import { buildAssistantPrompt } from './promptBuilder.js'
 import { selectProvider } from './providers/selectProvider.js'
+import { applyContextPolicy } from './rag/contextPolicy.js'
+import {
+  buildAssistantMessageMetadata,
+  buildConversationTurnMetadata,
+} from './rag/persistence.js'
+import { resolveRetriever } from './rag/retriever.js'
 import { turnEventBroker } from './stream/broker.js'
 import {
   createTurnStreamEvent,
@@ -98,6 +106,14 @@ const enqueuePostprocessJobsForTurn = async (
       })
     }
   }
+}
+
+type RetrievalStageState = {
+  prompt: ReturnType<typeof buildAssistantPrompt>
+  assistantMetadata?: Parameters<typeof createMessageForAuthorRecord>[0]['metadata']
+  turnMetadata?: NonNullable<
+    Parameters<typeof updateConversationTurnForAuthorRecord>[0]['metadata']
+  >
 }
 
 export const sendConversationTurn = async ({
@@ -214,7 +230,77 @@ export const sendConversationTurn = async ({
       currentUserId,
       userInput: input.text,
     })
-    const prompt = buildAssistantPrompt(context)
+
+    let retrievalState: RetrievalStageState = {
+      prompt: buildAssistantPrompt(context),
+    }
+    const ragConfig = getRagConfig()
+    const ragAllowed = isRagAllowedForTarget({
+      config: ragConfig,
+      userId: currentUserId,
+      workspaceId: context.node.workspaceId,
+    })
+
+    if (ragAllowed) {
+      publishTurnEvent({
+        type: 'turn.status',
+        payload: {
+          status: 'retrieving',
+          detail: 'Retrieving relevant context.',
+        },
+      })
+
+      try {
+        const retriever = resolveRetriever({ config: ragConfig })
+        const retrievalResult = await retriever.retrieve({
+          query: input.text,
+          nodeId: input.nodeId,
+          authorUserId: currentUserId,
+          workspaceId: context.node.workspaceId,
+          maxChunks: ragConfig.maxChunks,
+        })
+        const policyDecision = applyContextPolicy(retrievalResult, {
+          config: ragConfig,
+        })
+
+        retrievalState = {
+          prompt: buildAssistantPrompt(context, {
+            retrievedChunks: policyDecision.selectedChunks,
+          }),
+          assistantMetadata: buildAssistantMessageMetadata({
+            citations: policyDecision.citations,
+          }),
+          turnMetadata: buildConversationTurnMetadata({
+            existing: turnResult.turn.metadata,
+            snapshot: policyDecision.snapshot,
+            diagnostics: policyDecision.diagnostics,
+          }),
+        }
+      } catch (error) {
+        console.warn(
+          '[rag] Retrieval failed; continuing with base prompt.',
+          {
+            turnId: turnResult.turn.id,
+            nodeId: input.nodeId,
+            currentUserId,
+            error,
+          },
+        )
+
+        retrievalState = {
+          prompt: buildAssistantPrompt(context),
+          turnMetadata: buildConversationTurnMetadata({
+            existing: turnResult.turn.metadata,
+            diagnostics: {
+              retriever: ragConfig.retriever,
+              query: input.text,
+              fallbackReason: 'retrieval_failed',
+            },
+          }),
+        }
+      }
+    }
+
     publishTurnEvent({
       type: 'turn.status',
       payload: {
@@ -225,7 +311,7 @@ export const sendConversationTurn = async ({
     const provider = selectProvider({ model: input.model })
     const assistantOutput = await provider.generate({
       model: input.model,
-      prompt,
+      prompt: retrievalState.prompt,
       onTokenDelta: (delta) => {
         if (delta.length === 0) {
           return
@@ -251,6 +337,9 @@ export const sendConversationTurn = async ({
       turnId: turnResult.turn.id,
       role: 'assistant',
       content: assistantOutput.content,
+      ...(retrievalState.assistantMetadata !== undefined
+        ? { metadata: retrievalState.assistantMetadata }
+        : {}),
     })
 
     if (assistantMessage === null) {
@@ -268,6 +357,9 @@ export const sendConversationTurn = async ({
         status: 'completed',
         error: null,
         completedAt,
+        ...(retrievalState.turnMetadata !== undefined
+          ? { metadata: retrievalState.turnMetadata }
+          : {}),
       },
       currentUserId,
     )

@@ -6,6 +6,7 @@ describe('buildAssistantPrompt', () => {
     const prompt = buildAssistantPrompt({
       node: {
         id: 'n1',
+        workspaceId: 'w1',
         title: 'Root Decision',
         summary: 'Root summary',
         status: 'open',
@@ -44,6 +45,7 @@ describe('buildAssistantPrompt', () => {
     const prompt = buildAssistantPrompt({
       node: {
         id: 'n1',
+        workspaceId: 'w1',
         title: 'Root',
         summary: 'summary',
         status: 'open',
@@ -58,5 +60,39 @@ describe('buildAssistantPrompt', () => {
     })
 
     expect(prompt.input).toContain('No prior messages in this node.')
+  })
+
+  test('renders retrieved chunks when provided', () => {
+    const prompt = buildAssistantPrompt(
+      {
+        node: {
+          id: 'n1',
+          workspaceId: 'w1',
+          title: 'Root',
+          summary: 'summary',
+          status: 'open',
+          confidence: 'medium',
+          conclusion: null,
+          rationale: null,
+          depth: 0,
+          parentNodeId: 'n1',
+        },
+        recentMessages: [],
+        userInput: 'hello',
+      },
+      {
+        retrievedChunks: [
+          {
+            messageId: 'm-source',
+            nodeId: 'n1',
+            chunkIndex: 0,
+            content: 'retrieved evidence',
+          },
+        ],
+      },
+    )
+
+    expect(prompt.input).toContain('Retrieved context:')
+    expect(prompt.input).toContain('retrieved evidence')
   })
 })
