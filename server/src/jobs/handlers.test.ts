@@ -6,6 +6,7 @@ import type {
   MessageRetrievalChunkRecord,
   UpsertMessageRetrievalChunkInput,
 } from '../db/models/index.js'
+import { InMemoryJobMetrics } from './metrics'
 import { createIndexTurnHandler } from './handlers'
 
 const baseJob: ConversationPostprocessJobRecord = {
@@ -63,6 +64,13 @@ const indexedChunk: MessageRetrievalChunkRecord = {
 }
 
 const createDeps = () => ({
+  metrics: new InMemoryJobMetrics(),
+  logger: {
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+  },
+  now: jest.fn(() => 2_000),
   getConversationTurnById: jest.fn(async (_id: string) => turn as ConversationTurnRecord | null),
   listMessagesByTurn: jest.fn(async (_turnId: string) => [message]),
   upsertMessageRetrievalChunk: jest.fn(
@@ -106,6 +114,15 @@ describe('indexTurn handler', () => {
 
     expect(deps.getConversationTurnById).not.toHaveBeenCalled()
     expect(deps.upsertMessageRetrievalChunk).not.toHaveBeenCalled()
+    expect(deps.metrics.snapshot().counters['rag.indexing_completed_total{result=skipped,retriever=vector_v1}']).toBe(1)
+    expect(deps.logger.warn).toHaveBeenCalledWith(
+      '[rag] indexing skipped.',
+      expect.objectContaining({
+        job_id: 'job-1',
+        turn_id: 'turn-1',
+        reason: 'rag_disabled',
+      }),
+    )
   })
 
   test('indexes turn-linked messages into retrieval chunks', async () => {
@@ -126,6 +143,16 @@ describe('indexTurn handler', () => {
         embedding: [0.1, 0.2],
       }),
     )
+    expect(deps.metrics.snapshot().counters['rag.indexing_completed_total{result=success,retriever=vector_v1}']).toBe(1)
+    expect(deps.logger.info).toHaveBeenCalledWith(
+      '[rag] indexing completed.',
+      expect.objectContaining({
+        job_id: 'job-1',
+        turn_id: 'turn-1',
+        node_id: 'n1',
+        author_user_id: 'u1',
+      }),
+    )
   })
 
   test('returns cleanly when turn no longer exists', async () => {
@@ -136,5 +163,30 @@ describe('indexTurn handler', () => {
 
     expect(deps.listMessagesByTurn).not.toHaveBeenCalled()
     expect(deps.upsertMessageRetrievalChunk).not.toHaveBeenCalled()
+    expect(deps.metrics.snapshot().counters['rag.indexing_completed_total{result=skipped,retriever=vector_v1}']).toBe(1)
+  })
+
+  test('records failure telemetry before rethrowing indexing errors', async () => {
+    const deps = createDeps()
+    deps.createEmbedder.mockReturnValueOnce({
+      id: 'openai',
+      embed: jest.fn(async () => []),
+    })
+
+    await expect(createIndexTurnHandler(deps)(baseJob)).rejects.toThrow(
+      'Embedding count mismatch for indexed chunks.',
+    )
+
+    expect(deps.metrics.snapshot().counters['rag.indexing_completed_total{result=failed,retriever=vector_v1}']).toBe(1)
+    expect(deps.logger.error).toHaveBeenCalledWith(
+      '[rag] indexing failed.',
+      expect.objectContaining({
+        job_id: 'job-1',
+        turn_id: 'turn-1',
+        node_id: 'n1',
+        author_user_id: 'u1',
+        reason: 'Embedding count mismatch for indexed chunks.',
+      }),
+    )
   })
 })

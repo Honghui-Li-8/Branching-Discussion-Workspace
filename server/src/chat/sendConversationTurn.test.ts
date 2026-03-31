@@ -9,6 +9,7 @@ import {
 import { buildConversationContext } from './buildConversationContext.js'
 import { selectProvider } from './providers/selectProvider.js'
 import { resolveRetriever } from './rag/retriever.js'
+import { ragMetrics } from './rag/telemetry.js'
 import { sendConversationTurn } from './sendConversationTurn'
 import type { AssistantProvider } from './providers/provider.js'
 import { turnEventBroker } from './stream/broker.js'
@@ -151,6 +152,7 @@ const makeProvider = (impl: AssistantProvider['generate']): AssistantProvider =>
 describe('sendConversationTurn', () => {
   afterEach(() => {
     jest.restoreAllMocks()
+    ragMetrics.reset()
   })
 
   beforeEach(() => {
@@ -302,6 +304,7 @@ describe('sendConversationTurn', () => {
     process.env.RAG_ALLOWED_WORKSPACE_IDS = 'w1'
 
     const generatedPrompts: string[] = []
+    const consoleInfoSpy = jest.spyOn(console, 'info').mockImplementation(() => {})
     selectProviderMock.mockReturnValueOnce(
       makeProvider(async (input) => {
         generatedPrompts.push(input.prompt.input)
@@ -426,6 +429,18 @@ describe('sendConversationTurn', () => {
       'status' in event.payload ? [event.payload.status] : [],
     )
     expect(emittedStatuses).toContain('retrieving')
+    expect(ragMetrics.snapshot().counters['rag.retrieval_attempts_total{rag_enabled=true,retriever=vector_v1}']).toBe(1)
+    expect(ragMetrics.snapshot().counters['rag.retrieval_hits_total{retriever=vector_v1}']).toBe(1)
+    expect(consoleInfoSpy).toHaveBeenCalledWith(
+      '[rag] retrieval completed.',
+      expect.objectContaining({
+        turn_id: 't1',
+        node_id: 'n1',
+        author_user_id: 'u1',
+        retriever: 'vector_v1',
+        rag_enabled: true,
+      }),
+    )
     expect(result.assistantMessage?.metadata).toEqual({
       citations: [
         {
@@ -506,6 +521,18 @@ describe('sendConversationTurn', () => {
         turnId: 't1',
         nodeId: 'n1',
         currentUserId: 'u1',
+      }),
+    )
+    expect(ragMetrics.snapshot().counters['rag.retrieval_fallbacks_total{reason=retrieval_failed,retriever=vector_v1}']).toBe(1)
+    expect(consoleWarnSpy).toHaveBeenCalledWith(
+      '[rag] retrieval fell back to base prompt.',
+      expect.objectContaining({
+        turn_id: 't1',
+        node_id: 'n1',
+        author_user_id: 'u1',
+        retriever: 'vector_v1',
+        rag_enabled: true,
+        fallback_reason: 'retrieval_failed',
       }),
     )
     expect(result.assistantMessage?.metadata).toEqual({})

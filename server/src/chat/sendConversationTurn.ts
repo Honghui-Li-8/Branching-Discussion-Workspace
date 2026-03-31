@@ -21,6 +21,7 @@ import {
   buildConversationTurnMetadata,
 } from './rag/persistence.js'
 import { resolveRetriever } from './rag/retriever.js'
+import { recordRetrievalTelemetry } from './rag/telemetry.js'
 import { turnEventBroker } from './stream/broker.js'
 import {
   createTurnStreamEvent,
@@ -242,6 +243,7 @@ export const sendConversationTurn = async ({
     })
 
     if (ragAllowed) {
+      const retrievalStartedAtMs = Date.now()
       publishTurnEvent({
         type: 'turn.status',
         payload: {
@@ -276,6 +278,18 @@ export const sendConversationTurn = async ({
             diagnostics: policyDecision.diagnostics,
           }),
         }
+        recordRetrievalTelemetry({
+          turnId: turnResult.turn.id,
+          nodeId: input.nodeId,
+          authorUserId: currentUserId,
+          retriever: retriever.id,
+          ragEnabled: true,
+          startedAtMs: retrievalStartedAtMs,
+          chunksReturned: retrievalResult.chunks.length,
+          chunksSelected: policyDecision.selectedChunks.length,
+          citationCount: policyDecision.citations.length,
+          snapshotId: policyDecision.snapshot.id,
+        })
       } catch (error) {
         console.warn(
           '[rag] Retrieval failed; continuing with base prompt.',
@@ -298,6 +312,18 @@ export const sendConversationTurn = async ({
             },
           }),
         }
+        recordRetrievalTelemetry({
+          turnId: turnResult.turn.id,
+          nodeId: input.nodeId,
+          authorUserId: currentUserId,
+          retriever: ragConfig.retriever,
+          ragEnabled: true,
+          startedAtMs: retrievalStartedAtMs,
+          chunksReturned: 0,
+          chunksSelected: 0,
+          citationCount: 0,
+          fallbackReason: 'retrieval_failed',
+        })
       }
     }
 
