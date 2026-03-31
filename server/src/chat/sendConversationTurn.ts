@@ -5,6 +5,10 @@ import {
   listMessagesForNodeForAuthor as listMessagesForNodeForAuthorRecord,
   updateConversationTurnForAuthor as updateConversationTurnForAuthorRecord,
 } from '../db/index.js'
+import {
+  validateAllowedModelOrThrow,
+  validateProviderRuntimeConfigOrThrow,
+} from './config.js'
 import { buildConversationContext } from './buildConversationContext.js'
 import { selectProvider } from './providers/selectProvider.js'
 import type {
@@ -58,6 +62,9 @@ export const sendConversationTurn = async ({
   input,
   currentUserId,
 }: SendConversationTurnParams): Promise<SendConversationTurnResult> => {
+  validateAllowedModelOrThrow(input.model)
+  validateProviderRuntimeConfigOrThrow(input.model)
+
   const turnResult = await createOrGetConversationTurnForAuthorRecord({
     nodeId: input.nodeId,
     authorUserId: currentUserId,

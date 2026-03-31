@@ -259,6 +259,7 @@ describe('tRPC ownership integration', () => {
   beforeEach(() => {
     clearAllSessions()
     jest.clearAllMocks()
+    process.env.OPENAI_API_KEY = 'test-openai-key'
 
     getUserByIdMock.mockResolvedValue(selfUserRecord)
     listWorkspacesByAuthorMock.mockResolvedValue([ownedWorkspaceRecord])

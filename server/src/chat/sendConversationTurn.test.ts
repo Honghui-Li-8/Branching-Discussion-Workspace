@@ -112,6 +112,8 @@ const makeProvider = (impl: AssistantProvider['generate']): AssistantProvider =>
 describe('sendConversationTurn', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    process.env.OPENAI_API_KEY = 'test-openai-key'
+    delete process.env.CHAT_ALLOWED_MODELS
     createOrGetConversationTurnForAuthorMock.mockResolvedValue({
       turn: processingTurn,
       wasCreated: true,
@@ -303,5 +305,47 @@ describe('sendConversationTurn', () => {
       },
       'u1',
     )
+  })
+
+  test('rejects unsupported model before creating a turn', async () => {
+    process.env.CHAT_ALLOWED_MODELS = 'gpt-5'
+
+    await expect(
+      sendConversationTurn({
+        input: {
+          nodeId: 'n1',
+          text: 'hello',
+          model: 'gpt-4o',
+          idempotencyKey: 'idem-1',
+        },
+        currentUserId: 'u1',
+      }),
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'Unsupported model "gpt-4o". Allowed models: gpt-5',
+    })
+
+    expect(createOrGetConversationTurnForAuthorMock).not.toHaveBeenCalled()
+  })
+
+  test('rejects gpt model when OPENAI_API_KEY is missing', async () => {
+    delete process.env.OPENAI_API_KEY
+
+    await expect(
+      sendConversationTurn({
+        input: {
+          nodeId: 'n1',
+          text: 'hello',
+          model: 'gpt-5',
+          idempotencyKey: 'idem-1',
+        },
+        currentUserId: 'u1',
+      }),
+    ).rejects.toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'OPENAI_API_KEY is required for model "gpt-5".',
+    })
+
+    expect(createOrGetConversationTurnForAuthorMock).not.toHaveBeenCalled()
   })
 })
