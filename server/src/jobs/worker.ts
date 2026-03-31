@@ -13,6 +13,7 @@ import {
 } from '../db/queries/conversationTurnEvent.js'
 import { indexTurn, summarizeTurn } from './handlers.js'
 import { type JobMetricsRecorder, jobMetrics } from './metrics.js'
+import { createLogger } from '../logging/logger.js'
 
 export type WorkerLogger = Pick<Console, 'info' | 'warn' | 'error'>
 
@@ -60,7 +61,7 @@ const DEFAULT_DEPS: ConversationPostprocessWorkerDeps = {
   summarizeTurn,
   indexTurn,
   metrics: jobMetrics,
-  logger: console,
+  logger: createLogger('jobs-worker'),
 }
 
 const sleep = async (ms: number): Promise<void> =>

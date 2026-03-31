@@ -12,6 +12,7 @@ import { upsertMessageRetrievalChunk } from '../db/queries/messageRetrievalChunk
 import type { ConversationTurnRecord, MessageRecord } from '../db/models/index.js'
 import type { JobMetricsRecorder } from './metrics.js'
 import { ragMetrics } from '../chat/rag/telemetry.js'
+import { createLogger } from '../logging/logger.js'
 
 export type JobHandler = (job: ConversationPostprocessJobRecord) => Promise<void>
 
@@ -35,7 +36,7 @@ const DEFAULT_DEPS: IndexTurnDeps = {
   createEmbedder: () => new OpenAIEmbedder({ model: getRagConfig().embeddingModel }),
   getRagConfig,
   metrics: ragMetrics,
-  logger: console,
+  logger: createLogger('jobs-handlers'),
   now: () => Date.now(),
 }
 

@@ -2,6 +2,7 @@ import {
   InMemoryJobMetrics,
   type JobMetricsRecorder,
 } from '../../jobs/metrics.js'
+import { createLogger } from '../../logging/logger.js'
 
 export interface RagLogger {
   info: (message: string, context?: Record<string, unknown>) => void
@@ -45,7 +46,7 @@ type TelemetryDeps = {
 
 const DEFAULT_DEPS: TelemetryDeps = {
   metrics: ragMetrics,
-  logger: console,
+  logger: createLogger('rag-telemetry'),
   now: () => Date.now(),
 }
 

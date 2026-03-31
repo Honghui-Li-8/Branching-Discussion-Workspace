@@ -27,9 +27,11 @@ import {
 } from './db/queries/internal.js'
 import { buildPlaceholderAssistantReply } from './utils/placeholderModelReply.js'
 import { sendConversationTurn } from './chat/sendConversationTurn.js'
+import { createLogger } from './logging/logger.js'
 
 type ContextRequest = Pick<Request, 'headers'>
 type ExistsById = (id: string) => Promise<boolean>
+const logger = createLogger('trpc-context')
 
 export const createAppRouterContext = (req: ContextRequest): AppRouterContext => {
   const sessionId = getSessionIdFromCookieHeader(req.headers.cookie)
@@ -236,7 +238,11 @@ export const createAppRouterContext = (req: ContextRequest): AppRouterContext =>
             content: response,
           });
         } catch (error) {
-          console.warn('[placeholder-model] Failed to persist assistant echo reply.', error)
+          logger.warn('[placeholder-model] Failed to persist assistant echo reply.', {
+            node_id: input.nodeId,
+            author_user_id: currentUserId,
+            error,
+          })
         }
       }
 
@@ -267,10 +273,37 @@ export const createAppRouterContext = (req: ContextRequest): AppRouterContext =>
         'Node not found.',
       )
 
-      return sendConversationTurn({
-        input,
-        currentUserId,
+      logger.info('[chat] conversationSend request accepted.', {
+        node_id: input.nodeId,
+        author_user_id: currentUserId,
+        model: input.model,
+        idempotency_key: input.idempotencyKey,
+        text_length: input.text.length,
       })
+
+      try {
+        const result = await sendConversationTurn({
+          input,
+          currentUserId,
+        })
+        logger.info('[chat] conversationSend request completed.', {
+          node_id: input.nodeId,
+          author_user_id: currentUserId,
+          model: input.model,
+          turn_id: result.turnId,
+          status: result.status,
+        })
+        return result
+      } catch (error) {
+        logger.error('[chat] conversationSend request failed.', {
+          node_id: input.nodeId,
+          author_user_id: currentUserId,
+          model: input.model,
+          idempotency_key: input.idempotencyKey,
+          error,
+        })
+        throw error
+      }
     },
   }
 }

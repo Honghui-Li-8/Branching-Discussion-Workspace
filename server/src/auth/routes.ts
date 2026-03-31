@@ -16,6 +16,7 @@ import {
   verifyThirdPartyToken,
 } from './provider.js'
 import type { LoginRequestBody, SessionUser } from './types.js'
+import { createLogger } from '../logging/logger.js'
 
 const fallbackUser: SessionUser = {
   id: 'user-local-dev',
@@ -23,6 +24,7 @@ const fallbackUser: SessionUser = {
   email: 'dev@example.com',
   displayName: 'Local Dev',
 }
+const logger = createLogger('auth-routes')
 
 const resolveDevSessionUser = (inputUser: LoginRequestBody['user']): SessionUser => ({
   id:
@@ -84,7 +86,7 @@ export const handleLogin = async (req: Request, res: Response): Promise<void> =>
     const devAuthToken = getDevAuthToken()
     if (devAuthToken && token === devAuthToken) {
       user = await resolvePersistedDevUser(body.user)
-      console.log("dev time quick login");
+      logger.info('[auth] dev login token accepted.', { auth_mode: 'dev_token' })
     } else {
       const provider = normalizeProvider(body.provider)
       const verifiedIdentity = await verifyThirdPartyToken(token, provider)
@@ -96,7 +98,7 @@ export const handleLogin = async (req: Request, res: Response): Promise<void> =>
       return
     }
 
-    console.error('[auth] Unexpected login verification error.', error)
+    logger.error('[auth] Unexpected login verification error.', { error })
     res.status(401).json({ error: 'Invalid credential.' })
     return
   }
@@ -107,7 +109,7 @@ export const handleLogin = async (req: Request, res: Response): Promise<void> =>
     await seedIntroWorkspace(user.id)
   } catch (error) {
     // Dev convenience should not block login.
-    console.warn('[auth] Intro workspace seeding failed; continuing login.', error)
+    logger.warn('[auth] Intro workspace seeding failed; continuing login.', { error })
   }
 
   const sessionId = createSession(user)
@@ -144,7 +146,7 @@ export const handleLogout = (req: Request, res: Response): void => {
 export const registerAuthRoutes = (app: Express): void => {
   app.post('/auth/login', (req: Request, res: Response) => {
     void handleLogin(req, res).catch((error) => {
-      console.error('[auth] Unhandled login error.', error)
+      logger.error('[auth] Unhandled login error.', { error })
       if (!res.headersSent) {
         res.status(500).json({ error: 'Internal server error.' })
       }

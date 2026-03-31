@@ -10,11 +10,13 @@ import {
   validateChatTurnStreamEvent,
 } from './events.js'
 import { turnEventBroker } from './broker.js'
+import { createLogger } from '../../logging/logger.js'
 
 const HEARTBEAT_INTERVAL_MS = 15_000
 const EVENT_POLL_INTERVAL_MS = 1_000
 const REPLAY_BATCH_LIMIT = 200
 export const CONVERSATION_TURN_STREAM_ROUTE = '/chat/turns/:turnId/stream'
+const logger = createLogger('chat-stream')
 
 type StreamRequest = {
   headers: Request['headers']
@@ -175,9 +177,9 @@ export const handleConversationTurnStream = async (
         }
       })
       .catch((error) => {
-        console.warn('[chat-stream] Failed to poll replay events.', {
-          turnId,
-          userId: sessionUser.id,
+        logger.warn('[chat-stream] Failed to poll replay events.', {
+          turn_id: turnId,
+          author_user_id: sessionUser.id,
           error,
         })
       })
@@ -205,7 +207,7 @@ export const registerConversationStreamRoutes = (app: Express): void => {
   app.get(CONVERSATION_TURN_STREAM_ROUTE, (req, res) => {
     handleConversationTurnStream(req, res)
       .catch((error) => {
-        console.error('[chat-stream] Failed to open turn stream.', error)
+        logger.error('[chat-stream] Failed to open turn stream.', { error })
         if (!res.headersSent) {
           res.status(500).json({ error: 'Failed to open conversation stream.' })
           return

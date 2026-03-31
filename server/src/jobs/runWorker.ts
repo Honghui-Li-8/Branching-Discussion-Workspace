@@ -1,9 +1,12 @@
 import { closePool } from '../db/client.js'
 import { startConversationPostprocessWorker } from './worker.js'
+import { createLogger } from '../logging/logger.js'
+
+const logger = createLogger('jobs-runner')
 
 startConversationPostprocessWorker()
   .catch((error) => {
-    console.error('[jobs] worker crashed.', error)
+    logger.error('[jobs] worker crashed.', { error })
     process.exitCode = 1
   })
   .finally(async () => {

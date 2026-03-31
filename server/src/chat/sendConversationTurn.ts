@@ -32,6 +32,7 @@ import type {
   SendConversationTurnInput,
   SendConversationTurnResult,
 } from './types.js'
+import { createLogger } from '../logging/logger.js'
 
 type SendConversationTurnParams = {
   input: SendConversationTurnInput
@@ -39,6 +40,13 @@ type SendConversationTurnParams = {
 }
 
 const POSTPROCESS_JOB_TYPES = ['summary', 'index'] as const
+const logger = createLogger('chat-turn')
+const DEBUG_TEXT_PREVIEW_MAX_CHARS = 1_200
+
+const toDebugPreview = (value: string): string =>
+  value.length <= DEBUG_TEXT_PREVIEW_MAX_CHARS
+    ? value
+    : `${value.slice(0, DEBUG_TEXT_PREVIEW_MAX_CHARS)}...`
 
 const findRecoverableUserMessage = (
   messages: Awaited<ReturnType<typeof listMessagesForNodeForAuthorRecord>>,
@@ -92,17 +100,23 @@ const enqueuePostprocessJobsForTurn = async (
         currentUserId,
       )
       if (!result) {
-        console.warn('[postprocess] enqueue skipped because turn is not accessible.', {
+        logger.warn('[postprocess] enqueue skipped because turn is not accessible.', {
           turnId,
           jobType,
           currentUserId,
+          turn_id: turnId,
+          job_type: jobType,
+          author_user_id: currentUserId,
         })
       }
     } catch (error) {
-      console.warn('[postprocess] enqueue failed but response path remains successful.', {
+      logger.warn('[postprocess] enqueue failed but response path remains successful.', {
         turnId,
         jobType,
         currentUserId,
+        turn_id: turnId,
+        job_type: jobType,
+        author_user_id: currentUserId,
         error,
       })
     }
@@ -121,9 +135,27 @@ export const sendConversationTurn = async ({
   input,
   currentUserId,
 }: SendConversationTurnParams): Promise<SendConversationTurnResult> => {
+  const requestStartedAtMs = Date.now()
+  let stage = 'validating'
+  logger.info('[chat] sendConversationTurn started.', {
+    node_id: input.nodeId,
+    author_user_id: currentUserId,
+    model: input.model,
+    idempotency_key: input.idempotencyKey,
+    text_length: input.text.length,
+  })
+  logger.debug('[chat] sendConversationTurn user input.', {
+    node_id: input.nodeId,
+    author_user_id: currentUserId,
+    model: input.model,
+    idempotency_key: input.idempotencyKey,
+    text: toDebugPreview(input.text),
+  })
+
   validateAllowedModelOrThrow(input.model)
   validateProviderRuntimeConfigOrThrow(input.model)
 
+  stage = 'creating_turn'
   const turnResult = await createOrGetConversationTurnForAuthorRecord({
     nodeId: input.nodeId,
     authorUserId: currentUserId,
@@ -133,13 +165,28 @@ export const sendConversationTurn = async ({
   })
 
   if (!turnResult) {
+    logger.warn('[chat] sendConversationTurn could not resolve node while creating turn.', {
+      node_id: input.nodeId,
+      author_user_id: currentUserId,
+      model: input.model,
+      idempotency_key: input.idempotencyKey,
+    })
     throw new TRPCError({
       code: 'NOT_FOUND',
       message: 'Node not found.',
     })
   }
 
+  logger.info('[chat] conversation turn resolved.', {
+    turn_id: turnResult.turn.id,
+    node_id: input.nodeId,
+    author_user_id: currentUserId,
+    status: turnResult.turn.status,
+    was_created: turnResult.wasCreated,
+  })
+
   if (!turnResult.wasCreated) {
+    stage = 'recovering_existing_turn'
     const existingNodeMessages = await listMessagesForNodeForAuthorRecord(
       input.nodeId,
       currentUserId,
@@ -151,6 +198,12 @@ export const sendConversationTurn = async ({
     )
 
     if (!existingUserMessage) {
+      logger.warn('[chat] idempotency recovery failed due to missing user message.', {
+        turn_id: turnResult.turn.id,
+        node_id: input.nodeId,
+        author_user_id: currentUserId,
+        idempotency_key: input.idempotencyKey,
+      })
       throw new TRPCError({
         code: 'CONFLICT',
         message: 'A turn already exists for this idempotency key.',
@@ -163,6 +216,15 @@ export const sendConversationTurn = async ({
     if (existingAssistantMessage) {
       await enqueuePostprocessJobsForTurn(turnResult.turn.id, currentUserId)
     }
+
+    logger.info('[chat] idempotent turn replay completed.', {
+      turn_id: turnResult.turn.id,
+      node_id: input.nodeId,
+      author_user_id: currentUserId,
+      has_assistant_message: Boolean(existingAssistantMessage),
+      status: turnResult.turn.status,
+      duration_ms: Date.now() - requestStartedAtMs,
+    })
 
     return {
       turnId: turnResult.turn.id,
@@ -182,7 +244,12 @@ export const sendConversationTurn = async ({
         event: createTurnStreamEvent(eventSequencer, event),
       })
     } catch (error) {
-      console.warn('[chat-stream] Failed to publish turn event.', error)
+      logger.warn('[chat-stream] Failed to publish turn event.', {
+        turn_id: turnResult.turn.id,
+        author_user_id: currentUserId,
+        event_type: event.type,
+        error,
+      })
     }
   }
 
@@ -210,6 +277,7 @@ export const sendConversationTurn = async ({
   }
 
   try {
+    stage = 'persisting_user_message'
     const userMessage = await createMessageForAuthorRecord({
       nodeId: input.nodeId,
       authorUserId: currentUserId,
@@ -220,30 +288,54 @@ export const sendConversationTurn = async ({
 
     if (userMessage === null) {
       await markTurnFailedOnce('Node not found.')
+      logger.warn('[chat] failed to persist user message because node was not found.', {
+        turn_id: turnResult.turn.id,
+        node_id: input.nodeId,
+        author_user_id: currentUserId,
+      })
       throw new TRPCError({
         code: 'NOT_FOUND',
         message: 'Node not found.',
       })
     }
 
+    stage = 'building_context'
     const context = await buildConversationContext({
       nodeId: input.nodeId,
       currentUserId,
       userInput: input.text,
     })
+    logger.debug('[chat] conversation context built.', {
+      turn_id: turnResult.turn.id,
+      node_id: input.nodeId,
+      author_user_id: currentUserId,
+      workspace_id: context.node.workspaceId,
+      recent_messages: context.recentMessages.length,
+    })
 
     let retrievalState: RetrievalStageState = {
       prompt: buildAssistantPrompt(context),
     }
+    stage = 'evaluating_rag'
     const ragConfig = getRagConfig()
     const ragAllowed = isRagAllowedForTarget({
       config: ragConfig,
       userId: currentUserId,
       workspaceId: context.node.workspaceId,
     })
+    logger.debug('[rag] retrieval gate evaluated.', {
+      turn_id: turnResult.turn.id,
+      node_id: input.nodeId,
+      author_user_id: currentUserId,
+      rag_enabled: ragConfig.enabled,
+      rag_allowed: ragAllowed,
+      retriever: ragConfig.retriever,
+      workspace_id: context.node.workspaceId,
+    })
 
     if (ragAllowed) {
       const retrievalStartedAtMs = Date.now()
+      stage = 'retrieving_context'
       publishTurnEvent({
         type: 'turn.status',
         payload: {
@@ -254,6 +346,13 @@ export const sendConversationTurn = async ({
 
       try {
         const retriever = resolveRetriever({ config: ragConfig })
+        logger.debug('[rag] retrieval started.', {
+          turn_id: turnResult.turn.id,
+          node_id: input.nodeId,
+          author_user_id: currentUserId,
+          retriever: retriever.id,
+          max_chunks: ragConfig.maxChunks,
+        })
         const retrievalResult = await retriever.retrieve({
           query: input.text,
           nodeId: input.nodeId,
@@ -278,6 +377,41 @@ export const sendConversationTurn = async ({
             diagnostics: policyDecision.diagnostics,
           }),
         }
+        logger.debug('[rag] retrieval policy applied.', {
+          turn_id: turnResult.turn.id,
+          node_id: input.nodeId,
+          author_user_id: currentUserId,
+          retriever: retriever.id,
+          chunks_returned: retrievalResult.chunks.length,
+          chunks_selected: policyDecision.selectedChunks.length,
+          citations: policyDecision.citations.length,
+          snapshot_id: policyDecision.snapshot.id,
+        })
+        logger.debug('[rag] retrieval details.', {
+          turn_id: turnResult.turn.id,
+          node_id: input.nodeId,
+          author_user_id: currentUserId,
+          retriever: retriever.id,
+          diagnostics: retrievalResult.diagnostics,
+          returned_chunks: retrievalResult.chunks.map((chunk) => ({
+            message_id: chunk.messageId,
+            node_id: chunk.nodeId,
+            chunk_index: chunk.chunkIndex,
+            token_count: chunk.tokenCount,
+            score: chunk.score,
+            content_preview: toDebugPreview(chunk.content),
+          })),
+          selected_chunks: policyDecision.selectedChunks.map((chunk) => ({
+            message_id: chunk.messageId,
+            node_id: chunk.nodeId,
+            chunk_index: chunk.chunkIndex,
+            token_count: chunk.tokenCount,
+            score: chunk.score,
+            content_preview: toDebugPreview(chunk.content),
+          })),
+          citations: policyDecision.citations,
+          snapshot: policyDecision.snapshot,
+        })
         recordRetrievalTelemetry({
           turnId: turnResult.turn.id,
           nodeId: input.nodeId,
@@ -291,15 +425,16 @@ export const sendConversationTurn = async ({
           snapshotId: policyDecision.snapshot.id,
         })
       } catch (error) {
-        console.warn(
-          '[rag] Retrieval failed; continuing with base prompt.',
-          {
-            turnId: turnResult.turn.id,
-            nodeId: input.nodeId,
-            currentUserId,
-            error,
-          },
-        )
+        logger.warn('[rag] Retrieval failed; continuing with base prompt.', {
+          turnId: turnResult.turn.id,
+          nodeId: input.nodeId,
+          currentUserId,
+          turn_id: turnResult.turn.id,
+          node_id: input.nodeId,
+          author_user_id: currentUserId,
+          retriever: ragConfig.retriever,
+          error,
+        })
 
         retrievalState = {
           prompt: buildAssistantPrompt(context),
@@ -312,6 +447,13 @@ export const sendConversationTurn = async ({
             },
           }),
         }
+        logger.debug('[rag] fallback retrieval diagnostics.', {
+          turn_id: turnResult.turn.id,
+          node_id: input.nodeId,
+          author_user_id: currentUserId,
+          retriever: ragConfig.retriever,
+          fallback_reason: 'retrieval_failed',
+        })
         recordRetrievalTelemetry({
           turnId: turnResult.turn.id,
           nodeId: input.nodeId,
@@ -327,6 +469,7 @@ export const sendConversationTurn = async ({
       }
     }
 
+    stage = 'generating_assistant_reply'
     publishTurnEvent({
       type: 'turn.status',
       payload: {
@@ -335,6 +478,24 @@ export const sendConversationTurn = async ({
       },
     })
     const provider = selectProvider({ model: input.model })
+    logger.debug('[llm] provider selected.', {
+      turn_id: turnResult.turn.id,
+      node_id: input.nodeId,
+      author_user_id: currentUserId,
+      model: input.model,
+      provider: provider.id,
+    })
+    logger.debug('[llm] provider input prepared.', {
+      turn_id: turnResult.turn.id,
+      node_id: input.nodeId,
+      author_user_id: currentUserId,
+      model: input.model,
+      provider: provider.id,
+      prompt_input_length: retrievalState.prompt.input.length,
+      prompt_user_input_length: retrievalState.prompt.userInput.length,
+      prompt_input_preview: toDebugPreview(retrievalState.prompt.input),
+      prompt_user_input_preview: toDebugPreview(retrievalState.prompt.userInput),
+    })
     const assistantOutput = await provider.generate({
       model: input.model,
       prompt: retrievalState.prompt,
@@ -350,6 +511,17 @@ export const sendConversationTurn = async ({
         })
       },
     })
+    logger.info('[llm] assistant generation completed.', {
+      turn_id: turnResult.turn.id,
+      node_id: input.nodeId,
+      author_user_id: currentUserId,
+      provider: provider.id,
+      finish_reason: assistantOutput.finishReason,
+      provider_response_id: assistantOutput.providerResponseId,
+      output_length: assistantOutput.content.length,
+    })
+
+    stage = 'persisting_assistant_message'
     publishTurnEvent({
       type: 'turn.status',
       payload: {
@@ -370,12 +542,18 @@ export const sendConversationTurn = async ({
 
     if (assistantMessage === null) {
       await markTurnFailedOnce('Node not found.')
+      logger.warn('[chat] failed to persist assistant message because node was not found.', {
+        turn_id: turnResult.turn.id,
+        node_id: input.nodeId,
+        author_user_id: currentUserId,
+      })
       throw new TRPCError({
         code: 'NOT_FOUND',
         message: 'Node not found.',
       })
     }
 
+    stage = 'finalizing_turn'
     const completedAt = new Date().toISOString()
     const finalizedTurn = await updateConversationTurnForAuthorRecord(
       {
@@ -391,6 +569,11 @@ export const sendConversationTurn = async ({
     )
 
     if (!finalizedTurn) {
+      logger.warn('[chat] failed to finalize conversation turn because it was not found.', {
+        turn_id: turnResult.turn.id,
+        node_id: input.nodeId,
+        author_user_id: currentUserId,
+      })
       throw new TRPCError({
         code: 'NOT_FOUND',
         message: 'Conversation turn not found.',
@@ -406,6 +589,16 @@ export const sendConversationTurn = async ({
       },
     })
 
+    logger.info('[chat] sendConversationTurn completed.', {
+      turn_id: finalizedTurn.id,
+      node_id: input.nodeId,
+      author_user_id: currentUserId,
+      status: finalizedTurn.status,
+      user_message_id: userMessage.id,
+      assistant_message_id: assistantMessage.id,
+      duration_ms: Date.now() - requestStartedAtMs,
+    })
+
     return {
       turnId: finalizedTurn.id,
       status: finalizedTurn.status,
@@ -416,6 +609,15 @@ export const sendConversationTurn = async ({
   } catch (error) {
     if (error instanceof TRPCError) {
       await markTurnFailedOnce(error.message)
+      logger.warn('[chat] sendConversationTurn failed with TRPCError.', {
+        turn_id: turnResult.turn.id,
+        node_id: input.nodeId,
+        author_user_id: currentUserId,
+        stage,
+        code: error.code,
+        message: error.message,
+        duration_ms: Date.now() - requestStartedAtMs,
+      })
       publishTurnEvent({
         type: 'turn.error',
         payload: {
@@ -430,6 +632,14 @@ export const sendConversationTurn = async ({
       ? error.message
       : 'Assistant generation failed.'
     await markTurnFailedOnce(errorMessage)
+    logger.error('[chat] sendConversationTurn failed with unexpected error.', {
+      turn_id: turnResult.turn.id,
+      node_id: input.nodeId,
+      author_user_id: currentUserId,
+      stage,
+      error,
+      duration_ms: Date.now() - requestStartedAtMs,
+    })
     publishTurnEvent({
       type: 'turn.error',
       payload: {
