@@ -227,9 +227,9 @@ describe('conversation turn stream route handler', () => {
     })
 
     const firstFrame = res.writes.join('')
-    expect(firstFrame).toContain('id: 1')
     expect(firstFrame).toContain('event: turn.status')
     expect(firstFrame).toContain('"status":"generating"')
+    expect(firstFrame).not.toContain('id: 1')
 
     jest.advanceTimersByTime(15_000)
     expect(res.writes.filter((chunk) => chunk === ': heartbeat\n\n').length).toBeGreaterThanOrEqual(2)

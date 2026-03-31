@@ -9,6 +9,7 @@ type TurnStartedEvent = {
   type: 'turn.started'
   turnId: string
   seq: number
+  eventId?: number
   ts: string
   payload: {
     status: 'loading_context'
@@ -19,6 +20,7 @@ type TurnStatusEvent = {
   type: 'turn.status'
   turnId: string
   seq: number
+  eventId?: number
   ts: string
   payload: {
     status: TurnStage
@@ -30,6 +32,7 @@ type TokenDeltaEvent = {
   type: 'token.delta'
   turnId: string
   seq: number
+  eventId?: number
   ts: string
   payload: {
     delta: string
@@ -40,6 +43,7 @@ type MessageCompletedEvent = {
   type: 'message.completed'
   turnId: string
   seq: number
+  eventId?: number
   ts: string
   payload: {
     messageId: string
@@ -51,6 +55,7 @@ type TurnErrorEvent = {
   type: 'turn.error'
   turnId: string
   seq: number
+  eventId?: number
   ts: string
   payload: {
     code: string
@@ -62,6 +67,7 @@ type SummaryCompletedEvent = {
   type: 'summary.completed'
   turnId: string
   seq: number
+  eventId?: number
   ts: string
   payload: {
     jobId: string
@@ -75,6 +81,7 @@ type SummaryFailedEvent = {
   type: 'summary.failed'
   turnId: string
   seq: number
+  eventId?: number
   ts: string
   payload: {
     jobId: string
@@ -106,6 +113,7 @@ export type ConversationStreamState = {
   turnId: string | null
   stage: TurnStage | null
   lastSeq: number
+  lastEventId: number
   assistantDraft: string
   errorMessage: string | null
   summaryStatus: 'idle' | 'pending' | 'completed' | 'failed'
@@ -127,6 +135,7 @@ export const initialConversationStreamState: ConversationStreamState = {
   turnId: null,
   stage: null,
   lastSeq: 0,
+  lastEventId: 0,
   assistantDraft: '',
   errorMessage: null,
   summaryStatus: 'idle',
@@ -141,7 +150,8 @@ const withEventEnvelope = (
 ): ConversationStreamState => ({
   ...state,
   turnId: event.turnId,
-  lastSeq: event.seq,
+  lastSeq: Math.max(state.lastSeq, event.seq),
+  lastEventId: event.eventId ? Math.max(state.lastEventId, event.eventId) : state.lastEventId,
 })
 
 export const conversationStreamReducer = (
@@ -157,6 +167,7 @@ export const conversationStreamReducer = (
         turnId: null,
         stage: 'loading_context',
         lastSeq: 0,
+        lastEventId: 0,
         assistantDraft: '',
         errorMessage: null,
         summaryStatus: 'pending',
@@ -197,7 +208,11 @@ export const conversationStreamReducer = (
       if (state.turnId && event.turnId !== state.turnId) {
         return state
       }
-      if (event.seq <= state.lastSeq) {
+      if (event.eventId !== undefined) {
+        if (event.eventId <= state.lastEventId) {
+          return state
+        }
+      } else if (event.seq <= state.lastSeq) {
         return state
       }
 
@@ -327,10 +342,19 @@ const parseBaseEvent = (value: unknown) => {
   const type = typeof value.type === 'string' ? value.type : null
   const turnId = typeof value.turnId === 'string' ? value.turnId : null
   const seq = typeof value.seq === 'number' ? value.seq : null
+  const eventId = value.eventId
+  const parsedEventId = eventId === undefined
+    ? undefined
+    : typeof eventId === 'number' && Number.isInteger(eventId) && eventId > 0
+      ? eventId
+      : null
   const ts = typeof value.ts === 'string' ? value.ts : null
   const payload = isObjectRecord(value.payload) ? value.payload : null
 
   if (!type || !turnId || seq === null || !Number.isInteger(seq) || seq <= 0 || !ts || !payload) {
+    return null
+  }
+  if (parsedEventId === null) {
     return null
   }
 
@@ -338,6 +362,7 @@ const parseBaseEvent = (value: unknown) => {
     type,
     turnId,
     seq,
+    eventId: parsedEventId,
     ts,
     payload,
   }

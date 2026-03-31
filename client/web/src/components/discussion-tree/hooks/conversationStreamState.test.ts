@@ -164,6 +164,7 @@ describe('conversationStreamState', () => {
         type: 'summary.completed',
         turnId: 'turn-1',
         seq: 7,
+        eventId: 101,
         ts: '2026-03-31T00:00:07.000Z',
         payload: {
           jobId: 'job-1',
@@ -182,6 +183,7 @@ describe('conversationStreamState', () => {
         type: 'summary.completed',
         turnId: 'turn-1',
         seq: 7,
+        eventId: 101,
         ts: '2026-03-31T00:00:07.000Z',
         payload: {
           jobId: 'job-1',
@@ -200,6 +202,7 @@ describe('conversationStreamState', () => {
         type: 'summary.failed',
         turnId: 'turn-1',
         seq: 8,
+        eventId: 102,
         ts: '2026-03-31T00:00:08.000Z',
         payload: {
           jobId: 'job-1',
@@ -213,9 +216,51 @@ describe('conversationStreamState', () => {
 
     expect(deduped.summaryMetadata).toEqual({ version: 'a' })
     expect(deduped.lastSeq).toBe(7)
+    expect(deduped.lastEventId).toBe(101)
     expect(state.summaryStatus).toBe('failed')
     expect(state.summaryError).toBe('summary unavailable')
     expect(state.lastSeq).toBe(8)
+    expect(state.lastEventId).toBe(102)
+  })
+
+  test('accepts durable summary event with low seq when eventId advances', () => {
+    let state = conversationStreamReducer(initialConversationStreamState, {
+      type: 'eventReceived',
+      event: {
+        type: 'message.completed',
+        turnId: 'turn-1',
+        seq: 9,
+        ts: '2026-03-31T00:00:09.000Z',
+        payload: {
+          messageId: 'msg-1',
+          content: 'final',
+        },
+      },
+    })
+
+    state = conversationStreamReducer(state, {
+      type: 'eventReceived',
+      event: {
+        type: 'summary.completed',
+        turnId: 'turn-1',
+        seq: 1,
+        eventId: 201,
+        ts: '2026-03-31T00:00:10.000Z',
+        payload: {
+          jobId: 'job-1',
+          jobType: 'summary',
+          attemptCount: 1,
+          metadata: {
+            source: 'replay',
+          },
+        },
+      },
+    })
+
+    expect(state.summaryStatus).toBe('completed')
+    expect(state.summaryMetadata).toEqual({ source: 'replay' })
+    expect(state.lastSeq).toBe(9)
+    expect(state.lastEventId).toBe(201)
   })
 
   test('maps stage + errors to UX labels', () => {
@@ -296,6 +341,7 @@ describe('conversationStreamState', () => {
           type: 'summary.completed',
           turnId: 'turn-1',
           seq: 5,
+          eventId: 105,
           ts: '2026-03-31T00:00:05.000Z',
           payload: {
             jobId: 'job-1',
@@ -315,6 +361,7 @@ describe('conversationStreamState', () => {
           type: 'summary.failed',
           turnId: 'turn-1',
           seq: 6,
+          eventId: 106,
           ts: '2026-03-31T00:00:06.000Z',
           payload: {
             jobId: 'job-1',
@@ -333,6 +380,7 @@ describe('conversationStreamState', () => {
           type: 'summary.completed',
           turnId: 'turn-1',
           seq: 5,
+          eventId: 0,
           ts: '2026-03-31T00:00:05.000Z',
           payload: {
             jobId: 'job-1',

@@ -201,7 +201,7 @@ export const useNodeConversation = ({
         if (
           parsedEvent.type === 'turn.error' ||
           parsedEvent.type === 'summary.completed' ||
-          parsedEvent.type === 'summary.failed'
+          (parsedEvent.type === 'summary.failed' && parsedEvent.payload.terminal)
         ) {
           closeTurnStream()
         }

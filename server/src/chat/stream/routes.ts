@@ -37,7 +37,9 @@ const writeSseHeartbeat = (res: StreamResponse): void => {
 }
 
 const writeSseEvent = (res: StreamResponse, event: ChatTurnStreamEvent): void => {
-  res.write(`id: ${event.eventId ?? event.seq}\n`)
+  if (event.eventId) {
+    res.write(`id: ${event.eventId}\n`)
+  }
   res.write(`event: ${event.type}\n`)
   res.write(`data: ${JSON.stringify(event)}\n\n`)
 }
