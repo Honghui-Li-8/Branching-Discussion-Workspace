@@ -216,6 +216,15 @@ describe('sendConversationTurn', () => {
   })
 
   test('duplicate idempotency replay does not regenerate and recovers existing messages', async () => {
+    const emittedEvents: ChatTurnStreamEvent[] = []
+    const unsubscribe = turnEventBroker.subscribe({
+      turnId: processingTurn.id,
+      authorUserId: processingTurn.authorUserId,
+      onEvent: (event) => {
+        emittedEvents.push(event)
+      },
+    })
+
     createOrGetConversationTurnForAuthorMock.mockResolvedValueOnce({
       turn: {
         ...completedTurn,
@@ -237,10 +246,13 @@ describe('sendConversationTurn', () => {
       },
       currentUserId: 'u1',
     })
+    unsubscribe()
 
     expect(buildConversationContextMock).not.toHaveBeenCalled()
     expect(selectProviderMock).not.toHaveBeenCalled()
     expect(createMessageForAuthorMock).not.toHaveBeenCalled()
+    expect(updateConversationTurnForAuthorMock).not.toHaveBeenCalled()
+    expect(emittedEvents).toEqual([])
     expect(result).toEqual({
       turnId: 't1',
       status: 'completed',
@@ -329,6 +341,15 @@ describe('sendConversationTurn', () => {
   })
 
   test('assistant insert race marks turn failed and returns NOT_FOUND', async () => {
+    const emittedEvents: ChatTurnStreamEvent[] = []
+    const unsubscribe = turnEventBroker.subscribe({
+      turnId: processingTurn.id,
+      authorUserId: processingTurn.authorUserId,
+      onEvent: (event) => {
+        emittedEvents.push(event)
+      },
+    })
+
     createMessageForAuthorMock
       .mockResolvedValueOnce(userMessage)
       .mockResolvedValueOnce(null)
@@ -347,6 +368,7 @@ describe('sendConversationTurn', () => {
       code: 'NOT_FOUND',
       message: 'Node not found.',
     })
+    unsubscribe()
 
     expect(updateConversationTurnForAuthorMock).toHaveBeenCalledWith(
       {
@@ -356,6 +378,14 @@ describe('sendConversationTurn', () => {
       },
       'u1',
     )
+    expect(emittedEvents[emittedEvents.length - 1]).toMatchObject({
+      type: 'turn.error',
+      payload: {
+        code: 'NOT_FOUND',
+        message: 'Node not found.',
+      },
+    })
+    expect(emittedEvents.some((event) => event.type === 'message.completed')).toBe(false)
   })
 
   test('rejects unsupported model before creating a turn', async () => {

@@ -146,6 +146,9 @@ export const conversationStreamReducer = (
       }
     case 'eventReceived': {
       const { event } = action
+      if (state.phase === 'done' || state.phase === 'error') {
+        return state
+      }
       if (state.turnId && event.turnId !== state.turnId) {
         return state
       }

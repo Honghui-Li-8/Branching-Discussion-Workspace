@@ -128,4 +128,62 @@ describe('conversationStreamState', () => {
     })
     expect(getConversationStreamStatusLabel(failed)).toBe('Error: boom')
   })
+
+  test('ignores late events after terminal completion/error states', () => {
+    const doneState = conversationStreamReducer(initialConversationStreamState, {
+      type: 'eventReceived',
+      event: {
+        type: 'message.completed',
+        turnId: 'turn-1',
+        seq: 3,
+        ts: '2026-03-31T00:00:03.000Z',
+        payload: {
+          messageId: 'msg-1',
+          content: 'final',
+        },
+      },
+    })
+
+    const doneWithLateDelta = conversationStreamReducer(doneState, {
+      type: 'eventReceived',
+      event: {
+        type: 'token.delta',
+        turnId: 'turn-1',
+        seq: 4,
+        ts: '2026-03-31T00:00:04.000Z',
+        payload: { delta: 'ignored' },
+      },
+    })
+
+    const errorState = conversationStreamReducer(initialConversationStreamState, {
+      type: 'eventReceived',
+      event: {
+        type: 'turn.error',
+        turnId: 'turn-1',
+        seq: 2,
+        ts: '2026-03-31T00:00:02.000Z',
+        payload: {
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'failed',
+        },
+      },
+    })
+
+    const errorWithLateComplete = conversationStreamReducer(errorState, {
+      type: 'eventReceived',
+      event: {
+        type: 'message.completed',
+        turnId: 'turn-1',
+        seq: 3,
+        ts: '2026-03-31T00:00:03.000Z',
+        payload: {
+          messageId: 'msg-2',
+          content: 'ignored',
+        },
+      },
+    })
+
+    expect(doneWithLateDelta).toEqual(doneState)
+    expect(errorWithLateComplete).toEqual(errorState)
+  })
 })
