@@ -36,6 +36,7 @@ export {
 export {
   createOrGetConversationPostprocessJob,
   findDueConversationPostprocessJobs,
+  getConversationPostprocessJobQueueSnapshot,
   getConversationPostprocessJobById,
   leaseDueConversationPostprocessJobs,
   markConversationPostprocessJobFailed,

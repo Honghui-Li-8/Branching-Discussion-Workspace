@@ -1,4 +1,5 @@
 import type {
+  ConversationPostprocessJobQueueSnapshot,
   ConversationPostprocessJobRecord,
   ConversationPostprocessJobStatus,
   CreateConversationPostprocessJobInput,
@@ -35,6 +36,20 @@ const DEFAULT_MAX_ATTEMPTS = 5
 const DEFAULT_LEASE_BATCH_LIMIT = 10
 const DEFAULT_RETRY_BASE_DELAY_SECONDS = 5
 const DEFAULT_RETRY_MAX_DELAY_SECONDS = 300
+
+const toFiniteNumber = (value: unknown): number | null => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value
+  }
+  if (typeof value === 'string' && value.trim().length > 0) {
+    const parsed = Number.parseFloat(value)
+    if (Number.isFinite(parsed)) {
+      return parsed
+    }
+  }
+
+  return null
+}
 
 const mapConversationPostprocessJobRow = (
   row: ConversationPostprocessJobRow,
@@ -410,6 +425,56 @@ export const findDueConversationPostprocessJobs = async (
   )
 
   return result.rows.map(mapConversationPostprocessJobRow)
+}
+
+export const getConversationPostprocessJobQueueSnapshot = async (
+  asOf: string = new Date().toISOString(),
+): Promise<ConversationPostprocessJobQueueSnapshot> => {
+  const result = await query<{
+    queued_count: number | string
+    running_count: number | string
+    succeeded_count: number | string
+    failed_count: number | string
+    oldest_queued_age_seconds: number | string | null
+  }>(
+    `
+    SELECT
+      COUNT(*) FILTER (WHERE status = 'queued')::int AS queued_count,
+      COUNT(*) FILTER (WHERE status = 'running')::int AS running_count,
+      COUNT(*) FILTER (WHERE status = 'succeeded')::int AS succeeded_count,
+      COUNT(*) FILTER (WHERE status = 'failed')::int AS failed_count,
+      CASE
+        WHEN COUNT(*) FILTER (WHERE status = 'queued') = 0 THEN NULL
+        ELSE GREATEST(
+          EXTRACT(EPOCH FROM (
+            $1::timestamptz - MIN(run_after) FILTER (WHERE status = 'queued')
+          )),
+          0
+        )::double precision
+      END AS oldest_queued_age_seconds
+    FROM conversation_postprocess_job
+    `,
+    [asOf],
+  )
+
+  const row = result.rows[0]
+  if (!row) {
+    return {
+      queued: 0,
+      running: 0,
+      succeeded: 0,
+      failed: 0,
+      oldestQueuedAgeSeconds: null,
+    }
+  }
+
+  return {
+    queued: toFiniteNumber(row.queued_count) ?? 0,
+    running: toFiniteNumber(row.running_count) ?? 0,
+    succeeded: toFiniteNumber(row.succeeded_count) ?? 0,
+    failed: toFiniteNumber(row.failed_count) ?? 0,
+    oldestQueuedAgeSeconds: toFiniteNumber(row.oldest_queued_age_seconds),
+  }
 }
 
 export const leaseDueConversationPostprocessJobs = async (

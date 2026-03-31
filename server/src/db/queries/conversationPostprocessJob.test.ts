@@ -4,6 +4,7 @@ import {
   createOrGetConversationPostprocessJob,
   createOrGetConversationPostprocessJobForAuthor,
   findDueConversationPostprocessJobs,
+  getConversationPostprocessJobQueueSnapshot,
   getConversationPostprocessJobById,
   leaseDueConversationPostprocessJobs,
   markConversationPostprocessJobFailed,
@@ -220,6 +221,34 @@ describe('conversation postprocess job queries', () => {
     expect(queryMock).toHaveBeenCalledWith(
       expect.stringContaining('attempt_count = attempt_count + 1'),
       ['job-1', 'boom', null, 10, 60, true, 'worker-1'],
+    )
+  })
+
+  test('getConversationPostprocessJobQueueSnapshot maps queue depth and age fields', async () => {
+    queryMock.mockResolvedValueOnce({
+      rows: [{
+        queued_count: 3,
+        running_count: 1,
+        succeeded_count: 12,
+        failed_count: 2,
+        oldest_queued_age_seconds: 48.5,
+      }],
+    } as never)
+
+    const result = await getConversationPostprocessJobQueueSnapshot(
+      '2026-03-31T01:05:00.000Z',
+    )
+
+    expect(result).toEqual({
+      queued: 3,
+      running: 1,
+      succeeded: 12,
+      failed: 2,
+      oldestQueuedAgeSeconds: 48.5,
+    })
+    expect(queryMock).toHaveBeenCalledWith(
+      expect.stringContaining('COUNT(*) FILTER (WHERE status = \'queued\')'),
+      ['2026-03-31T01:05:00.000Z'],
     )
   })
 })

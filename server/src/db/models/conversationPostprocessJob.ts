@@ -68,3 +68,11 @@ export interface RequeueConversationPostprocessJobWithBackoffInput {
   baseDelaySeconds?: number
   maxDelaySeconds?: number
 }
+
+export interface ConversationPostprocessJobQueueSnapshot {
+  queued: number
+  running: number
+  succeeded: number
+  failed: number
+  oldestQueuedAgeSeconds: number | null
+}

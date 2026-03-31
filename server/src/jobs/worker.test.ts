@@ -23,6 +23,11 @@ const baseJob: ConversationPostprocessJobRecord = {
 }
 
 const createTestDeps = () => {
+  const metrics = {
+    incrementCounter: jest.fn(),
+    setGauge: jest.fn(),
+    observeHistogram: jest.fn(),
+  }
   const logger = {
     info: jest.fn(),
     warn: jest.fn(),
@@ -53,6 +58,13 @@ const createTestDeps = () => {
       leasedAt: null,
       leaseOwner: null,
     })),
+    getConversationPostprocessJobQueueSnapshot: jest.fn(async () => ({
+      queued: 0,
+      running: 0,
+      succeeded: 0,
+      failed: 0,
+      oldestQueuedAgeSeconds: null,
+    })),
     appendConversationTurnEvent: jest.fn(async (_input: unknown) => ({
       id: 1,
       turnId: 'turn-1',
@@ -64,6 +76,7 @@ const createTestDeps = () => {
     getMaxConversationTurnEventSeq: jest.fn(async (_turnId: string) => 0),
     summarizeTurn: jest.fn(async (_job: ConversationPostprocessJobRecord) => {}),
     indexTurn: jest.fn(async (_job: ConversationPostprocessJobRecord) => {}),
+    metrics,
     logger,
   }
 }
@@ -98,6 +111,11 @@ describe('conversation postprocess worker', () => {
       id: 'job-1',
       leaseOwner: 'worker-1',
     })
+    expect(deps.metrics.incrementCounter).toHaveBeenCalledWith(
+      'jobs.completed_total',
+      1,
+      { job_type: 'summary' },
+    )
     expect(deps.appendConversationTurnEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         turnId: 'turn-1',
@@ -138,6 +156,11 @@ describe('conversation postprocess worker', () => {
       }),
     )
     expect(deps.markConversationPostprocessJobFailed).not.toHaveBeenCalled()
+    expect(deps.metrics.incrementCounter).toHaveBeenCalledWith(
+      'jobs.retried_total',
+      1,
+      { job_type: 'summary' },
+    )
     expect(deps.appendConversationTurnEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         turnId: 'turn-1',
@@ -178,6 +201,11 @@ describe('conversation postprocess worker', () => {
       }),
     )
     expect(deps.requeueConversationPostprocessJobWithBackoff).not.toHaveBeenCalled()
+    expect(deps.metrics.incrementCounter).toHaveBeenCalledWith(
+      'jobs.failed_total',
+      1,
+      { job_type: 'summary' },
+    )
     expect(deps.appendConversationTurnEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         turnId: 'turn-1',
@@ -212,5 +240,10 @@ describe('conversation postprocess worker', () => {
     expect(deps.requeueConversationPostprocessJobWithBackoff).toHaveBeenCalled()
     expect(deps.markConversationPostprocessJobSucceeded).not.toHaveBeenCalled()
     expect(deps.appendConversationTurnEvent).not.toHaveBeenCalled()
+    expect(deps.metrics.incrementCounter).toHaveBeenCalledWith(
+      'jobs.retried_total',
+      1,
+      { job_type: 'custom_future_job' },
+    )
   })
 })
