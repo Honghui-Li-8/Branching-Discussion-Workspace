@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import type { inferRouterOutputs } from '@trpc/server'
 import type { AppRouter } from '@branching/shared'
+import { parseMessageMetadata } from '@branching/shared'
 import { trpc } from '../../../trpc'
 import type { TreeMessage } from '../../../types/tree'
 import { invalidateMessagesByNode } from './mutationInvalidation'
@@ -266,6 +267,7 @@ export const useNodeConversation = ({
       id: message.id,
       role: mapMessageRoleToTreeRole(message.role),
       content: message.content,
+      metadata: parseMessageMetadata(message.metadata),
     }))
     const localPendingMessages = pendingMessages.map((message) => ({
       id: message.id,

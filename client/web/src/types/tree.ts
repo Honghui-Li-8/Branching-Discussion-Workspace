@@ -1,9 +1,12 @@
+import type { MessageMetadata } from '@branching/shared'
+
 export type TreeStatus = 'Open' | 'Exploring' | 'Approved'
 
 export type TreeMessage = {
   id: string
   role: 'user' | 'assistant'
   content: string
+  metadata?: MessageMetadata
 }
 
 export type FoldedNodeSummary = {
