@@ -46,12 +46,13 @@ export const NodeConversationPanel = ({
   onToggleFullScreen,
 }: NodeConversationPanelProps) => {
   const authUser = useAppSelector(selectAuthUser)
+  const [conversationModel, setConversationModel] = useState(CHAT_MODELS[0])
   const conversation = useNodeConversation({
     nodeId: node.id,
     canSendMessages: Boolean(authUser?.id),
+    conversationModel,
   })
   const [conversationInputText, setConversationInputText] = useState('')
-  const [conversationModel, setConversationModel] = useState(CHAT_MODELS[0])
   const [isResizing, setIsResizing] = useState(false)
   const [sendBlockAlert, setSendBlockAlert] = useState<string | null>(null)
 
@@ -202,6 +203,11 @@ export const NodeConversationPanel = ({
         onDismissFailedMessage={conversation.dismissFailedMessage}
         conversationScrollRef={conversationScrollRef}
       />
+      {conversation.streamStatusLabel ? (
+        <p className="m-0 border-t border-[#d8ebf6] bg-[#f4fbff] px-4 py-2 text-xs text-[#2f6688]">
+          {conversation.streamStatusLabel}
+        </p>
+      ) : null}
       {sendBlockAlert ? (
         <p
           role="alert"

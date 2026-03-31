@@ -1,3 +1,7 @@
+import {
+  parseMessageMetadata,
+  serializeMessageMetadata,
+} from '@branching/shared'
 import type {
   CreateMessageInput,
   MessageRecord,
@@ -10,8 +14,10 @@ type MessageRow = {
   id: string
   node_id: string
   author_user_id: string
+  turn_id: string | null
   role: MessageRole
   content: string
+  metadata: unknown
   created_at: string
 }
 
@@ -19,20 +25,44 @@ const mapMessageRow = (row: MessageRow): MessageRecord => ({
   id: row.id,
   authorUserId: row.author_user_id,
   nodeId: row.node_id,
+  turnId: row.turn_id,
   role: row.role,
   content: row.content,
+  metadata: parseMessageMetadata(row.metadata),
   createdAt: row.created_at,
 })
 
 export const listMessagesForNode = async (nodeId: string): Promise<MessageRecord[]> => {
   const result = await query<MessageRow>(
     `
-    SELECT id, node_id, author_user_id, role, content, created_at
+    SELECT id, node_id, author_user_id, turn_id, role, content, metadata, created_at
     FROM messages
     WHERE node_id = $1
     ORDER BY created_at ASC
     `,
     [nodeId],
+  )
+
+  return result.rows.map(mapMessageRow)
+}
+
+export const listMessagesByTurn = async (turnId: string): Promise<MessageRecord[]> => {
+  const result = await query<MessageRow>(
+    `
+    SELECT
+      id,
+      node_id,
+      author_user_id,
+      turn_id,
+      role,
+      content,
+      metadata,
+      created_at
+    FROM messages
+    WHERE turn_id = $1
+    ORDER BY created_at ASC
+    `,
+    [turnId],
   )
 
   return result.rows.map(mapMessageRow)
@@ -44,7 +74,15 @@ export const listMessagesForNodeForAuthor = async (
 ): Promise<MessageRecord[]> => {
   const result = await query<MessageRow>(
     `
-    SELECT m.id, m.node_id, m.author_user_id, m.role, m.content, m.created_at
+    SELECT
+      m.id,
+      m.node_id,
+      m.author_user_id,
+      m.turn_id,
+      m.role,
+      m.content,
+      m.metadata,
+      m.created_at
     FROM messages m
     JOIN nodes n ON n.id = m.node_id
     JOIN workspaces w ON w.id = n.workspace_id
@@ -61,7 +99,7 @@ export const listMessagesForNodeForAuthor = async (
 export const getMessageById = async (id: string): Promise<MessageRecord | null> => {
   const result = await query<MessageRow>(
     `
-    SELECT id, node_id, author_user_id, role, content, created_at
+    SELECT id, node_id, author_user_id, turn_id, role, content, metadata, created_at
     FROM messages
     WHERE id = $1
     `,
@@ -81,7 +119,15 @@ export const getMessageByIdForAuthor = async (
 ): Promise<MessageRecord | null> => {
   const result = await query<MessageRow>(
     `
-    SELECT m.id, m.node_id, m.author_user_id, m.role, m.content, m.created_at
+    SELECT
+      m.id,
+      m.node_id,
+      m.author_user_id,
+      m.turn_id,
+      m.role,
+      m.content,
+      m.metadata,
+      m.created_at
     FROM messages m
     JOIN nodes n ON n.id = m.node_id
     JOIN workspaces w ON w.id = n.workspace_id
@@ -112,15 +158,40 @@ export const messageExists = async (id: string): Promise<boolean> => {
 }
 
 export const createMessage = async (input: CreateMessageInput): Promise<MessageRecord> => {
+  const hasTurnId = input.turnId !== undefined && input.turnId !== null
+  const metadata = JSON.stringify(serializeMessageMetadata(input.metadata))
   const result = await query<MessageRow>(
     `
-    INSERT INTO messages (node_id, author_user_id, role, content)
-    SELECT $1, $2, $3, $4
+    WITH target_turn AS (
+      SELECT id
+      FROM conversation_turns
+      WHERE id = $6
+        AND node_id = $1
+        AND author_user_id = $2
+    )
+    INSERT INTO messages (node_id, author_user_id, role, content, turn_id, metadata)
+    SELECT
+      $1,
+      $2,
+      $3,
+      $4,
+      CASE WHEN $5::boolean THEN target_turn.id ELSE NULL END,
+      $7::jsonb
     FROM nodes
+    LEFT JOIN target_turn ON TRUE
     WHERE id = $1
-    RETURNING id, node_id, author_user_id, role, content, created_at
+      AND ($5::boolean = FALSE OR target_turn.id IS NOT NULL)
+    RETURNING id, node_id, author_user_id, turn_id, role, content, metadata, created_at
     `,
-    [input.nodeId, input.authorUserId, input.role, input.content],
+    [
+      input.nodeId,
+      input.authorUserId,
+      input.role,
+      input.content,
+      hasTurnId,
+      input.turnId ?? null,
+      metadata,
+    ],
   )
 
   if (result.rows.length === 0) {
@@ -131,17 +202,42 @@ export const createMessage = async (input: CreateMessageInput): Promise<MessageR
 }
 
 export const createMessageForAuthor = async (input: CreateMessageInput): Promise<MessageRecord | null> => {
+  const hasTurnId = input.turnId !== undefined && input.turnId !== null
+  const metadata = JSON.stringify(serializeMessageMetadata(input.metadata))
   const result = await query<MessageRow>(
     `
-    INSERT INTO messages (node_id, author_user_id, role, content)
-    SELECT $1, $2, $3, $4
+    WITH target_turn AS (
+      SELECT ct.id
+      FROM conversation_turns ct
+      WHERE ct.id = $6
+        AND ct.node_id = $1
+        AND ct.author_user_id = $2
+    )
+    INSERT INTO messages (node_id, author_user_id, role, content, turn_id, metadata)
+    SELECT
+      $1,
+      $2,
+      $3,
+      $4,
+      CASE WHEN $5::boolean THEN target_turn.id ELSE NULL END,
+      $7::jsonb
     FROM nodes n
     JOIN workspaces w ON w.id = n.workspace_id
+    LEFT JOIN target_turn ON TRUE
     WHERE n.id = $1
       AND w.author_user_id = $2
-    RETURNING id, node_id, author_user_id, role, content, created_at
+      AND ($5::boolean = FALSE OR target_turn.id IS NOT NULL)
+    RETURNING id, node_id, author_user_id, turn_id, role, content, metadata, created_at
     `,
-    [input.nodeId, input.authorUserId, input.role, input.content],
+    [
+      input.nodeId,
+      input.authorUserId,
+      input.role,
+      input.content,
+      hasTurnId,
+      input.turnId ?? null,
+      metadata,
+    ],
   )
 
   if (result.rows.length === 0) {
@@ -152,14 +248,19 @@ export const createMessageForAuthor = async (input: CreateMessageInput): Promise
 }
 
 export const updateMessage = async (input: UpdateMessageInput): Promise<MessageRecord | null> => {
+  const hasMetadata = input.metadata !== undefined
+  const metadata = hasMetadata
+    ? JSON.stringify(serializeMessageMetadata(input.metadata))
+    : null
   const result = await query<MessageRow>(
     `
     UPDATE messages
     SET
       role = CASE WHEN $2::boolean THEN $3 ELSE role END,
-      content = CASE WHEN $4::boolean THEN $5 ELSE content END
+      content = CASE WHEN $4::boolean THEN $5 ELSE content END,
+      metadata = CASE WHEN $6::boolean THEN $7::jsonb ELSE metadata END
     WHERE id = $1
-    RETURNING id, node_id, author_user_id, role, content, created_at
+    RETURNING id, node_id, author_user_id, turn_id, role, content, metadata, created_at
     `,
     [
       input.id,
@@ -167,6 +268,8 @@ export const updateMessage = async (input: UpdateMessageInput): Promise<MessageR
       input.role ?? null,
       input.content !== undefined,
       input.content ?? null,
+      hasMetadata,
+      metadata,
     ],
   )
 
@@ -181,18 +284,23 @@ export const updateMessageForAuthor = async (
   input: UpdateMessageInput,
   authorUserId: string,
 ): Promise<MessageRecord | null> => {
+  const hasMetadata = input.metadata !== undefined
+  const metadata = hasMetadata
+    ? JSON.stringify(serializeMessageMetadata(input.metadata))
+    : null
   const result = await query<MessageRow>(
     `
     UPDATE messages m
     SET
       role = CASE WHEN $2::boolean THEN $3 ELSE m.role END,
-      content = CASE WHEN $4::boolean THEN $5 ELSE m.content END
+      content = CASE WHEN $4::boolean THEN $5 ELSE m.content END,
+      metadata = CASE WHEN $6::boolean THEN $7::jsonb ELSE m.metadata END
     FROM nodes n
     JOIN workspaces w ON w.id = n.workspace_id
     WHERE m.id = $1
       AND n.id = m.node_id
-      AND w.author_user_id = $6
-    RETURNING m.id, m.node_id, m.author_user_id, m.role, m.content, m.created_at
+      AND w.author_user_id = $8
+    RETURNING m.id, m.node_id, m.author_user_id, m.turn_id, m.role, m.content, m.metadata, m.created_at
     `,
     [
       input.id,
@@ -200,6 +308,8 @@ export const updateMessageForAuthor = async (
       input.role ?? null,
       input.content !== undefined,
       input.content ?? null,
+      hasMetadata,
+      metadata,
       authorUserId,
     ],
   )

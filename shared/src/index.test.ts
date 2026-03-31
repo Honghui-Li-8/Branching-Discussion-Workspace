@@ -76,6 +76,18 @@ const makeContext = (): AppRouterContext => {
     createMessage: jest.fn(async () => message),
     updateMessage: jest.fn(async () => message),
     deleteMessage: jest.fn(async () => ({ id: message.id })),
+    conversationSend: jest.fn(async () => ({
+      turnId: 't1',
+      status: 'completed' as const,
+      userMessage: message,
+      assistantMessage: {
+        ...message,
+        id: 'm2',
+        role: 'assistant' as const,
+        content: 'assistant reply',
+      },
+      error: null,
+    })),
   }
 }
 
@@ -109,6 +121,14 @@ describe('appRouter', () => {
     await expect(caller.usersList()).rejects.toThrow('Authentication required.')
     await expect(caller.userById({ id: 'u1' })).rejects.toThrow('Authentication required.')
     await expect(caller.workspacesList()).rejects.toThrow('Authentication required.')
+    await expect(
+      caller.conversationSend({
+        nodeId: 'n1',
+        text: 'hello',
+        model: 'gpt-5',
+        idempotencyKey: 'idempotency-key-1',
+      }),
+    ).rejects.toThrow('Authentication required.')
   })
 
   test('nodeCreate validates input', async () => {
@@ -173,5 +193,53 @@ describe('appRouter', () => {
     expect(ctx.deleteWorkspace).toHaveBeenCalledWith('w1')
     expect(ctx.deleteNode).toHaveBeenCalledWith('n1')
     expect(ctx.deleteMessage).toHaveBeenCalledWith('m1')
+  })
+
+  test('conversationSend delegates to context', async () => {
+    const ctx = makeContext()
+    const caller = appRouter.createCaller(ctx)
+    const input = {
+      nodeId: 'n1',
+      text: 'hello',
+      model: 'gpt-5',
+      idempotencyKey: 'idempotency-key-1',
+    }
+
+    const result = await caller.conversationSend(input)
+
+    expect(ctx.conversationSend).toHaveBeenCalledWith(input)
+    expect(result.turnId).toBe('t1')
+    expect(result.status).toBe('completed')
+  })
+
+  test('conversationSend validates required input fields', async () => {
+    const caller = appRouter.createCaller(makeContext())
+
+    await expect(
+      caller.conversationSend({
+        nodeId: 'n1',
+        text: '',
+        model: 'gpt-5',
+        idempotencyKey: 'idempotency-key-1',
+      }),
+    ).rejects.toThrow()
+
+    await expect(
+      caller.conversationSend({
+        nodeId: 'n1',
+        text: 'hello',
+        model: '',
+        idempotencyKey: 'idempotency-key-1',
+      }),
+    ).rejects.toThrow()
+
+    await expect(
+      caller.conversationSend({
+        nodeId: 'n1',
+        text: 'hello',
+        model: 'gpt-5',
+        idempotencyKey: '',
+      }),
+    ).rejects.toThrow()
   })
 })

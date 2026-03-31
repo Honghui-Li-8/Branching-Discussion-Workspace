@@ -2,6 +2,7 @@ import { dirname, join } from 'node:path'
 import { readdir, readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { query, closePool, getClient, type DatabaseTarget, resolveDatabaseTarget } from './client.js'
+import { createLogger } from '../logging/logger.js'
 
 const dbDir = dirname(fileURLToPath(import.meta.url))
 const migrationsDir = join(dbDir, 'migrations')
@@ -16,6 +17,7 @@ const MIGRATION_FILE_ORDER = /^\d+_.*\.sql$/
 
 const command = process.argv[2] ?? 'status'
 const databaseTarget = resolveDatabaseTarget(process.argv.includes('--dev') ? 'dev' : undefined)
+const logger = createLogger('db-migrate')
 
 const ensureMetadataTable = async (target: DatabaseTarget): Promise<void> => {
   await query(
@@ -60,7 +62,7 @@ const runMigration = async (file: string, target: DatabaseTarget): Promise<void>
       [file, file],
     )
     await client.query('COMMIT')
-    console.log(`Applied migration: ${file}`)
+    logger.info('Applied migration.', { file })
   } catch (error) {
     await client.query('ROLLBACK')
     throw error
@@ -78,7 +80,7 @@ export const runMigrations = async (target: DatabaseTarget = 'app'): Promise<voi
   const pending = files.filter((file) => !applied.has(file))
 
   if (pending.length === 0) {
-    console.log('No migrations pending')
+    logger.info('No migrations pending.')
     return
   }
 
@@ -86,7 +88,7 @@ export const runMigrations = async (target: DatabaseTarget = 'app'): Promise<voi
     await runMigration(file, target)
   }
 
-  console.log(`Applied ${pending.length} migration(s).`)
+  logger.info('Applied migrations.', { count: pending.length })
 }
 
 export const showStatus = async (target: DatabaseTarget = 'app'): Promise<void> => {
@@ -106,14 +108,17 @@ export const showStatus = async (target: DatabaseTarget = 'app'): Promise<void> 
 
   for (const file of files) {
     if (appliedVersions.has(file)) {
-      console.log(`up\t${file}`)
+      logger.info('Migration status.', { file, status: 'up' })
     } else {
-      console.log(`down\t${file}`)
+      logger.info('Migration status.', { file, status: 'down' })
     }
   }
 
   const allApplied = appliedRows.rows.length
-  console.log(`\n${allApplied}/${files.length} migrations applied.`)
+  logger.info('Migration status summary.', {
+    applied: allApplied,
+    total: files.length,
+  })
 }
 
 const main = async (): Promise<void> => {
@@ -127,7 +132,7 @@ const main = async (): Promise<void> => {
 
 main()
   .catch((error) => {
-    console.error(error)
+    logger.error('Migration command failed.', { error })
     process.exitCode = 1
   })
   .finally(async () => {

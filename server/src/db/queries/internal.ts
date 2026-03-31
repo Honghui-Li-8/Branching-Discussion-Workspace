@@ -20,7 +20,38 @@ export {
   createMessage,
   deleteMessage,
   getMessageById,
+  listMessagesByTurn,
   listMessagesForNode,
   messageExists,
   updateMessage,
 } from './message.js'
+
+export {
+  listMessageRetrievalChunksByMessageId,
+  upsertMessageRetrievalChunk,
+} from './messageRetrievalChunk.js'
+
+export {
+  conversationTurnExists,
+  createOrGetConversationTurn,
+  getConversationTurnById,
+  getConversationTurnByIdempotencyKey,
+  updateConversationTurn,
+} from './conversationTurn.js'
+
+export {
+  createOrGetConversationPostprocessJob,
+  findDueConversationPostprocessJobs,
+  getConversationPostprocessJobQueueSnapshot,
+  getConversationPostprocessJobById,
+  leaseDueConversationPostprocessJobs,
+  markConversationPostprocessJobFailed,
+  markConversationPostprocessJobSucceeded,
+  requeueConversationPostprocessJobWithBackoff,
+} from './conversationPostprocessJob.js'
+
+export {
+  appendConversationTurnEvent,
+  getMaxConversationTurnEventSeq,
+  listConversationTurnEventsAfterId,
+} from './conversationTurnEvent.js'

@@ -2,9 +2,11 @@ import { query, closePool } from './client.js'
 import { runMigrations } from './migrate.js'
 import { runSeed } from './seed.js'
 import { resolveDatabaseTarget, type DatabaseTarget } from './client.js'
+import { createLogger } from '../logging/logger.js'
 
 const getTarget = (): DatabaseTarget =>
   resolveDatabaseTarget(process.argv.includes('--dev') || process.env.DB_ENV === 'dev' ? 'dev' : undefined)
+const logger = createLogger('db-reset')
 
 const main = async (): Promise<void> => {
   const target = getTarget()
@@ -16,12 +18,12 @@ const main = async (): Promise<void> => {
   await query('CREATE SCHEMA public', [], target)
   await runMigrations(target)
   await runSeed(target)
-  console.log('Reset completed.')
+  logger.info('Reset completed.', { target })
 }
 
 main()
   .catch((error) => {
-    console.error(error)
+    logger.error('Reset command failed.', { error })
     process.exitCode = 1
   })
   .finally(async () => {
