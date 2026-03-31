@@ -5,6 +5,7 @@ import {
   createRetrieverRegistry,
   resolveRetriever,
 } from './retriever'
+import { VectorRetrieverV1 } from './vectorRetriever'
 
 const retrieverInput = {
   query: 'hello',
@@ -31,6 +32,7 @@ describe('rag retriever registry', () => {
     const registry = createRetrieverRegistry()
 
     expect(registry.noop).toBeInstanceOf(NoopRetriever)
+    expect(registry.vector_v1).toBeInstanceOf(VectorRetrieverV1)
   })
 
   test('resolveRetriever returns configured retriever when it exists', () => {
@@ -70,7 +72,9 @@ describe('rag retriever registry', () => {
         allowedUserIds: [],
         allowedWorkspaceIds: [],
       },
-      registry: createRetrieverRegistry(),
+      registry: {
+        noop: new NoopRetriever(),
+      },
     })
 
     expect(retriever.id).toBe('noop')

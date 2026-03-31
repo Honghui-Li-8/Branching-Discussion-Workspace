@@ -1,5 +1,7 @@
 import type {
   MessageRetrievalChunkRecord,
+  ScoredMessageRetrievalChunkRecord,
+  SearchMessageRetrievalChunksInput,
   UpsertMessageRetrievalChunkInput,
 } from '../models/messageRetrievalChunk.js'
 import { query } from '../client.js'
@@ -16,6 +18,10 @@ type MessageRetrievalChunkRow = {
   updated_at: string
 }
 
+type ScoredMessageRetrievalChunkRow = MessageRetrievalChunkRow & {
+  score: number
+}
+
 const mapMessageRetrievalChunkRow = (
   row: MessageRetrievalChunkRow,
 ): MessageRetrievalChunkRecord => ({
@@ -28,6 +34,13 @@ const mapMessageRetrievalChunkRow = (
   tokenCount: row.token_count,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
+})
+
+const mapScoredMessageRetrievalChunkRow = (
+  row: ScoredMessageRetrievalChunkRow,
+): ScoredMessageRetrievalChunkRecord => ({
+  ...mapMessageRetrievalChunkRow(row),
+  score: row.score,
 })
 
 const toVectorLiteral = (embedding: number[]): string => {
@@ -116,4 +129,37 @@ export const listMessageRetrievalChunksByMessageId = async (
   )
 
   return result.rows.map(mapMessageRetrievalChunkRow)
+}
+
+export const searchMessageRetrievalChunks = async (
+  input: SearchMessageRetrievalChunksInput,
+): Promise<ScoredMessageRetrievalChunkRecord[]> => {
+  const result = await query<ScoredMessageRetrievalChunkRow>(
+    `
+    SELECT
+      id,
+      message_id,
+      node_id,
+      author_user_id,
+      chunk_index,
+      content,
+      token_count,
+      created_at,
+      updated_at,
+      1 - (embedding <=> $3::vector) AS score
+    FROM message_retrieval_chunk
+    WHERE node_id = $1
+      AND author_user_id = $2
+    ORDER BY embedding <=> $3::vector ASC, chunk_index ASC
+    LIMIT $4
+    `,
+    [
+      input.nodeId,
+      input.authorUserId,
+      toVectorLiteral(input.embedding),
+      input.limit,
+    ],
+  )
+
+  return result.rows.map(mapScoredMessageRetrievalChunkRow)
 }

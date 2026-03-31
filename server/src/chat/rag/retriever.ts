@@ -1,5 +1,6 @@
 import type { RetrieverInput, RetrieverResult } from '@branching/shared'
 import { getRagConfig, type RagConfig, type RagRetrieverStrategy } from '../config.js'
+import { VectorRetrieverV1 } from './vectorRetriever.js'
 
 export interface Retriever {
   readonly id: string
@@ -34,6 +35,7 @@ export const createRetrieverRegistry = (
   overrides: RetrieverRegistry = {},
 ): RetrieverRegistry => ({
   noop: new NoopRetriever(),
+  vector_v1: new VectorRetrieverV1(),
   ...overrides,
 })
 

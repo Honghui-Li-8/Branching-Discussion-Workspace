@@ -19,3 +19,14 @@ export interface UpsertMessageRetrievalChunkInput {
   tokenCount: number
   embedding: number[]
 }
+
+export interface SearchMessageRetrievalChunksInput {
+  nodeId: string
+  authorUserId: string
+  embedding: number[]
+  limit: number
+}
+
+export interface ScoredMessageRetrievalChunkRecord extends MessageRetrievalChunkRecord {
+  score: number
+}
