@@ -7,6 +7,7 @@ import { registerAuthRoutes } from './auth/routes.js'
 import { startSessionCleanup } from './auth/sessionStore.js'
 import { closePool, testConnection } from './db/client.js'
 import { createAppRouterContext } from './trpcContext.js'
+import { registerConversationStreamRoutes } from './chat/stream/routes.js'
 
 const app = express()
 const PORT = Number(process.env.PORT) || 3001
@@ -19,6 +20,7 @@ app.use(
 )
 app.use(express.json())
 registerAuthRoutes(app)
+registerConversationStreamRoutes(app)
 
 const sessionCleanupTimer = startSessionCleanup()
 
@@ -72,4 +74,3 @@ process.on('SIGINT', () => {
       process.exit(1)
     })
 })
-
