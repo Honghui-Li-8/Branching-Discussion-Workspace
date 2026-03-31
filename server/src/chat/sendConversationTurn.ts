@@ -1,5 +1,6 @@
 import { TRPCError } from '@trpc/server'
 import {
+  createOrGetConversationPostprocessJobForAuthor as createOrGetConversationPostprocessJobForAuthorRecord,
   createMessageForAuthor as createMessageForAuthorRecord,
   createOrGetConversationTurnForAuthor as createOrGetConversationTurnForAuthorRecord,
   listMessagesForNodeForAuthor as listMessagesForNodeForAuthorRecord,
@@ -26,6 +27,8 @@ type SendConversationTurnParams = {
   input: SendConversationTurnInput
   currentUserId: string
 }
+
+const POSTPROCESS_JOB_TYPES = ['summary', 'index'] as const
 
 const findRecoverableUserMessage = (
   messages: Awaited<ReturnType<typeof listMessagesForNodeForAuthorRecord>>,
@@ -62,6 +65,38 @@ const markTurnFailed = async (
     },
     currentUserId,
   )
+}
+
+const enqueuePostprocessJobsForTurn = async (
+  turnId: string,
+  currentUserId: string,
+): Promise<void> => {
+  for (const jobType of POSTPROCESS_JOB_TYPES) {
+    try {
+      const result = await createOrGetConversationPostprocessJobForAuthorRecord(
+        {
+          turnId,
+          jobType,
+          payload: {},
+        },
+        currentUserId,
+      )
+      if (!result) {
+        console.warn('[postprocess] enqueue skipped because turn is not accessible.', {
+          turnId,
+          jobType,
+          currentUserId,
+        })
+      }
+    } catch (error) {
+      console.warn('[postprocess] enqueue failed but response path remains successful.', {
+        turnId,
+        jobType,
+        currentUserId,
+        error,
+      })
+    }
+  }
 }
 
 export const sendConversationTurn = async ({
@@ -107,6 +142,9 @@ export const sendConversationTurn = async ({
       existingNodeMessages,
       existingUserMessage.createdAt,
     )
+    if (existingAssistantMessage) {
+      await enqueuePostprocessJobsForTurn(turnResult.turn.id, currentUserId)
+    }
 
     return {
       turnId: turnResult.turn.id,
@@ -236,6 +274,7 @@ export const sendConversationTurn = async ({
         message: 'Conversation turn not found.',
       })
     }
+    await enqueuePostprocessJobsForTurn(finalizedTurn.id, currentUserId)
 
     publishTurnEvent({
       type: 'message.completed',

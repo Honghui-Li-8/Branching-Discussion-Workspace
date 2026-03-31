@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, jest, test } from '@jest/globals'
 import {
+  createOrGetConversationPostprocessJobForAuthor,
   createMessageForAuthor,
   createOrGetConversationTurnForAuthor,
   listMessagesForNodeForAuthor,
@@ -13,6 +14,7 @@ import { turnEventBroker } from './stream/broker.js'
 import type { ChatTurnStreamEvent } from './stream/events.js'
 
 jest.mock('../db/index.js', () => ({
+  createOrGetConversationPostprocessJobForAuthor: jest.fn(),
   createMessageForAuthor: jest.fn(),
   createOrGetConversationTurnForAuthor: jest.fn(),
   listMessagesForNodeForAuthor: jest.fn(),
@@ -27,6 +29,10 @@ jest.mock('./providers/selectProvider.js', () => ({
   selectProvider: jest.fn(),
 }))
 
+const createOrGetConversationPostprocessJobForAuthorMock =
+  createOrGetConversationPostprocessJobForAuthor as jest.MockedFunction<
+    typeof createOrGetConversationPostprocessJobForAuthor
+  >
 const createMessageForAuthorMock = createMessageForAuthor as jest.MockedFunction<
   typeof createMessageForAuthor
 >
@@ -83,6 +89,23 @@ const assistantMessage = {
   createdAt: '2026-03-30T00:00:02.000Z',
 }
 
+const queuedPostprocessJob = {
+  id: 'job-1',
+  turnId: 't1',
+  jobType: 'summary',
+  payload: {},
+  status: 'queued' as const,
+  attemptCount: 0,
+  maxAttempts: 5,
+  runAfter: '2026-03-30T00:00:00.000Z',
+  lastError: null,
+  leasedAt: null,
+  leaseOwner: null,
+  finishedAt: null,
+  createdAt: '2026-03-30T00:00:00.000Z',
+  updatedAt: '2026-03-30T00:00:00.000Z',
+}
+
 const context = {
   node: {
     id: 'n1',
@@ -119,6 +142,10 @@ describe('sendConversationTurn', () => {
     delete process.env.CHAT_ALLOWED_MODELS
     createOrGetConversationTurnForAuthorMock.mockResolvedValue({
       turn: processingTurn,
+      wasCreated: true,
+    })
+    createOrGetConversationPostprocessJobForAuthorMock.mockResolvedValue({
+      job: queuedPostprocessJob,
       wasCreated: true,
     })
     createMessageForAuthorMock.mockResolvedValue(userMessage)
@@ -189,6 +216,24 @@ describe('sendConversationTurn', () => {
       },
       'u1',
     )
+    expect(createOrGetConversationPostprocessJobForAuthorMock).toHaveBeenNthCalledWith(
+      1,
+      {
+        turnId: 't1',
+        jobType: 'summary',
+        payload: {},
+      },
+      'u1',
+    )
+    expect(createOrGetConversationPostprocessJobForAuthorMock).toHaveBeenNthCalledWith(
+      2,
+      {
+        turnId: 't1',
+        jobType: 'index',
+        payload: {},
+      },
+      'u1',
+    )
     expect(result).toEqual({
       turnId: 't1',
       status: 'completed',
@@ -252,6 +297,7 @@ describe('sendConversationTurn', () => {
     expect(selectProviderMock).not.toHaveBeenCalled()
     expect(createMessageForAuthorMock).not.toHaveBeenCalled()
     expect(updateConversationTurnForAuthorMock).not.toHaveBeenCalled()
+    expect(createOrGetConversationPostprocessJobForAuthorMock).toHaveBeenCalledTimes(2)
     expect(emittedEvents).toEqual([])
     expect(result).toEqual({
       turnId: 't1',
@@ -338,6 +384,7 @@ describe('sendConversationTurn', () => {
         message: 'Assistant generation failed.',
       },
     })
+    expect(createOrGetConversationPostprocessJobForAuthorMock).not.toHaveBeenCalled()
   })
 
   test('assistant insert race marks turn failed and returns NOT_FOUND', async () => {
@@ -428,5 +475,44 @@ describe('sendConversationTurn', () => {
     })
 
     expect(createOrGetConversationTurnForAuthorMock).not.toHaveBeenCalled()
+  })
+
+  test('enqueue postprocess failure is non-fatal to successful turn completion', async () => {
+    createMessageForAuthorMock
+      .mockResolvedValueOnce(userMessage)
+      .mockResolvedValueOnce(assistantMessage)
+    createOrGetConversationPostprocessJobForAuthorMock
+      .mockRejectedValueOnce(new Error('enqueue boom'))
+      .mockResolvedValueOnce({
+        job: {
+          ...queuedPostprocessJob,
+          id: 'job-2',
+          jobType: 'index',
+        },
+        wasCreated: true,
+      })
+    const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {})
+
+    const result = await sendConversationTurn({
+      input: {
+        nodeId: 'n1',
+        text: 'hello',
+        model: 'gpt-5',
+        idempotencyKey: 'idem-1',
+      },
+      currentUserId: 'u1',
+    })
+
+    expect(result.status).toBe('completed')
+    expect(result.assistantMessage?.id).toBe('m-assistant')
+    expect(createOrGetConversationPostprocessJobForAuthorMock).toHaveBeenCalledTimes(2)
+    expect(consoleWarnSpy).toHaveBeenCalledWith(
+      '[postprocess] enqueue failed but response path remains successful.',
+      expect.objectContaining({
+        turnId: 't1',
+        jobType: 'summary',
+        currentUserId: 'u1',
+      }),
+    )
   })
 })

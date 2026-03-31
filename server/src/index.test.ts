@@ -31,6 +31,7 @@ import { createAppRouterContext } from './trpcContext.js'
 import * as selectProviderModule from './chat/providers/selectProvider.js'
 
 jest.mock('./db/index.js', () => ({
+  createOrGetConversationPostprocessJobForAuthor: jest.fn(),
   createOrGetConversationTurnForAuthor: jest.fn(),
   createMessageForAuthor: jest.fn(),
   createNodeForAuthor: jest.fn(),
