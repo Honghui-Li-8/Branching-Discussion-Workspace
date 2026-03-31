@@ -32,3 +32,7 @@ export {
 export {
   createOrGetConversationPostprocessJobForAuthor,
 } from './conversationPostprocessJob.js'
+
+export {
+  listConversationTurnEventsAfterIdForAuthor,
+} from './conversationTurnEvent.js'

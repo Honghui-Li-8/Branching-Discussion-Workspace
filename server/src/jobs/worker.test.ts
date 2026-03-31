@@ -53,6 +53,15 @@ const createTestDeps = () => {
       leasedAt: null,
       leaseOwner: null,
     })),
+    appendConversationTurnEvent: jest.fn(async (_input: unknown) => ({
+      id: 1,
+      turnId: 'turn-1',
+      seq: 1,
+      eventType: 'summary.completed',
+      payload: {},
+      createdAt: '2026-03-31T00:00:12.000Z',
+    })),
+    getMaxConversationTurnEventSeq: jest.fn(async (_turnId: string) => 0),
     summarizeTurn: jest.fn(async (_job: ConversationPostprocessJobRecord) => {}),
     indexTurn: jest.fn(async (_job: ConversationPostprocessJobRecord) => {}),
     logger,
@@ -89,6 +98,17 @@ describe('conversation postprocess worker', () => {
       id: 'job-1',
       leaseOwner: 'worker-1',
     })
+    expect(deps.appendConversationTurnEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        turnId: 'turn-1',
+        eventType: 'summary.completed',
+        payload: expect.objectContaining({
+          jobId: 'job-1',
+          jobType: 'summary',
+          attemptCount: 0,
+        }),
+      }),
+    )
   })
 
   test('processLeasedConversationPostprocessJob requeues with backoff on retryable failure', async () => {
@@ -118,6 +138,19 @@ describe('conversation postprocess worker', () => {
       }),
     )
     expect(deps.markConversationPostprocessJobFailed).not.toHaveBeenCalled()
+    expect(deps.appendConversationTurnEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        turnId: 'turn-1',
+        eventType: 'summary.failed',
+        payload: expect.objectContaining({
+          jobId: 'job-1',
+          jobType: 'summary',
+          attemptCount: 1,
+          terminal: false,
+          error: 'summary failed',
+        }),
+      }),
+    )
   })
 
   test('processLeasedConversationPostprocessJob marks terminal failure at max attempts', async () => {
@@ -145,6 +178,19 @@ describe('conversation postprocess worker', () => {
       }),
     )
     expect(deps.requeueConversationPostprocessJobWithBackoff).not.toHaveBeenCalled()
+    expect(deps.appendConversationTurnEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        turnId: 'turn-1',
+        eventType: 'summary.failed',
+        payload: expect.objectContaining({
+          jobId: 'job-1',
+          jobType: 'summary',
+          attemptCount: 0,
+          terminal: true,
+          error: 'still failing',
+        }),
+      }),
+    )
   })
 
   test('unknown job type follows failure path and remains retryable when attempts remain', async () => {
@@ -165,5 +211,6 @@ describe('conversation postprocess worker', () => {
 
     expect(deps.requeueConversationPostprocessJobWithBackoff).toHaveBeenCalled()
     expect(deps.markConversationPostprocessJobSucceeded).not.toHaveBeenCalled()
+    expect(deps.appendConversationTurnEvent).not.toHaveBeenCalled()
   })
 })

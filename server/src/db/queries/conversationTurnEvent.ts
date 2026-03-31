@@ -109,3 +109,34 @@ export const listConversationTurnEventsAfterId = async (
 
   return result.rows.map(mapConversationTurnEventRow)
 }
+
+export const listConversationTurnEventsAfterIdForAuthor = async (
+  turnId: string,
+  authorUserId: string,
+  afterEventId: number,
+  limit = 100,
+): Promise<ConversationTurnEventRecord[]> => {
+  const result = await query<ConversationTurnEventRow>(
+    `
+    SELECT
+      cte.id,
+      cte.turn_id,
+      cte.seq,
+      cte.event_type,
+      cte.payload,
+      cte.created_at
+    FROM conversation_turn_event cte
+    JOIN conversation_turns ct ON ct.id = cte.turn_id
+    JOIN nodes n ON n.id = ct.node_id
+    JOIN workspaces w ON w.id = n.workspace_id
+    WHERE cte.turn_id = $1
+      AND w.author_user_id = $2
+      AND cte.id > $3
+    ORDER BY cte.id ASC
+    LIMIT $4
+    `,
+    [turnId, authorUserId, Math.max(0, afterEventId), Math.max(1, limit)],
+  )
+
+  return result.rows.map(mapConversationTurnEventRow)
+}

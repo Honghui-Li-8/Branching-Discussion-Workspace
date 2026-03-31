@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globals'
 import { getSessionIdFromCookieHeader } from '../../auth/cookies.js'
 import { getSessionUser } from '../../auth/sessionStore.js'
-import { getConversationTurnByIdForAuthor } from '../../db/index.js'
+import {
+  getConversationTurnByIdForAuthor,
+  listConversationTurnEventsAfterIdForAuthor,
+} from '../../db/index.js'
 import { turnEventBroker } from './broker.js'
 import type { ChatTurnStreamEvent } from './events.js'
 import { handleConversationTurnStream } from './routes.js'
@@ -16,6 +19,7 @@ jest.mock('../../auth/sessionStore.js', () => ({
 
 jest.mock('../../db/index.js', () => ({
   getConversationTurnByIdForAuthor: jest.fn(),
+  listConversationTurnEventsAfterIdForAuthor: jest.fn(),
 }))
 
 const getSessionIdFromCookieHeaderMock = getSessionIdFromCookieHeader as jest.MockedFunction<
@@ -25,10 +29,15 @@ const getSessionUserMock = getSessionUser as jest.MockedFunction<typeof getSessi
 const getConversationTurnByIdForAuthorMock = getConversationTurnByIdForAuthor as jest.MockedFunction<
   typeof getConversationTurnByIdForAuthor
 >
+const listConversationTurnEventsAfterIdForAuthorMock =
+  listConversationTurnEventsAfterIdForAuthor as jest.MockedFunction<
+    typeof listConversationTurnEventsAfterIdForAuthor
+  >
 
 type MockStreamRequest = {
   headers: {
     cookie?: string
+    'last-event-id'?: string
   }
   params: {
     turnId?: string
@@ -56,10 +65,14 @@ type MockStreamResponse = {
 const createMockStreamRequest = (options?: {
   cookie?: string
   turnId?: string
+  lastEventId?: string
 }): MockStreamRequest => {
   const closeHandlers: Array<() => void> = []
   const request: MockStreamRequest = {
-    headers: { cookie: options?.cookie },
+    headers: {
+      cookie: options?.cookie,
+      'last-event-id': options?.lastEventId,
+    },
     params: { turnId: options?.turnId },
     on: (_event, handler) => {
       closeHandlers.push(handler)
@@ -143,6 +156,7 @@ describe('conversation turn stream route handler', () => {
       createdAt: '2026-03-31T00:00:00.000Z',
       updatedAt: '2026-03-31T00:00:00.000Z',
     })
+    listConversationTurnEventsAfterIdForAuthorMock.mockResolvedValue([])
   })
 
   afterEach(() => {
@@ -160,6 +174,7 @@ describe('conversation turn stream route handler', () => {
     expect(res.statusCode).toBe(401)
     expect(res.body).toEqual({ error: 'Authentication required.' })
     expect(getConversationTurnByIdForAuthorMock).not.toHaveBeenCalled()
+    expect(listConversationTurnEventsAfterIdForAuthorMock).not.toHaveBeenCalled()
   })
 
   test('returns NOT_FOUND when turn is absent or not owned', async () => {
@@ -172,6 +187,7 @@ describe('conversation turn stream route handler', () => {
     expect(getConversationTurnByIdForAuthorMock).toHaveBeenCalledWith('turn-404', 'user-1')
     expect(res.statusCode).toBe(404)
     expect(res.body).toEqual({ error: 'Conversation turn not found.' })
+    expect(listConversationTurnEventsAfterIdForAuthorMock).not.toHaveBeenCalled()
   })
 
   test('streams heartbeat + published events and cleans up on disconnect', async () => {
@@ -186,6 +202,12 @@ describe('conversation turn stream route handler', () => {
     expect(res.headers.connection).toBe('keep-alive')
     expect(res.writes).toContain(': heartbeat\n\n')
     expect(turnEventBroker.listenerCount({ turnId: 'turn-1', authorUserId: 'user-1' })).toBe(1)
+    expect(listConversationTurnEventsAfterIdForAuthorMock).toHaveBeenCalledWith(
+      'turn-1',
+      'user-1',
+      0,
+      200,
+    )
 
     const event: ChatTurnStreamEvent = {
       turnId: 'turn-1',
@@ -228,5 +250,80 @@ describe('conversation turn stream route handler', () => {
     })
 
     expect(res.writes.length).toBe(beforeCloseWrites)
+  })
+
+  test('replays durable events from Last-Event-ID cursor before broker subscription', async () => {
+    listConversationTurnEventsAfterIdForAuthorMock.mockResolvedValueOnce([
+      {
+        id: 101,
+        turnId: 'turn-1',
+        seq: 7,
+        eventType: 'summary.completed',
+        payload: {
+          jobId: 'job-1',
+          jobType: 'summary',
+          attemptCount: 1,
+        },
+        createdAt: '2026-03-31T00:00:07.000Z',
+      },
+    ])
+
+    const req = createMockStreamRequest({
+      cookie: 'bdw_session=session-1',
+      turnId: 'turn-1',
+      lastEventId: '100',
+    })
+    const res = createMockStreamResponse()
+
+    await handleConversationTurnStream(req, res)
+
+    expect(listConversationTurnEventsAfterIdForAuthorMock).toHaveBeenCalledWith(
+      'turn-1',
+      'user-1',
+      100,
+      200,
+    )
+    const frame = res.writes.join('')
+    expect(frame).toContain('id: 101')
+    expect(frame).toContain('event: summary.completed')
+    expect(frame).toContain('"jobId":"job-1"')
+
+    req.triggerClose()
+  })
+
+  test('polls durable log and streams newly persisted async events', async () => {
+    listConversationTurnEventsAfterIdForAuthorMock
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          id: 102,
+          turnId: 'turn-1',
+          seq: 8,
+          eventType: 'summary.failed',
+          payload: {
+            jobId: 'job-1',
+            jobType: 'summary',
+            attemptCount: 2,
+            terminal: false,
+            error: 'summary timeout',
+          },
+          createdAt: '2026-03-31T00:00:08.000Z',
+        },
+      ])
+
+    const req = createMockStreamRequest({ cookie: 'bdw_session=session-1', turnId: 'turn-1' })
+    const res = createMockStreamResponse()
+    await handleConversationTurnStream(req, res)
+
+    jest.advanceTimersByTime(1_000)
+    await Promise.resolve()
+    await Promise.resolve()
+
+    const frame = res.writes.join('')
+    expect(frame).toContain('id: 102')
+    expect(frame).toContain('event: summary.failed')
+    expect(frame).toContain('"terminal":false')
+
+    req.triggerClose()
   })
 })

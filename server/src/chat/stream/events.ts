@@ -11,6 +11,7 @@ const turnStageSchema = z.enum([
 const streamEventBaseSchema = z.object({
   turnId: z.string().min(1),
   seq: z.number().int().positive(),
+  eventId: z.number().int().positive().optional(),
   ts: z.iso.datetime(),
 })
 
@@ -52,12 +53,35 @@ const turnErrorEventSchema = streamEventBaseSchema.extend({
   }),
 })
 
+const summaryCompletedEventSchema = streamEventBaseSchema.extend({
+  type: z.literal('summary.completed'),
+  payload: z.object({
+    jobId: z.string().min(1),
+    jobType: z.literal('summary'),
+    attemptCount: z.number().int().nonnegative(),
+    metadata: z.record(z.string(), z.unknown()).optional(),
+  }),
+})
+
+const summaryFailedEventSchema = streamEventBaseSchema.extend({
+  type: z.literal('summary.failed'),
+  payload: z.object({
+    jobId: z.string().min(1),
+    jobType: z.literal('summary'),
+    attemptCount: z.number().int().nonnegative(),
+    terminal: z.boolean(),
+    error: z.string().min(1),
+  }),
+})
+
 export const chatTurnStreamEventSchema = z.discriminatedUnion('type', [
   turnStartedEventSchema,
   turnStatusEventSchema,
   tokenDeltaEventSchema,
   messageCompletedEventSchema,
   turnErrorEventSchema,
+  summaryCompletedEventSchema,
+  summaryFailedEventSchema,
 ])
 
 export type TurnStage = z.infer<typeof turnStageSchema>

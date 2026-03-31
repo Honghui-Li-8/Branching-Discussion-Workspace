@@ -4,6 +4,7 @@ import {
   appendConversationTurnEvent,
   getMaxConversationTurnEventSeq,
   listConversationTurnEventsAfterId,
+  listConversationTurnEventsAfterIdForAuthor,
 } from './conversationTurnEvent'
 
 jest.mock('../client.js', () => ({
@@ -87,6 +88,23 @@ describe('conversation turn event queries', () => {
     expect(queryMock).toHaveBeenCalledWith(
       expect.stringContaining('AND id > $2'),
       ['turn-1', 100, 50],
+    )
+  })
+
+  test('listConversationTurnEventsAfterIdForAuthor scopes replay rows by owner', async () => {
+    queryMock.mockResolvedValueOnce({ rows: [eventRow] } as never)
+
+    const result = await listConversationTurnEventsAfterIdForAuthor(
+      'turn-1',
+      'user-1',
+      100,
+      25,
+    )
+
+    expect(result).toHaveLength(1)
+    expect(queryMock).toHaveBeenCalledWith(
+      expect.stringContaining('AND w.author_user_id = $2'),
+      ['turn-1', 'user-1', 100, 25],
     )
   })
 })

@@ -79,4 +79,39 @@ describe('chat stream event protocol', () => {
       }),
     ).toThrow()
   })
+
+  test('supports async summary lifecycle event variants', () => {
+    const completed = validateChatTurnStreamEvent({
+      turnId: 'turn-1',
+      seq: 9,
+      eventId: 201,
+      ts: '2026-03-31T00:00:09.000Z',
+      type: 'summary.completed',
+      payload: {
+        jobId: 'job-1',
+        jobType: 'summary',
+        attemptCount: 1,
+        metadata: {
+          source: 'worker',
+        },
+      },
+    })
+    const failed = validateChatTurnStreamEvent({
+      turnId: 'turn-1',
+      seq: 10,
+      eventId: 202,
+      ts: '2026-03-31T00:00:10.000Z',
+      type: 'summary.failed',
+      payload: {
+        jobId: 'job-1',
+        jobType: 'summary',
+        attemptCount: 2,
+        terminal: true,
+        error: 'summary failed',
+      },
+    })
+
+    expect(completed.type).toBe('summary.completed')
+    expect(failed.type).toBe('summary.failed')
+  })
 })

@@ -6,6 +6,10 @@ import {
   markConversationPostprocessJobSucceeded,
   requeueConversationPostprocessJobWithBackoff,
 } from '../db/queries/conversationPostprocessJob.js'
+import {
+  appendConversationTurnEvent,
+  getMaxConversationTurnEventSeq,
+} from '../db/queries/conversationTurnEvent.js'
 import { indexTurn, summarizeTurn } from './handlers.js'
 
 export type WorkerLogger = Pick<Console, 'info' | 'warn' | 'error'>
@@ -15,6 +19,8 @@ type ConversationPostprocessWorkerDeps = {
   markConversationPostprocessJobSucceeded: typeof markConversationPostprocessJobSucceeded
   markConversationPostprocessJobFailed: typeof markConversationPostprocessJobFailed
   requeueConversationPostprocessJobWithBackoff: typeof requeueConversationPostprocessJobWithBackoff
+  appendConversationTurnEvent: typeof appendConversationTurnEvent
+  getMaxConversationTurnEventSeq: typeof getMaxConversationTurnEventSeq
   summarizeTurn: (job: ConversationPostprocessJobRecord) => Promise<void>
   indexTurn: (job: ConversationPostprocessJobRecord) => Promise<void>
   logger: WorkerLogger
@@ -37,12 +43,15 @@ const DEFAULT_OPTIONS: ConversationPostprocessWorkerOptions = {
   retryBaseDelaySeconds: 5,
   retryMaxDelaySeconds: 300,
 }
+const MAX_EVENT_APPEND_ATTEMPTS = 4
 
 const DEFAULT_DEPS: ConversationPostprocessWorkerDeps = {
   leaseDueConversationPostprocessJobs,
   markConversationPostprocessJobSucceeded,
   markConversationPostprocessJobFailed,
   requeueConversationPostprocessJobWithBackoff,
+  appendConversationTurnEvent,
+  getMaxConversationTurnEventSeq,
   summarizeTurn,
   indexTurn,
   logger: console,
@@ -55,6 +64,106 @@ const sleep = async (ms: number): Promise<void> =>
 
 const getErrorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : 'Unknown job processing error.'
+
+const isUniqueViolationError = (error: unknown): boolean =>
+  typeof error === 'object' &&
+  error !== null &&
+  'code' in error &&
+  (error as { code?: string }).code === '23505'
+
+type SummaryLifecycleEventPayload =
+  | {
+      type: 'summary.completed'
+      attemptCount: number
+      metadata?: Record<string, unknown>
+    }
+  | {
+      type: 'summary.failed'
+      attemptCount: number
+      terminal: boolean
+      error: string
+    }
+
+const appendNextTurnEventWithRetry = async (
+  deps: ConversationPostprocessWorkerDeps,
+  turnId: string,
+  eventType: SummaryLifecycleEventPayload['type'],
+  payload: Record<string, unknown>,
+): Promise<boolean> => {
+  let attempt = 0
+  while (attempt < MAX_EVENT_APPEND_ATTEMPTS) {
+    attempt += 1
+    try {
+      const maxSeq = await deps.getMaxConversationTurnEventSeq(turnId)
+      const persistedEvent = await deps.appendConversationTurnEvent({
+        turnId,
+        seq: maxSeq + 1,
+        eventType,
+        payload,
+      })
+      return persistedEvent !== null
+    } catch (error) {
+      if (isUniqueViolationError(error) && attempt < MAX_EVENT_APPEND_ATTEMPTS) {
+        continue
+      }
+      throw error
+    }
+  }
+
+  return false
+}
+
+const emitSummaryLifecycleEvent = async (
+  deps: ConversationPostprocessWorkerDeps,
+  job: ConversationPostprocessJobRecord,
+  event: SummaryLifecycleEventPayload,
+): Promise<void> => {
+  if (job.jobType !== 'summary') {
+    return
+  }
+
+  const basePayload = {
+    jobId: job.id,
+    jobType: 'summary',
+    attemptCount: event.attemptCount,
+  } satisfies Record<string, unknown>
+
+  const payload = event.type === 'summary.completed'
+    ? {
+        ...basePayload,
+        ...(event.metadata ? { metadata: event.metadata } : {}),
+      }
+    : {
+        ...basePayload,
+        terminal: event.terminal,
+        error: event.error,
+      }
+
+  try {
+    const wasPersisted = await appendNextTurnEventWithRetry(
+      deps,
+      job.turnId,
+      event.type,
+      payload,
+    )
+    if (wasPersisted) {
+      return
+    }
+
+    deps.logger.warn('[jobs] Summary lifecycle event skipped because turn was not found.', {
+      turnId: job.turnId,
+      jobId: job.id,
+      eventType: event.type,
+    })
+  } catch (error) {
+    deps.logger.warn('[jobs] Failed to persist summary lifecycle event.', {
+      turnId: job.turnId,
+      jobId: job.id,
+      eventType: event.type,
+      error,
+    })
+  }
+}
 
 const getHandlerForJob = (
   job: ConversationPostprocessJobRecord,
@@ -100,6 +209,10 @@ export const processLeasedConversationPostprocessJob = async (
       status: 'succeeded',
       attemptCount: markedSucceeded.attemptCount,
     })
+    await emitSummaryLifecycleEvent(deps, job, {
+      type: 'summary.completed',
+      attemptCount: markedSucceeded.attemptCount,
+    })
   } catch (error) {
     const lastError = getErrorMessage(error)
     const nextAttemptCount = job.attemptCount + 1
@@ -128,6 +241,12 @@ export const processLeasedConversationPostprocessJob = async (
         attemptCount: markedFailed.attemptCount,
         maxAttempts: markedFailed.maxAttempts,
         lastError,
+      })
+      await emitSummaryLifecycleEvent(deps, job, {
+        type: 'summary.failed',
+        attemptCount: markedFailed.attemptCount,
+        terminal: true,
+        error: lastError,
       })
       return
     }
@@ -158,6 +277,12 @@ export const processLeasedConversationPostprocessJob = async (
       maxAttempts: requeuedJob.maxAttempts,
       runAfter: requeuedJob.runAfter,
       lastError,
+    })
+    await emitSummaryLifecycleEvent(deps, job, {
+      type: 'summary.failed',
+      attemptCount: requeuedJob.attemptCount,
+      terminal: false,
+      error: lastError,
     })
   }
 }
