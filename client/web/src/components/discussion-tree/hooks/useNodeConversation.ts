@@ -15,6 +15,7 @@ type RouterOutputs = inferRouterOutputs<AppRouter>
 type NodeMessage = RouterOutputs['messagesByNode'][number]
 
 const STREAM_COMPLETE_FALLBACK_MS = 750
+const STREAM_POSTPROCESS_WINDOW_MS = 15_000
 
 const loggedUnknownMessageRoles = new Set<string>()
 
@@ -122,6 +123,7 @@ export const useNodeConversation = ({
   const streamSourceRef = useRef<EventSource | null>(null)
   const streamTurnIdRef = useRef<string | null>(null)
   const fallbackTimerRef = useRef<number | null>(null)
+  const postprocessWindowTimerRef = useRef<number | null>(null)
 
   const messagesQuery = trpc.messagesByNode.useQuery(
     { nodeId: nodeId ?? '' },
@@ -132,17 +134,22 @@ export const useNodeConversation = ({
     await invalidateMessagesByNode(utils.messagesByNode.invalidate, targetNodeId)
   }
 
-  const clearFallbackTimer = () => {
+  const clearStreamTimers = () => {
     if (fallbackTimerRef.current === null) {
-      return
+      // no-op
+    } else {
+      window.clearTimeout(fallbackTimerRef.current)
+      fallbackTimerRef.current = null
     }
 
-    window.clearTimeout(fallbackTimerRef.current)
-    fallbackTimerRef.current = null
+    if (postprocessWindowTimerRef.current !== null) {
+      window.clearTimeout(postprocessWindowTimerRef.current)
+      postprocessWindowTimerRef.current = null
+    }
   }
 
   const closeTurnStream = useCallback(() => {
-    clearFallbackTimer()
+    clearStreamTimers()
     if (!streamSourceRef.current) {
       streamTurnIdRef.current = null
       return
@@ -172,7 +179,9 @@ export const useNodeConversation = ({
         | 'turn.status'
         | 'token.delta'
         | 'message.completed'
-        | 'turn.error',
+        | 'turn.error'
+        | 'summary.completed'
+        | 'summary.failed',
     ) => {
       source.addEventListener(eventType, (event) => {
         if (!(event instanceof MessageEvent)) {
@@ -189,7 +198,11 @@ export const useNodeConversation = ({
           event: parsedEvent,
         })
 
-        if (parsedEvent.type === 'message.completed' || parsedEvent.type === 'turn.error') {
+        if (
+          parsedEvent.type === 'turn.error' ||
+          parsedEvent.type === 'summary.completed' ||
+          parsedEvent.type === 'summary.failed'
+        ) {
           closeTurnStream()
         }
       })
@@ -200,6 +213,8 @@ export const useNodeConversation = ({
     bindEvent('token.delta')
     bindEvent('message.completed')
     bindEvent('turn.error')
+    bindEvent('summary.completed')
+    bindEvent('summary.failed')
   }, [closeTurnStream])
 
   useEffect(() => {
@@ -344,7 +359,7 @@ export const useNodeConversation = ({
             })
             closeTurnStream()
           } else if (result.status === 'completed') {
-            clearFallbackTimer()
+            clearStreamTimers()
             fallbackTimerRef.current = window.setTimeout(() => {
               if (streamTurnIdRef.current !== result.turnId) {
                 return
@@ -354,7 +369,12 @@ export const useNodeConversation = ({
               if (latestState.phase !== 'done' && latestState.phase !== 'error') {
                 dispatchStreamAction({ type: 'sendCompleted' })
               }
-              closeTurnStream()
+              postprocessWindowTimerRef.current = window.setTimeout(() => {
+                if (streamTurnIdRef.current !== result.turnId) {
+                  return
+                }
+                closeTurnStream()
+              }, STREAM_POSTPROCESS_WINDOW_MS)
             }, STREAM_COMPLETE_FALLBACK_MS)
           }
 

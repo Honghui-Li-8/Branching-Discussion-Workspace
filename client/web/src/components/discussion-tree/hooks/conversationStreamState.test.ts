@@ -79,6 +79,7 @@ describe('conversationStreamState', () => {
     expect(state.phase).toBe('done')
     expect(state.lastSeq).toBe(4)
     expect(state.assistantDraft).toBe('')
+    expect(state.summaryStatus).toBe('pending')
   })
 
   test('ignores events from non-active turn and parses event payloads safely', () => {
@@ -114,6 +115,107 @@ describe('conversationStreamState', () => {
     ).not.toBeNull()
     expect(parseConversationStreamEvent('not-json')).toBeNull()
     expect(parseConversationStreamEvent(JSON.stringify({ type: 'unknown' }))).toBeNull()
+  })
+
+  test('applies summary completion as metadata-only enrichment after message completion', () => {
+    let state = conversationStreamReducer(initialConversationStreamState, {
+      type: 'eventReceived',
+      event: {
+        type: 'message.completed',
+        turnId: 'turn-1',
+        seq: 3,
+        ts: '2026-03-31T00:00:03.000Z',
+        payload: {
+          messageId: 'msg-1',
+          content: 'assistant final',
+        },
+      },
+    })
+
+    state = conversationStreamReducer(state, {
+      type: 'eventReceived',
+      event: {
+        type: 'summary.completed',
+        turnId: 'turn-1',
+        seq: 4,
+        ts: '2026-03-31T00:00:04.000Z',
+        payload: {
+          jobId: 'job-1',
+          jobType: 'summary',
+          attemptCount: 1,
+          metadata: {
+            tokensSaved: 12,
+          },
+        },
+      },
+    })
+
+    expect(state.phase).toBe('done')
+    expect(state.assistantDraft).toBe('')
+    expect(state.summaryStatus).toBe('completed')
+    expect(state.summaryMetadata).toEqual({ tokensSaved: 12 })
+    expect(state.summaryError).toBeNull()
+  })
+
+  test('dedupes duplicate summary.completed and converges on highest-seq summary.failed', () => {
+    let state = conversationStreamReducer(initialConversationStreamState, {
+      type: 'eventReceived',
+      event: {
+        type: 'summary.completed',
+        turnId: 'turn-1',
+        seq: 7,
+        ts: '2026-03-31T00:00:07.000Z',
+        payload: {
+          jobId: 'job-1',
+          jobType: 'summary',
+          attemptCount: 1,
+          metadata: {
+            version: 'a',
+          },
+        },
+      },
+    })
+
+    const deduped = conversationStreamReducer(state, {
+      type: 'eventReceived',
+      event: {
+        type: 'summary.completed',
+        turnId: 'turn-1',
+        seq: 7,
+        ts: '2026-03-31T00:00:07.000Z',
+        payload: {
+          jobId: 'job-1',
+          jobType: 'summary',
+          attemptCount: 1,
+          metadata: {
+            version: 'duplicate',
+          },
+        },
+      },
+    })
+
+    state = conversationStreamReducer(deduped, {
+      type: 'eventReceived',
+      event: {
+        type: 'summary.failed',
+        turnId: 'turn-1',
+        seq: 8,
+        ts: '2026-03-31T00:00:08.000Z',
+        payload: {
+          jobId: 'job-1',
+          jobType: 'summary',
+          attemptCount: 2,
+          terminal: true,
+          error: 'summary unavailable',
+        },
+      },
+    })
+
+    expect(deduped.summaryMetadata).toEqual({ version: 'a' })
+    expect(deduped.lastSeq).toBe(7)
+    expect(state.summaryStatus).toBe('failed')
+    expect(state.summaryError).toBe('summary unavailable')
+    expect(state.lastSeq).toBe(8)
   })
 
   test('maps stage + errors to UX labels', () => {
@@ -185,5 +287,60 @@ describe('conversationStreamState', () => {
 
     expect(doneWithLateDelta).toEqual(doneState)
     expect(errorWithLateComplete).toEqual(errorState)
+  })
+
+  test('parses summary lifecycle payloads safely', () => {
+    expect(
+      parseConversationStreamEvent(
+        JSON.stringify({
+          type: 'summary.completed',
+          turnId: 'turn-1',
+          seq: 5,
+          ts: '2026-03-31T00:00:05.000Z',
+          payload: {
+            jobId: 'job-1',
+            jobType: 'summary',
+            attemptCount: 1,
+            metadata: {
+              source: 'worker',
+            },
+          },
+        }),
+      ),
+    ).not.toBeNull()
+
+    expect(
+      parseConversationStreamEvent(
+        JSON.stringify({
+          type: 'summary.failed',
+          turnId: 'turn-1',
+          seq: 6,
+          ts: '2026-03-31T00:00:06.000Z',
+          payload: {
+            jobId: 'job-1',
+            jobType: 'summary',
+            attemptCount: 2,
+            terminal: false,
+            error: 'boom',
+          },
+        }),
+      ),
+    ).not.toBeNull()
+
+    expect(
+      parseConversationStreamEvent(
+        JSON.stringify({
+          type: 'summary.completed',
+          turnId: 'turn-1',
+          seq: 5,
+          ts: '2026-03-31T00:00:05.000Z',
+          payload: {
+            jobId: 'job-1',
+            jobType: 'summary',
+            attemptCount: -1,
+          },
+        }),
+      ),
+    ).toBeNull()
   })
 })

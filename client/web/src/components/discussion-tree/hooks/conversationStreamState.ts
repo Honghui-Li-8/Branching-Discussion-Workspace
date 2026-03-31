@@ -58,12 +58,41 @@ type TurnErrorEvent = {
   }
 }
 
+type SummaryCompletedEvent = {
+  type: 'summary.completed'
+  turnId: string
+  seq: number
+  ts: string
+  payload: {
+    jobId: string
+    jobType: 'summary'
+    attemptCount: number
+    metadata?: Record<string, unknown>
+  }
+}
+
+type SummaryFailedEvent = {
+  type: 'summary.failed'
+  turnId: string
+  seq: number
+  ts: string
+  payload: {
+    jobId: string
+    jobType: 'summary'
+    attemptCount: number
+    terminal: boolean
+    error: string
+  }
+}
+
 export type ConversationStreamEvent =
   | TurnStartedEvent
   | TurnStatusEvent
   | TokenDeltaEvent
   | MessageCompletedEvent
   | TurnErrorEvent
+  | SummaryCompletedEvent
+  | SummaryFailedEvent
 
 export type ConversationStreamPhase =
   | 'idle'
@@ -79,6 +108,10 @@ export type ConversationStreamState = {
   lastSeq: number
   assistantDraft: string
   errorMessage: string | null
+  summaryStatus: 'idle' | 'pending' | 'completed' | 'failed'
+  summaryMetadata: Record<string, unknown> | null
+  summaryError: string | null
+  summaryUpdatedAt: string | null
 }
 
 type ConversationStreamAction =
@@ -96,6 +129,10 @@ export const initialConversationStreamState: ConversationStreamState = {
   lastSeq: 0,
   assistantDraft: '',
   errorMessage: null,
+  summaryStatus: 'idle',
+  summaryMetadata: null,
+  summaryError: null,
+  summaryUpdatedAt: null,
 }
 
 const withEventEnvelope = (
@@ -122,6 +159,10 @@ export const conversationStreamReducer = (
         lastSeq: 0,
         assistantDraft: '',
         errorMessage: null,
+        summaryStatus: 'pending',
+        summaryMetadata: null,
+        summaryError: null,
+        summaryUpdatedAt: null,
       }
     case 'turnBound':
       return {
@@ -146,7 +187,11 @@ export const conversationStreamReducer = (
       }
     case 'eventReceived': {
       const { event } = action
-      if (state.phase === 'done' || state.phase === 'error') {
+      if (
+        (state.phase === 'done' || state.phase === 'error') &&
+        event.type !== 'summary.completed' &&
+        event.type !== 'summary.failed'
+      ) {
         return state
       }
       if (state.turnId && event.turnId !== state.turnId) {
@@ -207,6 +252,27 @@ export const conversationStreamReducer = (
               stage: null,
               assistantDraft: '',
               errorMessage: event.payload.message,
+            },
+            event,
+          )
+        case 'summary.completed':
+          return withEventEnvelope(
+            {
+              ...state,
+              summaryStatus: 'completed',
+              summaryMetadata: event.payload.metadata ?? null,
+              summaryError: null,
+              summaryUpdatedAt: event.ts,
+            },
+            event,
+          )
+        case 'summary.failed':
+          return withEventEnvelope(
+            {
+              ...state,
+              summaryStatus: 'failed',
+              summaryError: event.payload.error,
+              summaryUpdatedAt: event.ts,
             },
             event,
           )
@@ -332,6 +398,36 @@ export const parseConversationStreamEvent = (
         return null
       }
       return base as TurnErrorEvent
+    case 'summary.completed':
+      if (
+        typeof base.payload.jobId !== 'string' ||
+        base.payload.jobType !== 'summary' ||
+        typeof base.payload.attemptCount !== 'number' ||
+        !Number.isInteger(base.payload.attemptCount) ||
+        base.payload.attemptCount < 0
+      ) {
+        return null
+      }
+      if (
+        base.payload.metadata !== undefined &&
+        !isObjectRecord(base.payload.metadata)
+      ) {
+        return null
+      }
+      return base as SummaryCompletedEvent
+    case 'summary.failed':
+      if (
+        typeof base.payload.jobId !== 'string' ||
+        base.payload.jobType !== 'summary' ||
+        typeof base.payload.attemptCount !== 'number' ||
+        !Number.isInteger(base.payload.attemptCount) ||
+        base.payload.attemptCount < 0 ||
+        typeof base.payload.terminal !== 'boolean' ||
+        typeof base.payload.error !== 'string'
+      ) {
+        return null
+      }
+      return base as SummaryFailedEvent
     default:
       return null
   }
