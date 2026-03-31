@@ -20,10 +20,16 @@ export {
   createMessage,
   deleteMessage,
   getMessageById,
+  listMessagesByTurn,
   listMessagesForNode,
   messageExists,
   updateMessage,
 } from './message.js'
+
+export {
+  listMessageRetrievalChunksByMessageId,
+  upsertMessageRetrievalChunk,
+} from './messageRetrievalChunk.js'
 
 export {
   conversationTurnExists,

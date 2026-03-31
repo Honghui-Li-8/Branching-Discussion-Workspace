@@ -7,6 +7,7 @@ import {
   deleteMessage,
   getMessageByIdForAuthor,
   getMessageById,
+  listMessagesByTurn,
   listMessagesForNodeForAuthor,
   listMessagesForNode,
   updateMessageForAuthor,
@@ -71,6 +72,19 @@ describe('message queries', () => {
       2,
       expect.stringContaining('AND w.author_user_id = $2'),
       ['n1', 'u2'],
+    )
+  })
+
+  test('listMessagesByTurn returns rows for a turn in order', async () => {
+    queryMock.mockResolvedValueOnce({ rows: [messageRow] } as never)
+
+    const result = await listMessagesByTurn('t1')
+
+    expect(result).toHaveLength(1)
+    expect(result[0]?.turnId).toBe('t1')
+    expect(queryMock).toHaveBeenCalledWith(
+      expect.stringContaining('WHERE turn_id = $1'),
+      ['t1'],
     )
   })
 

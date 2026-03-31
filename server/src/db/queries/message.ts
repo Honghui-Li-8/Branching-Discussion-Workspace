@@ -46,6 +46,28 @@ export const listMessagesForNode = async (nodeId: string): Promise<MessageRecord
   return result.rows.map(mapMessageRow)
 }
 
+export const listMessagesByTurn = async (turnId: string): Promise<MessageRecord[]> => {
+  const result = await query<MessageRow>(
+    `
+    SELECT
+      id,
+      node_id,
+      author_user_id,
+      turn_id,
+      role,
+      content,
+      metadata,
+      created_at
+    FROM messages
+    WHERE turn_id = $1
+    ORDER BY created_at ASC
+    `,
+    [turnId],
+  )
+
+  return result.rows.map(mapMessageRow)
+}
+
 export const listMessagesForNodeForAuthor = async (
   nodeId: string,
   authorUserId: string,
