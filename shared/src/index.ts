@@ -1,5 +1,8 @@
 import { TRPCError, initTRPC } from '@trpc/server'
 import { z } from 'zod'
+import { messageMetadataSchema } from './metadata.js'
+
+export * from './metadata.js'
 
 const userSchema = z.object({
   id: z.string(),
@@ -42,8 +45,10 @@ const messageSchema = z.object({
   id: z.string(),
   authorUserId: z.string(),
   nodeId: z.string(),
+  turnId: z.string().nullable().optional(),
   role: z.enum(['user', 'assistant', 'system']),
   content: z.string(),
+  metadata: messageMetadataSchema.optional(),
   createdAt: z.string(),
 })
 

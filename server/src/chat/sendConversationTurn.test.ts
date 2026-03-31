@@ -60,6 +60,7 @@ const processingTurn = {
   idempotencyKey: 'idem-1',
   error: null,
   completedAt: null,
+  metadata: {},
   createdAt: '2026-03-30T00:00:00.000Z',
   updatedAt: '2026-03-30T00:00:00.000Z',
 }
@@ -75,8 +76,10 @@ const userMessage = {
   id: 'm-user',
   authorUserId: 'u1',
   nodeId: 'n1',
+  turnId: 't1',
   role: 'user' as const,
   content: 'hello',
+  metadata: {},
   createdAt: '2026-03-30T00:00:01.000Z',
 }
 
@@ -84,8 +87,10 @@ const assistantMessage = {
   id: 'm-assistant',
   authorUserId: 'u1',
   nodeId: 'n1',
+  turnId: 't1',
   role: 'assistant' as const,
   content: 'assistant reply',
+  metadata: {},
   createdAt: '2026-03-30T00:00:02.000Z',
 }
 
@@ -198,12 +203,14 @@ describe('sendConversationTurn', () => {
     expect(createMessageForAuthorMock).toHaveBeenNthCalledWith(1, {
       nodeId: 'n1',
       authorUserId: 'u1',
+      turnId: 't1',
       role: 'user',
       content: 'hello',
     })
     expect(createMessageForAuthorMock).toHaveBeenNthCalledWith(2, {
       nodeId: 'n1',
       authorUserId: 'u1',
+      turnId: 't1',
       role: 'assistant',
       content: 'assistant reply',
     })

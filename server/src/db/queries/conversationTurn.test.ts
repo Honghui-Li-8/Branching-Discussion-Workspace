@@ -27,6 +27,7 @@ const conversationTurnRow = {
   idempotency_key: 'turn-key-1',
   error: null,
   completed_at: null,
+  metadata: {},
   created_at: '2026-03-30T00:00:00.000Z',
   updated_at: '2026-03-30T00:00:00.000Z',
 }
@@ -50,6 +51,7 @@ describe('conversation turn queries', () => {
       idempotencyKey: 'turn-key-1',
       error: null,
       completedAt: null,
+      metadata: {},
       createdAt: '2026-03-30T00:00:00.000Z',
       updatedAt: '2026-03-30T00:00:00.000Z',
     })
@@ -146,6 +148,7 @@ describe('conversation turn queries', () => {
         idempotencyKey: 'turn-key-1',
         error: null,
         completedAt: null,
+        metadata: {},
         createdAt: '2026-03-30T00:00:00.000Z',
         updatedAt: '2026-03-30T00:00:00.000Z',
       },
@@ -205,7 +208,7 @@ describe('conversation turn queries', () => {
     expect(result?.error).toBe('oops')
     expect(queryMock).toHaveBeenCalledWith(
       expect.stringContaining('UPDATE conversation_turns'),
-      ['t1', true, 'failed', true, 'oops', false, null],
+      ['t1', true, 'failed', true, 'oops', false, null, false, null],
     )
   })
 
@@ -223,8 +226,8 @@ describe('conversation turn queries', () => {
     expect(ownedResult?.status).toBe('completed')
     expect(queryMock).toHaveBeenNthCalledWith(
       1,
-      expect.stringContaining('AND w.author_user_id = $8'),
-      ['t1', true, 'completed', false, null, false, null, 'u1'],
+      expect.stringContaining('AND w.author_user_id = $10'),
+      ['t1', true, 'completed', false, null, false, null, false, null, 'u1'],
     )
 
     queryMock.mockResolvedValueOnce({ rows: [] } as never)
@@ -238,8 +241,8 @@ describe('conversation turn queries', () => {
     expect(nonOwnerResult).toBeNull()
     expect(queryMock).toHaveBeenNthCalledWith(
       2,
-      expect.stringContaining('AND w.author_user_id = $8'),
-      ['t1', true, 'completed', false, null, false, null, 'u2'],
+      expect.stringContaining('AND w.author_user_id = $10'),
+      ['t1', true, 'completed', false, null, false, null, false, null, 'u2'],
     )
   })
 })

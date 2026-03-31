@@ -195,6 +195,7 @@ export const sendConversationTurn = async ({
     const userMessage = await createMessageForAuthorRecord({
       nodeId: input.nodeId,
       authorUserId: currentUserId,
+      turnId: turnResult.turn.id,
       role: 'user',
       content: input.text,
     })
@@ -245,6 +246,7 @@ export const sendConversationTurn = async ({
     const assistantMessage = await createMessageForAuthorRecord({
       nodeId: input.nodeId,
       authorUserId: currentUserId,
+      turnId: turnResult.turn.id,
       role: 'assistant',
       content: assistantOutput.content,
     })

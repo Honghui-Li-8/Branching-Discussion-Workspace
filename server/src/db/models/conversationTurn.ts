@@ -1,3 +1,5 @@
+import type { ConversationTurnMetadata } from '@branching/shared'
+
 export type ConversationTurnStatus = 'pending' | 'processing' | 'completed' | 'failed'
 
 export interface ConversationTurnRecord {
@@ -9,6 +11,7 @@ export interface ConversationTurnRecord {
   idempotencyKey: string
   error: string | null
   completedAt: string | null
+  metadata: ConversationTurnMetadata
   createdAt: string
   updatedAt: string
 }
@@ -28,6 +31,7 @@ export interface UpdateConversationTurnInput {
   status?: ConversationTurnStatus
   error?: string | null
   completedAt?: string | null
+  metadata?: ConversationTurnMetadata
 }
 
 export interface CreateOrGetConversationTurnResult {

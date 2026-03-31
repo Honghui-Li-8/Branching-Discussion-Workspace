@@ -1,3 +1,7 @@
+import {
+  parseConversationTurnMetadata,
+  serializeConversationTurnMetadata,
+} from '@branching/shared'
 import type {
   CreateConversationTurnInput,
   CreateOrGetConversationTurnResult,
@@ -16,6 +20,7 @@ type ConversationTurnRow = {
   idempotency_key: string
   error: string | null
   completed_at: string | null
+  metadata: unknown
   created_at: string
   updated_at: string
 }
@@ -35,6 +40,7 @@ const mapConversationTurnRow = (
   idempotencyKey: row.idempotency_key,
   error: row.error,
   completedAt: row.completed_at,
+  metadata: parseConversationTurnMetadata(row.metadata),
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 })
@@ -53,6 +59,7 @@ export const getConversationTurnById = async (
       idempotency_key,
       error,
       completed_at,
+      metadata,
       created_at,
       updated_at
     FROM conversation_turns
@@ -83,6 +90,7 @@ export const getConversationTurnByIdForAuthor = async (
       ct.idempotency_key,
       ct.error,
       ct.completed_at,
+      ct.metadata,
       ct.created_at,
       ct.updated_at
     FROM conversation_turns ct
@@ -117,6 +125,7 @@ export const getConversationTurnByIdempotencyKey = async (
       idempotency_key,
       error,
       completed_at,
+      metadata,
       created_at,
       updated_at
     FROM conversation_turns
@@ -150,6 +159,7 @@ export const getConversationTurnByIdempotencyKeyForAuthor = async (
       ct.idempotency_key,
       ct.error,
       ct.completed_at,
+      ct.metadata,
       ct.created_at,
       ct.updated_at
     FROM conversation_turns ct
@@ -221,6 +231,7 @@ export const createOrGetConversationTurn = async (
         idempotency_key,
         error,
         completed_at,
+        metadata,
         created_at,
         updated_at
     ),
@@ -234,6 +245,7 @@ export const createOrGetConversationTurn = async (
         it.idempotency_key,
         it.error,
         it.completed_at,
+        it.metadata,
         it.created_at,
         it.updated_at,
         TRUE AS was_created
@@ -250,6 +262,7 @@ export const createOrGetConversationTurn = async (
         ct.idempotency_key,
         ct.error,
         ct.completed_at,
+        ct.metadata,
         ct.created_at,
         ct.updated_at,
         FALSE AS was_created
@@ -268,6 +281,7 @@ export const createOrGetConversationTurn = async (
       idempotency_key,
       error,
       completed_at,
+      metadata,
       created_at,
       updated_at,
       was_created
@@ -341,6 +355,7 @@ export const createOrGetConversationTurnForAuthor = async (
         idempotency_key,
         error,
         completed_at,
+        metadata,
         created_at,
         updated_at
     ),
@@ -354,6 +369,7 @@ export const createOrGetConversationTurnForAuthor = async (
         it.idempotency_key,
         it.error,
         it.completed_at,
+        it.metadata,
         it.created_at,
         it.updated_at,
         TRUE AS was_created
@@ -370,6 +386,7 @@ export const createOrGetConversationTurnForAuthor = async (
         ct.idempotency_key,
         ct.error,
         ct.completed_at,
+        ct.metadata,
         ct.created_at,
         ct.updated_at,
         FALSE AS was_created
@@ -388,6 +405,7 @@ export const createOrGetConversationTurnForAuthor = async (
       idempotency_key,
       error,
       completed_at,
+      metadata,
       created_at,
       updated_at,
       was_created
@@ -423,13 +441,18 @@ export const createOrGetConversationTurnForAuthor = async (
 export const updateConversationTurn = async (
   input: UpdateConversationTurnInput,
 ): Promise<ConversationTurnRecord | null> => {
+  const hasMetadata = input.metadata !== undefined
+  const metadata = hasMetadata
+    ? JSON.stringify(serializeConversationTurnMetadata(input.metadata))
+    : null
   const result = await query<ConversationTurnRow>(
     `
     UPDATE conversation_turns
     SET
       status = CASE WHEN $2::boolean THEN $3 ELSE status END,
       error = CASE WHEN $4::boolean THEN $5 ELSE error END,
-      completed_at = CASE WHEN $6::boolean THEN $7 ELSE completed_at END
+      completed_at = CASE WHEN $6::boolean THEN $7 ELSE completed_at END,
+      metadata = CASE WHEN $8::boolean THEN $9::jsonb ELSE metadata END
     WHERE id = $1
     RETURNING
       id,
@@ -440,6 +463,7 @@ export const updateConversationTurn = async (
       idempotency_key,
       error,
       completed_at,
+      metadata,
       created_at,
       updated_at
     `,
@@ -451,6 +475,8 @@ export const updateConversationTurn = async (
       input.error ?? null,
       input.completedAt !== undefined,
       input.completedAt ?? null,
+      hasMetadata,
+      metadata,
     ],
   )
 
@@ -465,18 +491,23 @@ export const updateConversationTurnForAuthor = async (
   input: UpdateConversationTurnInput,
   authorUserId: string,
 ): Promise<ConversationTurnRecord | null> => {
+  const hasMetadata = input.metadata !== undefined
+  const metadata = hasMetadata
+    ? JSON.stringify(serializeConversationTurnMetadata(input.metadata))
+    : null
   const result = await query<ConversationTurnRow>(
     `
     UPDATE conversation_turns ct
     SET
       status = CASE WHEN $2::boolean THEN $3 ELSE ct.status END,
       error = CASE WHEN $4::boolean THEN $5 ELSE ct.error END,
-      completed_at = CASE WHEN $6::boolean THEN $7 ELSE ct.completed_at END
+      completed_at = CASE WHEN $6::boolean THEN $7 ELSE ct.completed_at END,
+      metadata = CASE WHEN $8::boolean THEN $9::jsonb ELSE ct.metadata END
     FROM nodes n
     JOIN workspaces w ON w.id = n.workspace_id
     WHERE ct.id = $1
       AND n.id = ct.node_id
-      AND w.author_user_id = $8
+      AND w.author_user_id = $10
     RETURNING
       ct.id,
       ct.node_id,
@@ -486,6 +517,7 @@ export const updateConversationTurnForAuthor = async (
       ct.idempotency_key,
       ct.error,
       ct.completed_at,
+      ct.metadata,
       ct.created_at,
       ct.updated_at
     `,
@@ -497,6 +529,8 @@ export const updateConversationTurnForAuthor = async (
       input.error ?? null,
       input.completedAt !== undefined,
       input.completedAt ?? null,
+      hasMetadata,
+      metadata,
       authorUserId,
     ],
   )

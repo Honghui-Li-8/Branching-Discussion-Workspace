@@ -23,8 +23,10 @@ const messageRow = {
   id: 'm1',
   node_id: 'n1',
   author_user_id: 'u1',
+  turn_id: 't1',
   role: 'user' as const,
   content: 'hello',
+  metadata: {},
   created_at: '2026-03-17T00:00:00.000Z',
 }
 
@@ -43,8 +45,10 @@ describe('message queries', () => {
         id: 'm1',
         authorUserId: 'u1',
         nodeId: 'n1',
+        turnId: 't1',
         role: 'user',
         content: 'hello',
+        metadata: {},
         createdAt: '2026-03-17T00:00:00.000Z',
       },
     ])
@@ -83,7 +87,7 @@ describe('message queries', () => {
     expect(result.id).toBe('m1')
     expect(queryMock).toHaveBeenCalledWith(
       expect.stringContaining('FROM nodes'),
-      ['n1', 'u1', 'user', 'hello'],
+      ['n1', 'u1', 'user', 'hello', false, null, '{}'],
     )
   })
 
@@ -99,7 +103,7 @@ describe('message queries', () => {
     expect(queryMock).toHaveBeenNthCalledWith(
       1,
       expect.stringContaining('AND w.author_user_id = $2'),
-      ['n1', 'u1', 'user', 'hello'],
+      ['n1', 'u1', 'user', 'hello', false, null, '{}'],
     )
 
     queryMock.mockResolvedValueOnce({ rows: [] } as never)
@@ -113,7 +117,7 @@ describe('message queries', () => {
     expect(queryMock).toHaveBeenNthCalledWith(
       2,
       expect.stringContaining('AND w.author_user_id = $2'),
-      ['n1', 'u2', 'user', 'hello'],
+      ['n1', 'u2', 'user', 'hello', false, null, '{}'],
     )
   })
 
@@ -175,7 +179,7 @@ describe('message queries', () => {
     expect(result?.content).toBe('updated')
     expect(queryMock).toHaveBeenCalledWith(
       expect.stringContaining('UPDATE messages'),
-      ['m1', false, null, true, 'updated'],
+      ['m1', false, null, true, 'updated', false, null],
     )
   })
 
@@ -202,8 +206,8 @@ describe('message queries', () => {
     expect(ownedResult?.content).toBe('updated')
     expect(queryMock).toHaveBeenNthCalledWith(
       1,
-      expect.stringContaining('w.author_user_id = $6'),
-      ['m1', false, null, true, 'updated', 'u1'],
+      expect.stringContaining('w.author_user_id = $8'),
+      ['m1', false, null, true, 'updated', false, null, 'u1'],
     )
 
     queryMock.mockResolvedValueOnce({ rows: [] } as never)
@@ -217,8 +221,8 @@ describe('message queries', () => {
     expect(nonOwnerResult).toBeNull()
     expect(queryMock).toHaveBeenNthCalledWith(
       2,
-      expect.stringContaining('w.author_user_id = $6'),
-      ['m1', false, null, true, 'updated', 'u2'],
+      expect.stringContaining('w.author_user_id = $8'),
+      ['m1', false, null, true, 'updated', false, null, 'u2'],
     )
   })
 
