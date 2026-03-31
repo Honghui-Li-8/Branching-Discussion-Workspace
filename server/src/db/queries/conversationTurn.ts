@@ -219,7 +219,7 @@ export const createOrGetConversationTurn = async (
         $5,
         $6,
         CASE WHEN $7::boolean THEN $8 ELSE NULL END,
-        CASE WHEN $9::boolean THEN $10 ELSE NULL END
+        CASE WHEN $9::boolean THEN $10::timestamptz ELSE NULL END
       FROM target_node
       ON CONFLICT (author_user_id, node_id, idempotency_key) DO NOTHING
       RETURNING
@@ -343,7 +343,7 @@ export const createOrGetConversationTurnForAuthor = async (
         $5,
         $6,
         CASE WHEN $7::boolean THEN $8 ELSE NULL END,
-        CASE WHEN $9::boolean THEN $10 ELSE NULL END
+        CASE WHEN $9::boolean THEN $10::timestamptz ELSE NULL END
       FROM owned_node
       ON CONFLICT (author_user_id, node_id, idempotency_key) DO NOTHING
       RETURNING
@@ -451,7 +451,7 @@ export const updateConversationTurn = async (
     SET
       status = CASE WHEN $2::boolean THEN $3 ELSE status END,
       error = CASE WHEN $4::boolean THEN $5 ELSE error END,
-      completed_at = CASE WHEN $6::boolean THEN $7 ELSE completed_at END,
+      completed_at = CASE WHEN $6::boolean THEN $7::timestamptz ELSE completed_at END,
       metadata = CASE WHEN $8::boolean THEN $9::jsonb ELSE metadata END
     WHERE id = $1
     RETURNING
@@ -501,7 +501,7 @@ export const updateConversationTurnForAuthor = async (
     SET
       status = CASE WHEN $2::boolean THEN $3 ELSE ct.status END,
       error = CASE WHEN $4::boolean THEN $5 ELSE ct.error END,
-      completed_at = CASE WHEN $6::boolean THEN $7 ELSE ct.completed_at END,
+      completed_at = CASE WHEN $6::boolean THEN $7::timestamptz ELSE ct.completed_at END,
       metadata = CASE WHEN $8::boolean THEN $9::jsonb ELSE ct.metadata END
     FROM nodes n
     JOIN workspaces w ON w.id = n.workspace_id
