@@ -3,6 +3,7 @@ import {
   parseMessageMetadata,
   serializeConversationTurnMetadata,
   serializeMessageMetadata,
+  retrieverInputSchema,
 } from './metadata.js'
 
 describe('metadata contracts', () => {
@@ -66,5 +67,19 @@ describe('metadata contracts', () => {
         contextSnapshotId: '',
       }),
     ).toThrow()
+  })
+
+  test('retrieverInputSchema validates required retriever input shape', () => {
+    expect(
+      retrieverInputSchema.parse({
+        query: 'hello',
+        nodeId: 'n1',
+        authorUserId: 'u1',
+      }),
+    ).toEqual({
+      query: 'hello',
+      nodeId: 'n1',
+      authorUserId: 'u1',
+    })
   })
 })

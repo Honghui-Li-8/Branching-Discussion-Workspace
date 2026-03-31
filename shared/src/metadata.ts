@@ -9,6 +9,14 @@ export const citationSchema = z.object({
   sourceLabel: z.string().min(1).optional(),
 }).passthrough()
 
+export const retrieverInputSchema = z.object({
+  query: z.string().min(1),
+  nodeId: z.string().min(1),
+  authorUserId: z.string().min(1),
+  workspaceId: z.string().min(1).optional(),
+  maxChunks: z.number().int().positive().optional(),
+}).passthrough()
+
 export const retrievedChunkSchema = z.object({
   messageId: z.string().min(1),
   nodeId: z.string().min(1),
@@ -49,6 +57,7 @@ export const conversationTurnMetadataSchema = z.object({
 }).passthrough()
 
 export type Citation = z.infer<typeof citationSchema>
+export type RetrieverInput = z.infer<typeof retrieverInputSchema>
 export type RetrievedChunk = z.infer<typeof retrievedChunkSchema>
 export type RetrieverDiagnostics = z.infer<typeof retrieverDiagnosticsSchema>
 export type RetrieverResult = z.infer<typeof retrieverResultSchema>
