@@ -5,6 +5,8 @@ import {
   listMessagesForNodeForAuthor as listMessagesForNodeForAuthorRecord,
   updateConversationTurnForAuthor as updateConversationTurnForAuthorRecord,
 } from '../db/index.js'
+import { buildConversationContext } from './buildConversationContext.js'
+import { selectProvider } from './providers/selectProvider.js'
 import type {
   SendConversationTurnInput,
   SendConversationTurnResult,
@@ -26,6 +28,31 @@ const findRecoverableUserMessage = (
       message.content === text &&
       Date.parse(message.createdAt) >= Date.parse(turnCreatedAt),
   ) ?? null
+
+const findRecoverableAssistantMessage = (
+  messages: Awaited<ReturnType<typeof listMessagesForNodeForAuthorRecord>>,
+  userMessageCreatedAt: string,
+) =>
+  messages.find(
+    (message) =>
+      message.role === 'assistant' &&
+      Date.parse(message.createdAt) >= Date.parse(userMessageCreatedAt),
+  ) ?? null
+
+const markTurnFailed = async (
+  turnId: string,
+  currentUserId: string,
+  errorMessage: string,
+): Promise<void> => {
+  await updateConversationTurnForAuthorRecord(
+    {
+      id: turnId,
+      status: 'failed',
+      error: errorMessage,
+    },
+    currentUserId,
+  )
+}
 
 export const sendConversationTurn = async ({
   input,
@@ -63,12 +90,16 @@ export const sendConversationTurn = async ({
         message: 'A turn already exists for this idempotency key.',
       })
     }
+    const existingAssistantMessage = findRecoverableAssistantMessage(
+      existingNodeMessages,
+      existingUserMessage.createdAt,
+    )
 
     return {
       turnId: turnResult.turn.id,
       status: turnResult.turn.status,
       userMessage: existingUserMessage,
-      assistantMessage: null,
+      assistantMessage: existingAssistantMessage,
       error: turnResult.turn.error,
     }
   }
@@ -81,43 +112,76 @@ export const sendConversationTurn = async ({
   })
 
   if (userMessage === null) {
-    await updateConversationTurnForAuthorRecord(
-      {
-        id: turnResult.turn.id,
-        status: 'failed',
-        error: 'Node not found.',
-      },
-      currentUserId,
-    )
+    await markTurnFailed(turnResult.turn.id, currentUserId, 'Node not found.')
     throw new TRPCError({
       code: 'NOT_FOUND',
       message: 'Node not found.',
     })
   }
 
-  const completedAt = new Date().toISOString()
-  const finalizedTurn = await updateConversationTurnForAuthorRecord(
-    {
-      id: turnResult.turn.id,
-      status: 'completed',
-      error: null,
-      completedAt,
-    },
-    currentUserId,
-  )
-
-  if (!finalizedTurn) {
-    throw new TRPCError({
-      code: 'NOT_FOUND',
-      message: 'Conversation turn not found.',
+  try {
+    const context = await buildConversationContext({
+      nodeId: input.nodeId,
+      currentUserId,
+      userInput: input.text,
     })
-  }
+    const provider = selectProvider({ model: input.model })
+    const assistantOutput = await provider.generate({
+      model: input.model,
+      context,
+    })
+    const assistantMessage = await createMessageForAuthorRecord({
+      nodeId: input.nodeId,
+      authorUserId: currentUserId,
+      role: 'assistant',
+      content: assistantOutput.content,
+    })
 
-  return {
-    turnId: finalizedTurn.id,
-    status: finalizedTurn.status,
-    userMessage,
-    assistantMessage: null,
-    error: finalizedTurn.error,
+    if (assistantMessage === null) {
+      await markTurnFailed(turnResult.turn.id, currentUserId, 'Node not found.')
+      throw new TRPCError({
+        code: 'NOT_FOUND',
+        message: 'Node not found.',
+      })
+    }
+
+    const completedAt = new Date().toISOString()
+    const finalizedTurn = await updateConversationTurnForAuthorRecord(
+      {
+        id: turnResult.turn.id,
+        status: 'completed',
+        error: null,
+        completedAt,
+      },
+      currentUserId,
+    )
+
+    if (!finalizedTurn) {
+      throw new TRPCError({
+        code: 'NOT_FOUND',
+        message: 'Conversation turn not found.',
+      })
+    }
+
+    return {
+      turnId: finalizedTurn.id,
+      status: finalizedTurn.status,
+      userMessage,
+      assistantMessage,
+      error: finalizedTurn.error,
+    }
+  } catch (error) {
+    if (error instanceof TRPCError) {
+      throw error
+    }
+
+    const errorMessage = error instanceof Error
+      ? error.message
+      : 'Assistant generation failed.'
+    await markTurnFailed(turnResult.turn.id, currentUserId, errorMessage)
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Assistant generation failed.',
+    })
   }
 }
