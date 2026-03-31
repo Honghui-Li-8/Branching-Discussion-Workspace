@@ -38,19 +38,8 @@ describe('selectProvider', () => {
     expect(provider.id).toBe('openai')
     await provider.generate({
       model: 'gpt-5',
-      context: {
-        node: {
-          id: 'n1',
-          title: 'Root',
-          summary: 'summary',
-          status: 'open',
-          confidence: 'medium',
-          conclusion: null,
-          rationale: null,
-          depth: 0,
-          parentNodeId: 'n1',
-        },
-        recentMessages: [],
+      prompt: {
+        input: 'prebuilt prompt',
         userInput: 'hello',
       },
     })

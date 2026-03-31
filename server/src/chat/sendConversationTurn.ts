@@ -11,6 +11,7 @@ import {
   validateProviderRuntimeConfigOrThrow,
 } from './config.js'
 import { buildConversationContext } from './buildConversationContext.js'
+import { buildAssistantPrompt } from './promptBuilder.js'
 import { selectProvider } from './providers/selectProvider.js'
 import { turnEventBroker } from './stream/broker.js'
 import {
@@ -213,6 +214,7 @@ export const sendConversationTurn = async ({
       currentUserId,
       userInput: input.text,
     })
+    const prompt = buildAssistantPrompt(context)
     publishTurnEvent({
       type: 'turn.status',
       payload: {
@@ -223,7 +225,7 @@ export const sendConversationTurn = async ({
     const provider = selectProvider({ model: input.model })
     const assistantOutput = await provider.generate({
       model: input.model,
-      context,
+      prompt,
       onTokenDelta: (delta) => {
         if (delta.length === 0) {
           return

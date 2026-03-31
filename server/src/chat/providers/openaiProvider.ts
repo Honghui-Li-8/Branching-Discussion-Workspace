@@ -1,6 +1,5 @@
 import type { AssistantProvider } from './provider.js'
 import type {
-  ConversationContext,
   GenerateAssistantInput,
   GenerateAssistantResult,
 } from '../types.js'
@@ -43,27 +42,6 @@ const mapFinishReason = (
   }
 }
 
-const formatRecentMessages = (context: ConversationContext): string => {
-  if (context.recentMessages.length === 0) {
-    return 'No prior messages in this node.'
-  }
-
-  return context.recentMessages
-    .map((message) => `[${message.role}] ${message.content}`)
-    .join('\n')
-}
-
-const buildPrompt = (context: ConversationContext): string =>
-  [
-    `Node title: ${context.node.title}`,
-    `Node summary: ${context.node.summary}`,
-    `Node status: ${context.node.status}`,
-    `Node confidence: ${context.node.confidence}`,
-    `Recent messages:`,
-    formatRecentMessages(context),
-    `User input: ${context.userInput}`,
-  ].join('\n')
-
 const extractOutputText = (payload: OpenAIResponse): string => {
   if (typeof payload.output_text === 'string' && payload.output_text.trim().length > 0) {
     return payload.output_text
@@ -104,7 +82,7 @@ export const createOpenAIProvider = (
         },
         body: JSON.stringify({
           model: input.model,
-          input: buildPrompt(input.context),
+          input: input.prompt.input,
         }),
       })
 

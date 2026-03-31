@@ -35,9 +35,14 @@ export interface ConversationContext {
   userInput: string
 }
 
+export interface AssistantPrompt {
+  input: string
+  userInput: string
+}
+
 export interface GenerateAssistantInput {
   model: string
-  context: ConversationContext
+  prompt: AssistantPrompt
   onTokenDelta?: (delta: string) => void | Promise<void>
 }
 

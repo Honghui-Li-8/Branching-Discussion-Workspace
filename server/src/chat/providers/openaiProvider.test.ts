@@ -3,26 +3,8 @@ import { createOpenAIProvider } from './openaiProvider'
 
 const makeInput = () => ({
   model: 'gpt-5',
-  context: {
-    node: {
-      id: 'n1',
-      title: 'Root Decision',
-      summary: 'Root summary',
-      status: 'open' as const,
-      confidence: 'medium' as const,
-      conclusion: null,
-      rationale: null,
-      depth: 0,
-      parentNodeId: 'n1',
-    },
-    recentMessages: [
-      {
-        id: 'm1',
-        role: 'user' as const,
-        content: 'hello',
-        createdAt: '2026-03-30T00:00:00.000Z',
-      },
-    ],
+  prompt: {
+    input: 'prebuilt prompt',
     userInput: 'new question',
   },
 })
@@ -53,6 +35,16 @@ describe('createOpenAIProvider', () => {
 
     expect(provider.id).toBe('openai')
     expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.openai.com/v1/responses',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          model: 'gpt-5',
+          input: 'prebuilt prompt',
+        }),
+      }),
+    )
     expect(result).toEqual({
       content: 'assistant text',
       finishReason: 'stop',
