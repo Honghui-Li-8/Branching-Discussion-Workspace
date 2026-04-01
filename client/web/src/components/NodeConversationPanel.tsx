@@ -24,6 +24,16 @@ type NodeConversationPanelProps = {
   onToggleFullScreen: () => void
 }
 
+const formatStatusElapsed = (elapsedSeconds: number): string => {
+  if (elapsedSeconds < 60) {
+    return `${elapsedSeconds}s`
+  }
+
+  const minutes = Math.floor(elapsedSeconds / 60)
+  const seconds = elapsedSeconds % 60
+  return `${minutes}m ${String(seconds).padStart(2, '0')}s`
+}
+
 const getNodeConclusion = (messages: TreeMessage[] | undefined) => {
   if (!messages || messages.length === 0) {
     return 'No conclusion yet.'
@@ -73,9 +83,14 @@ export const NodeConversationPanel = ({
   const startWidthRef = useRef(0)
   const conversationScrollRef = useRef<HTMLDivElement | null>(null)
   const conversationInputRef = useRef<HTMLTextAreaElement | null>(null)
+  const [statusTimerStartedAtMs, setStatusTimerStartedAtMs] = useState<number | null>(null)
+  const [statusTimerNowMs, setStatusTimerNowMs] = useState(0)
 
   const messages = conversation.messages
   const hasFailedMessages = conversation.failedMessageIds.size > 0
+  const streamStatusLabel = conversation.streamStatusLabel
+  const hasActiveStreamStatus =
+    Boolean(streamStatusLabel) && !(streamStatusLabel?.startsWith('Error:') ?? false)
 
   const adjustConversationInputHeight = () => {
     const input = conversationInputRef.current
@@ -112,6 +127,20 @@ export const NodeConversationPanel = ({
   useEffect(() => {
     adjustConversationInputHeight()
   }, [conversationInputText])
+
+  useEffect(() => {
+    if (!hasActiveStreamStatus) {
+      return
+    }
+
+    const intervalId = window.setInterval(() => {
+      setStatusTimerNowMs(Date.now())
+    }, 1000)
+
+    return () => {
+      window.clearInterval(intervalId)
+    }
+  }, [hasActiveStreamStatus, node.id])
 
   useEffect(() => {
     if (!isResizing) {
@@ -168,6 +197,9 @@ export const NodeConversationPanel = ({
 
     setSendBlockAlert(null)
     setConversationInputText('')
+    const now = Date.now()
+    setStatusTimerStartedAtMs(now)
+    setStatusTimerNowMs(now)
 
     if (conversationInputRef.current) {
       conversationInputRef.current.style.overflowY = 'hidden'
@@ -186,6 +218,18 @@ export const NodeConversationPanel = ({
       sendConversationMessage()
     }
   }
+
+  const streamStatusWithElapsed = (() => {
+    if (!streamStatusLabel || !hasActiveStreamStatus || statusTimerStartedAtMs === null) {
+      return streamStatusLabel
+    }
+
+    const elapsedSeconds = Math.max(
+      0,
+      Math.floor((statusTimerNowMs - statusTimerStartedAtMs) / 1000),
+    )
+    return `${streamStatusLabel} (${formatStatusElapsed(elapsedSeconds)})`
+  })()
 
   return (
     <aside
@@ -215,9 +259,9 @@ export const NodeConversationPanel = ({
         onDismissFailedMessage={conversation.dismissFailedMessage}
         conversationScrollRef={conversationScrollRef}
       />
-      {conversation.streamStatusLabel ? (
+      {streamStatusWithElapsed ? (
         <p className="m-0 shrink-0 border-t border-[#d8ebf6] bg-[#f4fbff] px-4 py-2 text-xs text-[#2f6688]">
-          {conversation.streamStatusLabel}
+          {streamStatusWithElapsed}
         </p>
       ) : null}
       {sendBlockAlert ? (
