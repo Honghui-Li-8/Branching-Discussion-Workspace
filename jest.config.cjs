@@ -5,6 +5,8 @@ module.exports = {
   roots: ['<rootDir>/shared/src', '<rootDir>/client/web/src', '<rootDir>/server/src'],
   testMatch: ['**/*.test.ts'],
   moduleNameMapper: {
+    '^@branching/shared$': '<rootDir>/shared/src/index.ts',
+    '^@branching/shared/(.*)$': '<rootDir>/shared/src/$1',
     '^(\\.{1,2}/.*)\\.js$': '$1',
   },
   transform: {
