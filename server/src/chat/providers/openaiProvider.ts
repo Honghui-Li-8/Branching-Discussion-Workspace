@@ -46,6 +46,20 @@ type OpenAIInputMessage = {
   content: OpenAIInputTextContent[]
 }
 
+type OpenAIRetrievalContextPlaceholder = {
+  type: 'temporary_retrieval_context_placeholder'
+  chunkCount: number
+  chunks: Array<{
+    ordinal: number
+    messageId: string
+    nodeId: string
+    chunkIndex: number
+    tokenCount: number | null
+    score: number | null
+    content: string
+  }>
+}
+
 type OpenAIRequestBody = {
   model: string
   instructions: string
@@ -61,13 +75,21 @@ const toDebugPreview = (value: string): string =>
     ? value
     : `${value.slice(0, DEBUG_TEXT_PREVIEW_MAX_CHARS)}...`
 
-const formatRetrievedChunks = (chunks: RetrievedChunk[]): string =>
-  chunks
-    .map(
-      (chunk, index) =>
-        `[source ${index + 1} | message=${chunk.messageId} | chunk=${chunk.chunkIndex}] ${chunk.content}`,
-    )
-    .join('\n\n')
+const buildRetrievalContextPlaceholder = (
+  chunks: RetrievedChunk[],
+): OpenAIRetrievalContextPlaceholder => ({
+  type: 'temporary_retrieval_context_placeholder',
+  chunkCount: chunks.length,
+  chunks: chunks.map((chunk, index) => ({
+    ordinal: index + 1,
+    messageId: chunk.messageId,
+    nodeId: chunk.nodeId,
+    chunkIndex: chunk.chunkIndex,
+    tokenCount: chunk.tokenCount ?? null,
+    score: chunk.score ?? null,
+    content: chunk.content,
+  })),
+})
 
 const toInputTextContent = (text: string): OpenAIInputTextContent[] => [
   {
@@ -78,6 +100,7 @@ const toInputTextContent = (text: string): OpenAIInputTextContent[] => [
 
 const buildOpenAIInputMessages = (
   prompt: GenerateAssistantInput['prompt'],
+  logger: AppLogger,
 ): OpenAIInputMessage[] => {
   const messages: OpenAIInputMessage[] = prompt.conversation.map((message) => ({
     type: 'message',
@@ -86,12 +109,16 @@ const buildOpenAIInputMessages = (
   }))
 
   if (prompt.retrievalContext.length > 0) {
+    const placeholder = buildRetrievalContextPlaceholder(prompt.retrievalContext)
+    logger.warn('[llm] OpenAI retrieval context placeholder structure is in use.', {
+      retrieval_context_count: placeholder.chunkCount,
+      retrieval_context_chunk_ordinals: placeholder.chunks.map((chunk) => chunk.ordinal),
+      retrieval_context_message_ids: placeholder.chunks.map((chunk) => chunk.messageId),
+    })
     messages.push({
       type: 'message',
       role: 'developer',
-      content: toInputTextContent(
-        ['Retrieved context:', formatRetrievedChunks(prompt.retrievalContext)].join('\n'),
-      ),
+      content: toInputTextContent(JSON.stringify(placeholder, null, 2)),
     })
   }
 
@@ -107,10 +134,11 @@ const buildOpenAIInputMessages = (
 const buildOpenAIRequestBody = (
   model: string,
   prompt: GenerateAssistantInput['prompt'],
+  logger: AppLogger,
 ): OpenAIRequestBody => ({
   model,
   instructions: prompt.instructions.join('\n'),
-  input: buildOpenAIInputMessages(prompt),
+  input: buildOpenAIInputMessages(prompt, logger),
 })
 
 const estimateRequestBodySize = (body: OpenAIRequestBody): number =>
@@ -172,7 +200,7 @@ export const createOpenAIProvider = (
     id: 'openai',
     generate: async (input: GenerateAssistantInput) => {
       const startedAtMs = Date.now()
-      const requestBody = buildOpenAIRequestBody(input.model, input.prompt)
+      const requestBody = buildOpenAIRequestBody(input.model, input.prompt, logger)
       const promptSections = summarizePromptSections(input.prompt)
       logger.debug('[llm] OpenAI Responses request started.', {
         model: input.model,
