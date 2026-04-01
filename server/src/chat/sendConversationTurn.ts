@@ -14,6 +14,7 @@ import {
 } from './config.js'
 import { buildConversationContext } from './buildConversationContext.js'
 import { buildAssistantPrompt } from './promptBuilder.js'
+import { applyPromptBudget } from './promptBudget.js'
 import { selectProvider } from './providers/selectProvider.js'
 import { applyContextPolicy } from './rag/contextPolicy.js'
 import {
@@ -125,6 +126,7 @@ const enqueuePostprocessJobsForTurn = async (
 
 type RetrievalStageState = {
   prompt: ReturnType<typeof buildAssistantPrompt>
+  promptBudgetSummary?: ReturnType<typeof applyPromptBudget>['summary']
   assistantMetadata?: Parameters<typeof createMessageForAuthorRecord>[0]['metadata']
   turnMetadata?: NonNullable<
     Parameters<typeof updateConversationTurnForAuthorRecord>[0]['metadata']
@@ -470,6 +472,27 @@ export const sendConversationTurn = async ({
       }
     }
 
+    const budgetedPromptResult = applyPromptBudget(retrievalState.prompt)
+    retrievalState = {
+      ...retrievalState,
+      prompt: budgetedPromptResult.prompt,
+      promptBudgetSummary: budgetedPromptResult.summary,
+    }
+    logger.debug('[chat] prompt budget applied.', {
+      turn_id: turnResult.turn.id,
+      node_id: input.nodeId,
+      author_user_id: currentUserId,
+      instruction_count: budgetedPromptResult.summary.instructionCount,
+      conversation_count_before: budgetedPromptResult.summary.conversationCountBefore,
+      conversation_count_after: budgetedPromptResult.summary.conversationCountAfter,
+      retrieval_count_before: budgetedPromptResult.summary.retrievalCountBefore,
+      retrieval_count_after: budgetedPromptResult.summary.retrievalCountAfter,
+      trimmed_conversation_count: budgetedPromptResult.summary.trimmedConversationCount,
+      trimmed_retrieval_count: budgetedPromptResult.summary.trimmedRetrievalCount,
+      estimated_tokens_before: budgetedPromptResult.summary.estimatedTokensBefore,
+      estimated_tokens_after: budgetedPromptResult.summary.estimatedTokensAfter,
+    })
+
     stage = 'generating_assistant_reply'
     publishTurnEvent({
       type: 'turn.status',
@@ -492,6 +515,10 @@ export const sendConversationTurn = async ({
       author_user_id: currentUserId,
       model: input.model,
       provider: provider.id,
+      instruction_count: retrievalState.promptBudgetSummary?.instructionCount ?? null,
+      conversation_count: retrievalState.prompt.conversation.length,
+      retrieval_count: retrievalState.prompt.retrievalContext.length,
+      estimated_tokens_after_budget: retrievalState.promptBudgetSummary?.estimatedTokensAfter ?? null,
       prompt_instruction_count: retrievalState.prompt.instructions.length,
       prompt_conversation_turn_count: retrievalState.prompt.conversation.length,
       prompt_retrieval_chunk_count: retrievalState.prompt.retrievalContext.length,
