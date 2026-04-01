@@ -4,10 +4,48 @@ import { createOpenAIProvider } from './openaiProvider'
 const makeInput = () => ({
   model: 'gpt-5',
   prompt: {
-    input: 'prebuilt prompt',
-    userInput: 'new question',
+    instructions: [
+      'Node title: Root Decision',
+      'Node summary: Root summary',
+      'Node status: open',
+      'Node confidence: medium',
+    ],
+    conversation: [
+      {
+        id: 'm1',
+        role: 'user' as const,
+        content: 'hello',
+        createdAt: '2026-03-30T00:00:00.000Z',
+      },
+    ],
+    currentUserMessage: 'new question',
+    retrievalContext: [],
   },
 })
+
+const makeLogger = () => ({
+  debug: jest.fn(),
+  info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+})
+
+const getRequestBody = (fetchMock: jest.Mock) => {
+  const requestInit = fetchMock.mock.calls[0]?.[1] as { body?: string } | undefined
+
+  return JSON.parse(String(requestInit?.body ?? '{}')) as {
+    model?: string
+    instructions?: string
+    input?: Array<{
+      type?: string
+      role?: string
+      content?: Array<{
+        type?: string
+        text?: string
+      }>
+    }>
+  }
+}
 
 describe('createOpenAIProvider', () => {
   test('throws when api key is missing', () => {
@@ -26,10 +64,12 @@ describe('createOpenAIProvider', () => {
         finish_reason: 'stop',
       }),
     })) as unknown as typeof fetch
+    const logger = makeLogger()
 
     const provider = createOpenAIProvider({
       apiKey: 'test-key',
       fetchImpl: fetchMock,
+      logger,
     })
     const result = await provider.generate(makeInput())
 
@@ -39,17 +79,140 @@ describe('createOpenAIProvider', () => {
       'https://api.openai.com/v1/responses',
       expect.objectContaining({
         method: 'POST',
-        body: JSON.stringify({
-          model: 'gpt-5',
-          input: 'prebuilt prompt',
-        }),
       }),
     )
+    expect(getRequestBody(fetchMock as unknown as jest.Mock)).toEqual({
+      model: 'gpt-5',
+      instructions: [
+        'Node title: Root Decision',
+        'Node summary: Root summary',
+        'Node status: open',
+        'Node confidence: medium',
+      ].join('\n'),
+      input: [
+        {
+          type: 'message',
+          role: 'user',
+          content: [
+            {
+              type: 'input_text',
+              text: 'hello',
+            },
+          ],
+        },
+        {
+          type: 'message',
+          role: 'user',
+          content: [
+            {
+              type: 'input_text',
+              text: 'new question',
+            },
+          ],
+        },
+      ],
+    })
+    expect(logger.warn).not.toHaveBeenCalled()
     expect(result).toEqual({
       content: 'assistant text',
       finishReason: 'stop',
       providerResponseId: 'resp_1',
     })
+  })
+
+  test('includes retrieval context as a structured developer message', async () => {
+    const fetchMock = jest.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        id: 'resp_2',
+        output_text: 'assistant text',
+        finish_reason: 'stop',
+      }),
+    })) as unknown as typeof fetch
+    const logger = makeLogger()
+
+    const provider = createOpenAIProvider({
+      apiKey: 'test-key',
+      fetchImpl: fetchMock,
+      logger,
+    })
+
+    await provider.generate({
+      model: 'gpt-5',
+      prompt: {
+        instructions: ['Node title: Root Decision'],
+        conversation: [],
+        currentUserMessage: 'new question',
+        retrievalContext: [
+          {
+            messageId: 'm-source',
+            nodeId: 'n1',
+            chunkIndex: 0,
+            content: 'retrieved evidence',
+          },
+        ],
+      },
+    })
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.openai.com/v1/responses',
+      expect.objectContaining({
+        method: 'POST',
+      }),
+    )
+    expect(getRequestBody(fetchMock as unknown as jest.Mock)).toEqual({
+      model: 'gpt-5',
+      instructions: 'Node title: Root Decision',
+      input: [
+        {
+          type: 'message',
+          role: 'developer',
+          content: [
+            {
+              type: 'input_text',
+              text: JSON.stringify(
+                {
+                  type: 'temporary_retrieval_context_placeholder',
+                  chunkCount: 1,
+                  chunks: [
+                    {
+                      ordinal: 1,
+                      messageId: 'm-source',
+                      nodeId: 'n1',
+                      chunkIndex: 0,
+                      tokenCount: null,
+                      score: null,
+                      content: 'retrieved evidence',
+                    },
+                  ],
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        },
+        {
+          type: 'message',
+          role: 'user',
+          content: [
+            {
+              type: 'input_text',
+              text: 'new question',
+            },
+          ],
+        },
+      ],
+    })
+    expect(logger.warn).toHaveBeenCalledWith(
+      '[llm] OpenAI retrieval context placeholder structure is in use.',
+      expect.objectContaining({
+        retrieval_context_count: 1,
+        retrieval_context_chunk_ordinals: [1],
+        retrieval_context_message_ids: ['m-source'],
+      }),
+    )
   })
 
   test('throws on non-ok response', async () => {

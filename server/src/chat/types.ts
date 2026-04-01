@@ -1,3 +1,4 @@
+import type { RetrievedChunk } from '@branching/shared'
 import type {
   ConversationTurnStatus,
   MessageRecord,
@@ -34,16 +35,25 @@ export interface ConversationContext {
   node: ConversationContextNode
   recentMessages: ConversationContextMessage[]
   userInput: string
+  memoryPlaceholder?: ConversationMemoryPlaceholder | null
 }
 
-export interface AssistantPrompt {
-  input: string
-  userInput: string
+export interface ConversationMemoryPlaceholder {
+  status: 'pending'
+  olderMessageCount: number
+  retainedMessageCount: number
+}
+
+export interface PromptEnvelope {
+  instructions: string[]
+  conversation: ConversationContextMessage[]
+  currentUserMessage: string
+  retrievalContext: RetrievedChunk[]
 }
 
 export interface GenerateAssistantInput {
   model: string
-  prompt: AssistantPrompt
+  prompt: PromptEnvelope
   onTokenDelta?: (delta: string) => void | Promise<void>
 }
 

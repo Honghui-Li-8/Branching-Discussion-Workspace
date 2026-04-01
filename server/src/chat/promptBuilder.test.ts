@@ -2,7 +2,7 @@ import { describe, expect, test } from '@jest/globals'
 import { buildAssistantPrompt } from './promptBuilder'
 
 describe('buildAssistantPrompt', () => {
-  test('builds the legacy prompt shape from conversation context', () => {
+  test('builds the structured prompt envelope from conversation context', () => {
     const prompt = buildAssistantPrompt({
       node: {
         id: 'n1',
@@ -27,18 +27,22 @@ describe('buildAssistantPrompt', () => {
       userInput: 'new question',
     })
 
-    expect(prompt).toEqual({
-      input: [
-        'Node title: Root Decision',
-        'Node summary: Root summary',
-        'Node status: open',
-        'Node confidence: medium',
-        'Recent messages:',
-        '[user] hello',
-        'User input: new question',
-      ].join('\n'),
-      userInput: 'new question',
-    })
+    expect(prompt.instructions).toEqual([
+      'Node title: Root Decision',
+      'Node summary: Root summary',
+      'Node status: open',
+      'Node confidence: medium',
+    ])
+    expect(prompt.conversation).toEqual([
+      {
+        id: 'm1',
+        role: 'user',
+        content: 'hello',
+        createdAt: '2026-03-30T00:00:00.000Z',
+      },
+    ])
+    expect(prompt.currentUserMessage).toBe('new question')
+    expect(prompt.retrievalContext).toEqual([])
   })
 
   test('renders empty history fallback when there are no prior messages', () => {
@@ -59,7 +63,9 @@ describe('buildAssistantPrompt', () => {
       userInput: 'hello',
     })
 
-    expect(prompt.input).toContain('No prior messages in this node.')
+    expect(prompt.conversation).toEqual([])
+    expect(prompt.currentUserMessage).toBe('hello')
+    expect(prompt.retrievalContext).toEqual([])
   })
 
   test('renders retrieved chunks when provided', () => {
@@ -92,7 +98,13 @@ describe('buildAssistantPrompt', () => {
       },
     )
 
-    expect(prompt.input).toContain('Retrieved context:')
-    expect(prompt.input).toContain('retrieved evidence')
+    expect(prompt.retrievalContext).toEqual([
+      {
+        messageId: 'm-source',
+        nodeId: 'n1',
+        chunkIndex: 0,
+        content: 'retrieved evidence',
+      },
+    ])
   })
 })
