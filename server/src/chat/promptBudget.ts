@@ -1,7 +1,7 @@
 import type { RetrievedChunk } from '@branching/shared'
 import type {
-  AssistantPrompt,
-  PromptConversationTurn,
+  ConversationContextMessage,
+  PromptEnvelope,
 } from './types.js'
 
 export type PromptBudgetOptions = {
@@ -23,7 +23,7 @@ export type PromptBudgetSummary = {
 }
 
 type TrimmedConversation = {
-  conversation: PromptConversationTurn[]
+  conversation: ConversationContextMessage[]
   estimatedTokens: number
 }
 
@@ -33,7 +33,7 @@ type TrimmedRetrievalContext = {
 }
 
 export type PromptBudgetResult = {
-  prompt: AssistantPrompt
+  prompt: PromptEnvelope
   summary: PromptBudgetSummary
 }
 
@@ -50,7 +50,7 @@ const estimateTextTokens = (text: string): number =>
 const estimateInstructionsTokens = (instructions: string[]): number =>
   instructions.reduce((total, instruction) => total + estimateTextTokens(instruction), 0)
 
-const estimateConversationMessageTokens = (message: PromptConversationTurn): number =>
+const estimateConversationMessageTokens = (message: ConversationContextMessage): number =>
   estimateTextTokens(message.content) + MESSAGE_OVERHEAD_TOKENS
 
 const estimateRetrievalChunkTokens = (chunk: RetrievedChunk): number =>
@@ -58,14 +58,14 @@ const estimateRetrievalChunkTokens = (chunk: RetrievedChunk): number =>
     ? Math.floor(chunk.tokenCount ?? 0)
     : estimateTextTokens(chunk.content)) + CHUNK_OVERHEAD_TOKENS
 
-const estimatePromptTokens = (prompt: AssistantPrompt): number =>
+const estimatePromptTokens = (prompt: PromptEnvelope): number =>
   estimateInstructionsTokens(prompt.instructions) +
   prompt.conversation.reduce((total, message) => total + estimateConversationMessageTokens(message), 0) +
   prompt.retrievalContext.reduce((total, chunk) => total + estimateRetrievalChunkTokens(chunk), 0) +
   estimateTextTokens(prompt.currentUserMessage)
 
 const trimConversation = (
-  conversation: PromptConversationTurn[],
+  conversation: ConversationContextMessage[],
   maxConversationTokens: number,
 ): TrimmedConversation => {
   if (conversation.length === 0) {
@@ -75,7 +75,7 @@ const trimConversation = (
     }
   }
 
-  const retainedMessages: PromptConversationTurn[] = []
+  const retainedMessages: ConversationContextMessage[] = []
   let retainedTokens = 0
 
   for (let index = conversation.length - 1; index >= 0; index -= 1) {
@@ -145,7 +145,7 @@ const trimRetrievalContext = (
 }
 
 export const applyPromptBudget = (
-  prompt: AssistantPrompt,
+  prompt: PromptEnvelope,
   options: PromptBudgetOptions = {},
 ): PromptBudgetResult => {
   const maxConversationTokens = options.maxConversationTokens ?? DEFAULT_MAX_CONVERSATION_TOKENS
@@ -159,7 +159,7 @@ export const applyPromptBudget = (
     maxRetrievalTokens,
     maxRetrievalChunks,
   )
-  const budgetedPrompt: AssistantPrompt = {
+  const budgetedPrompt: PromptEnvelope = {
     ...prompt,
     conversation: conversationTrim.conversation,
     retrievalContext: retrievalTrim.retrievalContext,

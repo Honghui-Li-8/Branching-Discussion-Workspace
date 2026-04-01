@@ -37,20 +37,16 @@ export interface ConversationContext {
   userInput: string
 }
 
-export type PromptConversationTurn = ConversationContextMessage
-
 export interface PromptEnvelope {
   instructions: string[]
-  conversation: PromptConversationTurn[]
+  conversation: ConversationContextMessage[]
   currentUserMessage: string
   retrievalContext: RetrievedChunk[]
 }
 
-export interface AssistantPrompt extends PromptEnvelope {}
-
 export interface GenerateAssistantInput {
   model: string
-  prompt: AssistantPrompt
+  prompt: PromptEnvelope
   onTokenDelta?: (delta: string) => void | Promise<void>
 }
 

@@ -2,7 +2,7 @@ import { describe, expect, test } from '@jest/globals'
 import { buildAssistantPrompt } from './promptBuilder'
 
 describe('buildAssistantPrompt', () => {
-  test('builds the legacy prompt shape from conversation context', () => {
+  test('builds the structured prompt envelope from conversation context', () => {
     const prompt = buildAssistantPrompt({
       node: {
         id: 'n1',

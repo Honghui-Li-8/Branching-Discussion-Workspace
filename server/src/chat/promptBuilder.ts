@@ -1,12 +1,12 @@
 import type { RetrievedChunk } from '@branching/shared'
-import type { AssistantPrompt, ConversationContext } from './types.js'
+import type { ConversationContext, PromptEnvelope } from './types.js'
 
 export const buildAssistantPrompt = (
   context: ConversationContext,
   options: {
     retrievedChunks?: RetrievedChunk[]
   } = {},
-): AssistantPrompt => {
+): PromptEnvelope => {
   const instructions = [
     `Node title: ${context.node.title}`,
     `Node summary: ${context.node.summary}`,
