@@ -3,6 +3,7 @@ import type {
   GenerateAssistantInput,
   GenerateAssistantResult,
 } from '../types.js'
+import { summarizePromptSections } from '../promptObservability.js'
 import { emitTokenDeltas } from './tokenDeltas.js'
 import { createLogger, type AppLogger } from '../../logging/logger.js'
 import type { RetrievedChunk } from '@branching/shared'
@@ -172,14 +173,14 @@ export const createOpenAIProvider = (
     generate: async (input: GenerateAssistantInput) => {
       const startedAtMs = Date.now()
       const requestBody = buildOpenAIRequestBody(input.model, input.prompt)
+      const promptSections = summarizePromptSections(input.prompt)
       logger.debug('[llm] OpenAI Responses request started.', {
         model: input.model,
-        prompt_instruction_count: input.prompt.instructions.length,
-        prompt_conversation_turn_count: input.prompt.conversation.length,
-        prompt_retrieval_chunk_count: input.prompt.retrievalContext.length,
+        prompt_sections: promptSections,
         prompt_instruction_length: requestBody.instructions.length,
-        prompt_conversation_text_length: countInputTextCharacters(requestBody.input),
-        prompt_current_user_message_length: input.prompt.currentUserMessage.length,
+        request_input_text_length: countInputTextCharacters(requestBody.input),
+        prompt_retrieval_context_text_length: promptSections.retrievalContextTextLength,
+        prompt_current_user_message_length: promptSections.currentUserMessageLength,
         prompt_current_user_message_preview: toDebugPreview(input.prompt.currentUserMessage),
         request_payload_size_bytes: estimateRequestBodySize(requestBody),
         request_input_message_count: requestBody.input.length,
@@ -215,6 +216,7 @@ export const createOpenAIProvider = (
 
       logger.info('[llm] OpenAI Responses request completed.', {
         model: input.model,
+        prompt_sections: promptSections,
         provider_response_id: payload.id ?? null,
         finish_reason: payload.finish_reason ?? null,
         input_tokens: payload.usage?.input_tokens ?? null,
@@ -225,6 +227,7 @@ export const createOpenAIProvider = (
       })
       logger.debug('[llm] OpenAI Responses output preview.', {
         model: input.model,
+        prompt_sections: promptSections,
         provider_response_id: payload.id ?? null,
         content_preview: toDebugPreview(content),
       })

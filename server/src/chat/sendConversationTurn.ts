@@ -15,6 +15,7 @@ import {
 import { buildConversationContext } from './buildConversationContext.js'
 import { buildAssistantPrompt } from './promptBuilder.js'
 import { applyPromptBudget } from './promptBudget.js'
+import { summarizePromptSections } from './promptObservability.js'
 import { selectProvider } from './providers/selectProvider.js'
 import { applyContextPolicy } from './rag/contextPolicy.js'
 import {
@@ -472,7 +473,9 @@ export const sendConversationTurn = async ({
       }
     }
 
+    const promptSectionsBeforeBudget = summarizePromptSections(retrievalState.prompt)
     const budgetedPromptResult = applyPromptBudget(retrievalState.prompt)
+    const promptSectionsAfterBudget = summarizePromptSections(budgetedPromptResult.prompt)
     retrievalState = {
       ...retrievalState,
       prompt: budgetedPromptResult.prompt,
@@ -482,6 +485,8 @@ export const sendConversationTurn = async ({
       turn_id: turnResult.turn.id,
       node_id: input.nodeId,
       author_user_id: currentUserId,
+      prompt_sections_before_budget: promptSectionsBeforeBudget,
+      prompt_sections_after_budget: promptSectionsAfterBudget,
       instruction_count: budgetedPromptResult.summary.instructionCount,
       conversation_count_before: budgetedPromptResult.summary.conversationCountBefore,
       conversation_count_after: budgetedPromptResult.summary.conversationCountAfter,
@@ -518,6 +523,7 @@ export const sendConversationTurn = async ({
       instruction_count: retrievalState.promptBudgetSummary?.instructionCount ?? null,
       conversation_count: retrievalState.prompt.conversation.length,
       retrieval_count: retrievalState.prompt.retrievalContext.length,
+      prompt_sections: summarizePromptSections(retrievalState.prompt),
       estimated_tokens_after_budget: retrievalState.promptBudgetSummary?.estimatedTokensAfter ?? null,
       prompt_instruction_count: retrievalState.prompt.instructions.length,
       prompt_conversation_turn_count: retrievalState.prompt.conversation.length,
