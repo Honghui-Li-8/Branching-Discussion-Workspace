@@ -1,3 +1,4 @@
+import type { RetrievedChunk } from '@branching/shared'
 import type {
   ConversationTurnStatus,
   MessageRecord,
@@ -36,10 +37,18 @@ export interface ConversationContext {
   userInput: string
 }
 
-export interface AssistantPrompt {
+export type PromptConversationTurn = ConversationContextMessage
+
+export interface PromptEnvelope {
+  instructions: string[]
+  conversation: PromptConversationTurn[]
+  currentUserMessage: string
+  retrievalContext: RetrievedChunk[]
   input: string
   userInput: string
 }
+
+export interface AssistantPrompt extends PromptEnvelope {}
 
 export interface GenerateAssistantInput {
   model: string

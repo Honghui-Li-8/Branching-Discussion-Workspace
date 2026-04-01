@@ -1,14 +1,12 @@
 import type { RetrievedChunk } from '@branching/shared'
 import type { AssistantPrompt, ConversationContext } from './types.js'
 
-const formatRecentMessages = (context: ConversationContext): string => {
-  if (context.recentMessages.length === 0) {
+const formatRecentMessages = (messages: ConversationContext['recentMessages']): string => {
+  if (messages.length === 0) {
     return 'No prior messages in this node.'
   }
 
-  return context.recentMessages
-    .map((message) => `[${message.role}] ${message.content}`)
-    .join('\n')
+  return messages.map((message) => `[${message.role}] ${message.content}`).join('\n')
 }
 
 const formatRetrievedChunks = (chunks: RetrievedChunk[]): string =>
@@ -19,30 +17,49 @@ const formatRetrievedChunks = (chunks: RetrievedChunk[]): string =>
     )
     .join('\n\n')
 
+const buildLegacyPromptInput = (
+  instructions: string[],
+  conversation: ConversationContext['recentMessages'],
+  currentUserMessage: string,
+  retrievedChunks: RetrievedChunk[],
+): string => {
+  const sections = [...instructions, 'Recent messages:', formatRecentMessages(conversation)]
+
+  if (retrievedChunks.length > 0) {
+    sections.push('Retrieved context:')
+    sections.push(formatRetrievedChunks(retrievedChunks))
+  }
+
+  sections.push(`User input: ${currentUserMessage}`)
+
+  return sections.join('\n')
+}
+
 export const buildAssistantPrompt = (
   context: ConversationContext,
   options: {
     retrievedChunks?: RetrievedChunk[]
   } = {},
 ): AssistantPrompt => {
-  const sections = [
+  const instructions = [
     `Node title: ${context.node.title}`,
     `Node summary: ${context.node.summary}`,
     `Node status: ${context.node.status}`,
     `Node confidence: ${context.node.confidence}`,
-    'Recent messages:',
-    formatRecentMessages(context),
   ]
-
-  if ((options.retrievedChunks?.length ?? 0) > 0) {
-    sections.push('Retrieved context:')
-    sections.push(formatRetrievedChunks(options.retrievedChunks ?? []))
-  }
-
-  sections.push(`User input: ${context.userInput}`)
+  const conversation = context.recentMessages
 
   return {
-    input: sections.join('\n'),
+    instructions,
+    conversation,
+    currentUserMessage: context.userInput,
+    retrievalContext: options.retrievedChunks ?? [],
+    input: buildLegacyPromptInput(
+      instructions,
+      conversation,
+      context.userInput,
+      options.retrievedChunks ?? [],
+    ),
     userInput: context.userInput,
   }
 }

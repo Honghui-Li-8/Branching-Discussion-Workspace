@@ -27,18 +27,32 @@ describe('buildAssistantPrompt', () => {
       userInput: 'new question',
     })
 
-    expect(prompt).toEqual({
-      input: [
-        'Node title: Root Decision',
-        'Node summary: Root summary',
-        'Node status: open',
-        'Node confidence: medium',
-        'Recent messages:',
-        '[user] hello',
-        'User input: new question',
-      ].join('\n'),
-      userInput: 'new question',
-    })
+    expect(prompt.instructions).toEqual([
+      'Node title: Root Decision',
+      'Node summary: Root summary',
+      'Node status: open',
+      'Node confidence: medium',
+    ])
+    expect(prompt.conversation).toEqual([
+      {
+        id: 'm1',
+        role: 'user',
+        content: 'hello',
+        createdAt: '2026-03-30T00:00:00.000Z',
+      },
+    ])
+    expect(prompt.currentUserMessage).toBe('new question')
+    expect(prompt.retrievalContext).toEqual([])
+    expect(prompt.input).toEqual([
+      'Node title: Root Decision',
+      'Node summary: Root summary',
+      'Node status: open',
+      'Node confidence: medium',
+      'Recent messages:',
+      '[user] hello',
+      'User input: new question',
+    ].join('\n'))
+    expect(prompt.userInput).toBe('new question')
   })
 
   test('renders empty history fallback when there are no prior messages', () => {
@@ -59,6 +73,9 @@ describe('buildAssistantPrompt', () => {
       userInput: 'hello',
     })
 
+    expect(prompt.conversation).toEqual([])
+    expect(prompt.currentUserMessage).toBe('hello')
+    expect(prompt.retrievalContext).toEqual([])
     expect(prompt.input).toContain('No prior messages in this node.')
   })
 
@@ -92,6 +109,14 @@ describe('buildAssistantPrompt', () => {
       },
     )
 
+    expect(prompt.retrievalContext).toEqual([
+      {
+        messageId: 'm-source',
+        nodeId: 'n1',
+        chunkIndex: 0,
+        content: 'retrieved evidence',
+      },
+    ])
     expect(prompt.input).toContain('Retrieved context:')
     expect(prompt.input).toContain('retrieved evidence')
   })
