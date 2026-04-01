@@ -32,6 +32,25 @@ type OpenAIResponse = {
   }>
 }
 
+type OpenAIInputRole = 'system' | 'developer' | 'user' | 'assistant'
+
+type OpenAIInputTextContent = {
+  type: 'input_text'
+  text: string
+}
+
+type OpenAIInputMessage = {
+  type: 'message'
+  role: OpenAIInputRole
+  content: OpenAIInputTextContent[]
+}
+
+type OpenAIRequestBody = {
+  model: string
+  instructions: string
+  input: OpenAIInputMessage[]
+}
+
 const OPENAI_BASE_URL = 'https://api.openai.com'
 const OPENAI_RESPONSES_PATH = '/v1/responses'
 const DEBUG_TEXT_PREVIEW_MAX_CHARS = 1_200
@@ -41,11 +60,6 @@ const toDebugPreview = (value: string): string =>
     ? value
     : `${value.slice(0, DEBUG_TEXT_PREVIEW_MAX_CHARS)}...`
 
-const formatRecentMessages = (messages: GenerateAssistantInput['prompt']['conversation']): string =>
-  messages.length === 0
-    ? 'No prior messages in this node.'
-    : messages.map((message) => `[${message.role}] ${message.content}`).join('\n')
-
 const formatRetrievedChunks = (chunks: RetrievedChunk[]): string =>
   chunks
     .map(
@@ -54,22 +68,59 @@ const formatRetrievedChunks = (chunks: RetrievedChunk[]): string =>
     )
     .join('\n\n')
 
-const buildLegacyPromptInput = (prompt: GenerateAssistantInput['prompt']): string => {
-  const sections = [
-    ...prompt.instructions,
-    'Recent messages:',
-    formatRecentMessages(prompt.conversation),
-  ]
+const toInputTextContent = (text: string): OpenAIInputTextContent[] => [
+  {
+    type: 'input_text',
+    text,
+  },
+]
+
+const buildOpenAIInputMessages = (
+  prompt: GenerateAssistantInput['prompt'],
+): OpenAIInputMessage[] => {
+  const messages: OpenAIInputMessage[] = prompt.conversation.map((message) => ({
+    type: 'message',
+    role: message.role,
+    content: toInputTextContent(message.content),
+  }))
 
   if (prompt.retrievalContext.length > 0) {
-    sections.push('Retrieved context:')
-    sections.push(formatRetrievedChunks(prompt.retrievalContext))
+    messages.push({
+      type: 'message',
+      role: 'developer',
+      content: toInputTextContent(
+        ['Retrieved context:', formatRetrievedChunks(prompt.retrievalContext)].join('\n'),
+      ),
+    })
   }
 
-  sections.push(`User input: ${prompt.currentUserMessage}`)
+  messages.push({
+    type: 'message',
+    role: 'user',
+    content: toInputTextContent(prompt.currentUserMessage),
+  })
 
-  return sections.join('\n')
+  return messages
 }
+
+const buildOpenAIRequestBody = (
+  model: string,
+  prompt: GenerateAssistantInput['prompt'],
+): OpenAIRequestBody => ({
+  model,
+  instructions: prompt.instructions.join('\n'),
+  input: buildOpenAIInputMessages(prompt),
+})
+
+const estimateRequestBodySize = (body: OpenAIRequestBody): number =>
+  JSON.stringify(body).length
+
+const countInputTextCharacters = (messages: OpenAIInputMessage[]): number =>
+  messages.reduce(
+    (total, message) =>
+      total + message.content.reduce((contentTotal, item) => contentTotal + item.text.length, 0),
+    0,
+  )
 
 const mapFinishReason = (
   finishReason: string | undefined,
@@ -120,16 +171,18 @@ export const createOpenAIProvider = (
     id: 'openai',
     generate: async (input: GenerateAssistantInput) => {
       const startedAtMs = Date.now()
-      const legacyPromptInput = buildLegacyPromptInput(input.prompt)
+      const requestBody = buildOpenAIRequestBody(input.model, input.prompt)
       logger.debug('[llm] OpenAI Responses request started.', {
         model: input.model,
         prompt_instruction_count: input.prompt.instructions.length,
         prompt_conversation_turn_count: input.prompt.conversation.length,
         prompt_retrieval_chunk_count: input.prompt.retrievalContext.length,
+        prompt_instruction_length: requestBody.instructions.length,
+        prompt_conversation_text_length: countInputTextCharacters(requestBody.input),
         prompt_current_user_message_length: input.prompt.currentUserMessage.length,
         prompt_current_user_message_preview: toDebugPreview(input.prompt.currentUserMessage),
-        legacy_prompt_input_length: legacyPromptInput.length,
-        legacy_prompt_input_preview: toDebugPreview(legacyPromptInput),
+        request_payload_size_bytes: estimateRequestBodySize(requestBody),
+        request_input_message_count: requestBody.input.length,
       })
       const response = await fetchImpl(`${baseUrl}${OPENAI_RESPONSES_PATH}`, {
         method: 'POST',
@@ -137,10 +190,7 @@ export const createOpenAIProvider = (
           'Content-Type': 'application/json',
           Authorization: `Bearer ${apiKey}`,
         },
-        body: JSON.stringify({
-          model: input.model,
-          input: legacyPromptInput,
-        }),
+        body: JSON.stringify(requestBody),
       })
 
       if (!response.ok) {

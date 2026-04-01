@@ -55,15 +55,34 @@ describe('createOpenAIProvider', () => {
         method: 'POST',
         body: JSON.stringify({
           model: 'gpt-5',
-          input: [
+          instructions: [
             'Node title: Root Decision',
             'Node summary: Root summary',
             'Node status: open',
             'Node confidence: medium',
-            'Recent messages:',
-            '[user] hello',
-            'User input: new question',
           ].join('\n'),
+          input: [
+            {
+              type: 'message',
+              role: 'user',
+              content: [
+                {
+                  type: 'input_text',
+                  text: 'hello',
+                },
+              ],
+            },
+            {
+              type: 'message',
+              role: 'user',
+              content: [
+                {
+                  type: 'input_text',
+                  text: 'new question',
+                },
+              ],
+            },
+          ],
         }),
       }),
     )
@@ -72,6 +91,75 @@ describe('createOpenAIProvider', () => {
       finishReason: 'stop',
       providerResponseId: 'resp_1',
     })
+  })
+
+  test('includes retrieval context as a structured developer message', async () => {
+    const fetchMock = jest.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        id: 'resp_2',
+        output_text: 'assistant text',
+        finish_reason: 'stop',
+      }),
+    })) as unknown as typeof fetch
+
+    const provider = createOpenAIProvider({
+      apiKey: 'test-key',
+      fetchImpl: fetchMock,
+    })
+
+    await provider.generate({
+      model: 'gpt-5',
+      prompt: {
+        instructions: ['Node title: Root Decision'],
+        conversation: [],
+        currentUserMessage: 'new question',
+        retrievalContext: [
+          {
+            messageId: 'm-source',
+            nodeId: 'n1',
+            chunkIndex: 0,
+            content: 'retrieved evidence',
+          },
+        ],
+      },
+    })
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.openai.com/v1/responses',
+      expect.objectContaining({
+        body: JSON.stringify({
+          model: 'gpt-5',
+          instructions: 'Node title: Root Decision',
+          input: [
+            {
+              type: 'message',
+              role: 'developer',
+              content: [
+                {
+                  type: 'input_text',
+                  text: [
+                    'Retrieved context:',
+                    '[source 1 | message=m-source | chunk=0] retrieved evidence',
+                  ].join('\n'),
+                },
+              ],
+            },
+            {
+              type: 'message',
+              role: 'user',
+              content: [
+                {
+                  type: 'input_text',
+                  text: 'new question',
+                },
+              ],
+            },
+          ],
+        }),
+      }),
+    )
   })
 
   test('throws on non-ok response', async () => {
