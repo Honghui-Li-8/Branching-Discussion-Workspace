@@ -492,10 +492,13 @@ export const sendConversationTurn = async ({
       author_user_id: currentUserId,
       model: input.model,
       provider: provider.id,
-      prompt_input_length: retrievalState.prompt.input.length,
-      prompt_user_input_length: retrievalState.prompt.userInput.length,
-      prompt_input_preview: toDebugPreview(retrievalState.prompt.input),
-      prompt_user_input_preview: toDebugPreview(retrievalState.prompt.userInput),
+      prompt_instruction_count: retrievalState.prompt.instructions.length,
+      prompt_conversation_turn_count: retrievalState.prompt.conversation.length,
+      prompt_retrieval_chunk_count: retrievalState.prompt.retrievalContext.length,
+      prompt_current_user_message_length: retrievalState.prompt.currentUserMessage.length,
+      prompt_current_user_message_preview: toDebugPreview(
+        retrievalState.prompt.currentUserMessage,
+      ),
     })
     const assistantOutput = await provider.generate({
       model: input.model,

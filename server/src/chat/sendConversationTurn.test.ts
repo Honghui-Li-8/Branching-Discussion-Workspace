@@ -304,11 +304,11 @@ describe('sendConversationTurn', () => {
     process.env.RAG_RETRIEVER = 'vector_v1'
     process.env.RAG_ALLOWED_WORKSPACE_IDS = 'w1'
 
-    const generatedPrompts: string[] = []
+    const generatedPrompts: unknown[] = []
     const consoleInfoSpy = jest.spyOn(console, 'info').mockImplementation(() => {})
     selectProviderMock.mockReturnValueOnce(
       makeProvider(async (input) => {
-        generatedPrompts.push(input.prompt.input)
+        generatedPrompts.push(input.prompt)
         return {
           content: assistantMessage.content,
           finishReason: 'stop',
@@ -374,8 +374,33 @@ describe('sendConversationTurn', () => {
     unsubscribe()
 
     expect(resolveRetrieverMock).toHaveBeenCalledTimes(1)
-    expect(generatedPrompts[0]).toContain('Retrieved context:')
-    expect(generatedPrompts[0]).toContain('retrieved evidence')
+    expect(generatedPrompts[0]).toMatchObject({
+      instructions: [
+        'Node title: Root',
+        'Node summary: summary',
+        'Node status: open',
+        'Node confidence: medium',
+      ],
+      conversation: [
+        {
+          id: 'm-prev',
+          role: 'user',
+          content: 'previous',
+          createdAt: '2026-03-30T00:00:00.000Z',
+        },
+      ],
+      currentUserMessage: 'hello',
+      retrievalContext: [
+        {
+          messageId: 'm-source',
+          nodeId: 'n1',
+          chunkIndex: 0,
+          content: 'retrieved evidence',
+          tokenCount: 12,
+          score: 0.91,
+        },
+      ],
+    })
     expect(createMessageForAuthorMock).toHaveBeenNthCalledWith(2, {
       nodeId: 'n1',
       authorUserId: 'u1',
@@ -460,10 +485,10 @@ describe('sendConversationTurn', () => {
     process.env.RAG_RETRIEVER = 'vector_v1'
     process.env.RAG_ALLOWED_WORKSPACE_IDS = 'w1'
 
-    const generatedPrompts: string[] = []
+    const generatedPrompts: unknown[] = []
     selectProviderMock.mockReturnValueOnce(
       makeProvider(async (input) => {
-        generatedPrompts.push(input.prompt.input)
+        generatedPrompts.push(input.prompt)
         return {
           content: assistantMessage.content,
           finishReason: 'stop',
@@ -492,7 +517,10 @@ describe('sendConversationTurn', () => {
       currentUserId: 'u1',
     })
 
-    expect(generatedPrompts[0]).not.toContain('Retrieved context:')
+    expect(generatedPrompts[0]).toMatchObject({
+      retrievalContext: [],
+      currentUserMessage: 'hello',
+    })
     expect(createMessageForAuthorMock).toHaveBeenNthCalledWith(2, {
       nodeId: 'n1',
       authorUserId: 'u1',

@@ -4,8 +4,22 @@ import { createOpenAIProvider } from './openaiProvider'
 const makeInput = () => ({
   model: 'gpt-5',
   prompt: {
-    input: 'prebuilt prompt',
-    userInput: 'new question',
+    instructions: [
+      'Node title: Root Decision',
+      'Node summary: Root summary',
+      'Node status: open',
+      'Node confidence: medium',
+    ],
+    conversation: [
+      {
+        id: 'm1',
+        role: 'user' as const,
+        content: 'hello',
+        createdAt: '2026-03-30T00:00:00.000Z',
+      },
+    ],
+    currentUserMessage: 'new question',
+    retrievalContext: [],
   },
 })
 
@@ -41,7 +55,15 @@ describe('createOpenAIProvider', () => {
         method: 'POST',
         body: JSON.stringify({
           model: 'gpt-5',
-          input: 'prebuilt prompt',
+          input: [
+            'Node title: Root Decision',
+            'Node summary: Root summary',
+            'Node status: open',
+            'Node confidence: medium',
+            'Recent messages:',
+            '[user] hello',
+            'User input: new question',
+          ].join('\n'),
         }),
       }),
     )

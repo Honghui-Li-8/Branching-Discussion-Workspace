@@ -43,16 +43,6 @@ describe('buildAssistantPrompt', () => {
     ])
     expect(prompt.currentUserMessage).toBe('new question')
     expect(prompt.retrievalContext).toEqual([])
-    expect(prompt.input).toEqual([
-      'Node title: Root Decision',
-      'Node summary: Root summary',
-      'Node status: open',
-      'Node confidence: medium',
-      'Recent messages:',
-      '[user] hello',
-      'User input: new question',
-    ].join('\n'))
-    expect(prompt.userInput).toBe('new question')
   })
 
   test('renders empty history fallback when there are no prior messages', () => {
@@ -76,7 +66,6 @@ describe('buildAssistantPrompt', () => {
     expect(prompt.conversation).toEqual([])
     expect(prompt.currentUserMessage).toBe('hello')
     expect(prompt.retrievalContext).toEqual([])
-    expect(prompt.input).toContain('No prior messages in this node.')
   })
 
   test('renders retrieved chunks when provided', () => {
@@ -117,7 +106,5 @@ describe('buildAssistantPrompt', () => {
         content: 'retrieved evidence',
       },
     ])
-    expect(prompt.input).toContain('Retrieved context:')
-    expect(prompt.input).toContain('retrieved evidence')
   })
 })

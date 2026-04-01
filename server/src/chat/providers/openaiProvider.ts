@@ -5,6 +5,7 @@ import type {
 } from '../types.js'
 import { emitTokenDeltas } from './tokenDeltas.js'
 import { createLogger, type AppLogger } from '../../logging/logger.js'
+import type { RetrievedChunk } from '@branching/shared'
 
 type OpenAIProviderOptions = {
   apiKey?: string
@@ -39,6 +40,36 @@ const toDebugPreview = (value: string): string =>
   value.length <= DEBUG_TEXT_PREVIEW_MAX_CHARS
     ? value
     : `${value.slice(0, DEBUG_TEXT_PREVIEW_MAX_CHARS)}...`
+
+const formatRecentMessages = (messages: GenerateAssistantInput['prompt']['conversation']): string =>
+  messages.length === 0
+    ? 'No prior messages in this node.'
+    : messages.map((message) => `[${message.role}] ${message.content}`).join('\n')
+
+const formatRetrievedChunks = (chunks: RetrievedChunk[]): string =>
+  chunks
+    .map(
+      (chunk, index) =>
+        `[source ${index + 1} | message=${chunk.messageId} | chunk=${chunk.chunkIndex}] ${chunk.content}`,
+    )
+    .join('\n\n')
+
+const buildLegacyPromptInput = (prompt: GenerateAssistantInput['prompt']): string => {
+  const sections = [
+    ...prompt.instructions,
+    'Recent messages:',
+    formatRecentMessages(prompt.conversation),
+  ]
+
+  if (prompt.retrievalContext.length > 0) {
+    sections.push('Retrieved context:')
+    sections.push(formatRetrievedChunks(prompt.retrievalContext))
+  }
+
+  sections.push(`User input: ${prompt.currentUserMessage}`)
+
+  return sections.join('\n')
+}
 
 const mapFinishReason = (
   finishReason: string | undefined,
@@ -89,12 +120,16 @@ export const createOpenAIProvider = (
     id: 'openai',
     generate: async (input: GenerateAssistantInput) => {
       const startedAtMs = Date.now()
+      const legacyPromptInput = buildLegacyPromptInput(input.prompt)
       logger.debug('[llm] OpenAI Responses request started.', {
         model: input.model,
-        prompt_input_length: input.prompt.input.length,
-        prompt_user_input_length: input.prompt.userInput.length,
-        prompt_input_preview: toDebugPreview(input.prompt.input),
-        prompt_user_input_preview: toDebugPreview(input.prompt.userInput),
+        prompt_instruction_count: input.prompt.instructions.length,
+        prompt_conversation_turn_count: input.prompt.conversation.length,
+        prompt_retrieval_chunk_count: input.prompt.retrievalContext.length,
+        prompt_current_user_message_length: input.prompt.currentUserMessage.length,
+        prompt_current_user_message_preview: toDebugPreview(input.prompt.currentUserMessage),
+        legacy_prompt_input_length: legacyPromptInput.length,
+        legacy_prompt_input_preview: toDebugPreview(legacyPromptInput),
       })
       const response = await fetchImpl(`${baseUrl}${OPENAI_RESPONSES_PATH}`, {
         method: 'POST',
@@ -104,7 +139,7 @@ export const createOpenAIProvider = (
         },
         body: JSON.stringify({
           model: input.model,
-          input: input.prompt.input,
+          input: legacyPromptInput,
         }),
       })
 

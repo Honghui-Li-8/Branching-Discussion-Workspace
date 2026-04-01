@@ -8,8 +8,10 @@ describe('createPlaceholderProvider', () => {
     const result = await provider.generate({
       model: 'gpt-5',
       prompt: {
-        input: 'prebuilt prompt',
-        userInput: 'hello world',
+        instructions: ['Node title: Root'],
+        conversation: [],
+        currentUserMessage: 'hello world',
+        retrievalContext: [],
       },
     })
 

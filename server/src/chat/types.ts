@@ -44,8 +44,6 @@ export interface PromptEnvelope {
   conversation: PromptConversationTurn[]
   currentUserMessage: string
   retrievalContext: RetrievedChunk[]
-  input: string
-  userInput: string
 }
 
 export interface AssistantPrompt extends PromptEnvelope {}
