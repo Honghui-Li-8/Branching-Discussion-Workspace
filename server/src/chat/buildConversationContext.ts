@@ -3,6 +3,7 @@ import {
   getNodeByIdForAuthor as getNodeByIdForAuthorRecord,
   listMessagesForNodeForAuthor as listMessagesForNodeForAuthorRecord,
 } from '../db/index.js'
+import { buildConversationMemoryPlaceholder } from './conversationMemoryPlaceholder.js'
 import type { ConversationContext } from './types.js'
 
 export const DEFAULT_RECENT_MESSAGE_LIMIT = 12
@@ -52,6 +53,13 @@ export const buildConversationContext = async ({
   const boundedMessages = historyMessages.slice(
     -normalizeRecentMessageLimit(recentMessageLimit),
   )
+  const olderMessageCount = historyMessages.length - boundedMessages.length
+  const recentMessages = boundedMessages.map((message) => ({
+    id: message.id,
+    role: message.role,
+    content: message.content,
+    createdAt: message.createdAt,
+  }))
 
   return {
     node: {
@@ -66,12 +74,11 @@ export const buildConversationContext = async ({
       depth: node.depth,
       parentNodeId: node.parentNodeId,
     },
-    recentMessages: boundedMessages.map((message) => ({
-      id: message.id,
-      role: message.role,
-      content: message.content,
-      createdAt: message.createdAt,
-    })),
+    recentMessages,
     userInput,
+    memoryPlaceholder: buildConversationMemoryPlaceholder({
+      olderMessageCount,
+      recentMessages,
+    }),
   }
 }

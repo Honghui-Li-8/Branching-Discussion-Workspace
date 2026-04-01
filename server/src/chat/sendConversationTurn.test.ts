@@ -142,6 +142,11 @@ const context = {
     },
   ],
   userInput: 'hello',
+  memoryPlaceholder: {
+    status: 'pending' as const,
+    olderMessageCount: 3,
+    retainedMessageCount: 1,
+  },
 }
 
 const makeProvider = (impl: AssistantProvider['generate']): AssistantProvider => ({
@@ -158,6 +163,7 @@ describe('sendConversationTurn', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     turnEventBroker.clear()
+    jest.spyOn(console, 'warn').mockImplementation(() => {})
     process.env.OPENAI_API_KEY = 'test-openai-key'
     delete process.env.CHAT_ALLOWED_MODELS
     delete process.env.RAG_ENABLED
@@ -231,6 +237,17 @@ describe('sendConversationTurn', () => {
       userInput: 'hello',
       currentTurnId: 't1',
     })
+    expect(console.warn).toHaveBeenCalledWith(
+      '[chat] older conversation context would use a placeholder summary path.',
+      expect.objectContaining({
+        turn_id: 't1',
+        node_id: 'n1',
+        author_user_id: 'u1',
+        placeholder_status: 'pending',
+        older_message_count: 3,
+        retained_message_count: 1,
+      }),
+    )
     expect(selectProviderMock).toHaveBeenCalledWith({ model: 'gpt-5' })
     expect(createMessageForAuthorMock).toHaveBeenNthCalledWith(1, {
       nodeId: 'n1',

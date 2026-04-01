@@ -35,6 +35,13 @@ export interface ConversationContext {
   node: ConversationContextNode
   recentMessages: ConversationContextMessage[]
   userInput: string
+  memoryPlaceholder?: ConversationMemoryPlaceholder | null
+}
+
+export interface ConversationMemoryPlaceholder {
+  status: 'pending'
+  olderMessageCount: number
+  retainedMessageCount: number
 }
 
 export interface PromptEnvelope {

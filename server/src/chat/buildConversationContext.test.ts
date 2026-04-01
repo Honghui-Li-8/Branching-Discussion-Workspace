@@ -111,6 +111,11 @@ describe('buildConversationContext', () => {
         createdAt: '2026-03-30T00:02:00.000Z',
       },
     ])
+    expect(result.memoryPlaceholder).toEqual({
+      status: 'pending',
+      olderMessageCount: 1,
+      retainedMessageCount: 2,
+    })
     expect(result.userInput).toBe('new question')
   })
 
@@ -139,6 +144,11 @@ describe('buildConversationContext', () => {
     expect(result.recentMessages[result.recentMessages.length - 1]?.id).toBe(
       `m-${manyMessages.length}`,
     )
+    expect(result.memoryPlaceholder).toEqual({
+      status: 'pending',
+      olderMessageCount: 5,
+      retainedMessageCount: DEFAULT_RECENT_MESSAGE_LIMIT,
+    })
   })
 
   test('excludes the current turn from recent messages when provided', async () => {
@@ -197,6 +207,33 @@ describe('buildConversationContext', () => {
         createdAt: '2026-03-30T00:02:00.000Z',
       },
     ])
+    expect(result.memoryPlaceholder).toBeNull()
+  })
+
+  test('does not create a memory placeholder when no older context is trimmed', async () => {
+    listMessagesForNodeForAuthorMock.mockResolvedValueOnce([
+      {
+        id: 'm-only',
+        authorUserId: 'u1',
+        nodeId: 'n1',
+        turnId: 't-current',
+        role: 'user' as const,
+        content: 'only',
+        metadata: {},
+        createdAt: '2026-03-30T00:00:00.000Z',
+      },
+    ])
+
+    const result = await buildConversationContext({
+      nodeId: 'n1',
+      currentUserId: 'u1',
+      userInput: 'new question',
+      currentTurnId: 't-current',
+      recentMessageLimit: 10,
+    })
+
+    expect(result.recentMessages).toEqual([])
+    expect(result.memoryPlaceholder).toBeNull()
   })
 
   test('throws NOT_FOUND when node is not accessible', async () => {

@@ -309,6 +309,16 @@ export const sendConversationTurn = async ({
       userInput: input.text,
       currentTurnId: turnResult.turn.id,
     })
+    if (context.memoryPlaceholder) {
+      logger.warn('[chat] older conversation context would use a placeholder summary path.', {
+        turn_id: turnResult.turn.id,
+        node_id: input.nodeId,
+        author_user_id: currentUserId,
+        placeholder_status: context.memoryPlaceholder.status,
+        older_message_count: context.memoryPlaceholder.olderMessageCount,
+        retained_message_count: context.memoryPlaceholder.retainedMessageCount,
+      })
+    }
     logger.debug('[chat] conversation context built.', {
       turn_id: turnResult.turn.id,
       node_id: input.nodeId,
