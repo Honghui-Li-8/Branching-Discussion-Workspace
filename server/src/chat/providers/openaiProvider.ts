@@ -78,6 +78,9 @@ const toDebugPreview = (value: string): string =>
 const buildRetrievalContextPlaceholder = (
   chunks: RetrievedChunk[],
 ): OpenAIRetrievalContextPlaceholder => ({
+  // @todo, Temporary provider-level RAG shape: keep chunk boundaries and source metadata visible,
+  // but this is still JSON-in-text at the API boundary. The final format should be a native
+  // provider-side rendering, not a text-encoded placeholder.
   type: 'temporary_retrieval_context_placeholder',
   chunkCount: chunks.length,
   chunks: chunks.map((chunk, index) => ({
