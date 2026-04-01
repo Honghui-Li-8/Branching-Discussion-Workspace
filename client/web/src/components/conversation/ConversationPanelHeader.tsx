@@ -17,7 +17,7 @@ export const ConversationPanelHeader = ({
   onClose,
 }: ConversationPanelHeaderProps) => {
   return (
-    <header className="relative border-b border-[#c2dfef] px-4 py-3">
+    <header className="relative shrink-0 border-b border-[#c2dfef] px-4 py-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex items-start gap-2">
           <button
@@ -46,7 +46,15 @@ export const ConversationPanelHeader = ({
             </h2>
           </div>
         </div>
-        <p className="m-0 min-w-0 max-w-[220px] text-right text-[11px] leading-tight text-[#2f6f8e]">
+        <p
+          className="m-0 min-w-0 max-w-[220px] overflow-hidden text-right text-[11px] leading-tight text-[#2f6f8e]"
+          style={{
+            display: '-webkit-box',
+            WebkitLineClamp: 3,
+            WebkitBoxOrient: 'vertical',
+          }}
+          title={conclusion}
+        >
           {conclusion}
         </p>
         <div className="flex items-center gap-2">

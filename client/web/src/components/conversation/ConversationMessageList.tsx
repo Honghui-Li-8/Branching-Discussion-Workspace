@@ -4,6 +4,7 @@ import {
   formatCitationLabel,
   getRenderableCitations,
 } from './citationMetadata'
+import { ModelMarkdown } from './ModelMarkdown'
 
 type ConversationMessageListProps = {
   messages: TreeMessage[]
@@ -29,7 +30,7 @@ export const ConversationMessageList = ({
   return (
     <div
       ref={conversationScrollRef}
-      className="flex-1 overflow-y-auto bg-[linear-gradient(180deg,#fdfefe_0%,#f8fdff_100%)] px-4 py-3"
+      className="min-h-0 flex-1 overflow-y-auto bg-[linear-gradient(180deg,#fdfefe_0%,#f8fdff_100%)] px-4 py-3"
       style={{ minHeight: 0 }}
     >
       <div className="flex min-h-full flex-col justify-end gap-2">
@@ -46,28 +47,33 @@ export const ConversationMessageList = ({
             const isPending = pendingMessageIds.has(message.id)
             const isFailed = failedMessageIds.has(message.id)
             const citations = getRenderableCitations(message)
+            const isUser = message.role === 'user'
 
             return (
               <div
                 key={message.id}
-                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}
               >
-                <div className="max-w-[82%]">
+                <div className={isUser ? 'max-w-[82%]' : 'w-full'}>
                   <div
-                    className={`rounded-[14px] px-3 py-2 text-sm leading-relaxed ${
-                      message.role === 'user'
+                    className={`text-sm leading-relaxed ${
+                      isUser
                         ? isFailed
-                          ? 'border border-[#f1cabd] bg-[#fff6f3] text-[#8a3f2b]'
-                          : 'bg-[#e8f4fd] text-[#12384c]'
-                        : 'border border-[#b5deef] bg-white text-[#1f4f68]'
+                          ? 'rounded-[14px] border border-[#f1cabd] bg-[#fff6f3] px-3 py-2 text-[#8a3f2b]'
+                          : 'rounded-[14px] bg-[#e8f4fd] px-3 py-2 text-[#12384c]'
+                        : 'pl-3 pr-1 py-0.5 text-[#1f4f68]'
                     }`}
                     style={{ overflowWrap: 'anywhere' }}
                   >
-                    {message.content}
+                    {isUser ? (
+                      <p className="m-0 whitespace-pre-wrap">{message.content}</p>
+                    ) : (
+                      <ModelMarkdown content={message.content} />
+                    )}
                   </div>
 
                   {citations.length > 0 ? (
-                    <div className="mt-2 flex flex-col gap-1">
+                    <div className={`mt-2 flex flex-col gap-1 ${isUser ? '' : 'mr-4'}`}>
                       {citations.map((citation, index) => (
                         <div
                           key={`${message.id}-${citation.messageId}-${citation.chunkIndex ?? index}`}

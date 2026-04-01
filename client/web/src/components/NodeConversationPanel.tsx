@@ -30,7 +30,20 @@ const getNodeConclusion = (messages: TreeMessage[] | undefined) => {
   }
 
   const lastMessage = [...messages].reverse().find((message) => message.role === 'assistant')
-  return lastMessage?.content ?? messages[messages.length - 1].content
+  const rawConclusion = lastMessage?.content ?? messages[messages.length - 1].content
+  const normalizedConclusion = rawConclusion
+    .replace(/```[\s\S]*?```/g, '[code]')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  if (!normalizedConclusion.length) {
+    return 'No conclusion yet.'
+  }
+
+  const MAX_CONCLUSION_LENGTH = 140
+  return normalizedConclusion.length > MAX_CONCLUSION_LENGTH
+    ? `${normalizedConclusion.slice(0, MAX_CONCLUSION_LENGTH - 1)}…`
+    : normalizedConclusion
 }
 
 /**
@@ -83,7 +96,6 @@ export const NodeConversationPanel = ({
       conversationInputRef.current.style.height = `${CHAT_INPUT_MIN_HEIGHT}px`
       conversationInputRef.current.style.overflowY = 'hidden'
     }
-    setSendBlockAlert(null)
   }, [node.id])
 
   useEffect(() => {
@@ -177,7 +189,7 @@ export const NodeConversationPanel = ({
 
   return (
     <aside
-      className="absolute inset-y-0 right-0 z-[80] flex w-full flex-col border-l border-[#8bb8cd] bg-[#fefefe] shadow-[-20px_0_38px_rgba(22,57,74,0.12)]"
+      className="absolute inset-y-0 right-0 z-[80] flex h-full min-h-0 w-full flex-col overflow-hidden border-l border-[#8bb8cd] bg-[#fefefe] shadow-[-20px_0_38px_rgba(22,57,74,0.12)]"
       style={{ width: `${width}px`, zIndex: zIndex.conversationPanel }}
     >
       <div
@@ -204,20 +216,20 @@ export const NodeConversationPanel = ({
         conversationScrollRef={conversationScrollRef}
       />
       {conversation.streamStatusLabel ? (
-        <p className="m-0 border-t border-[#d8ebf6] bg-[#f4fbff] px-4 py-2 text-xs text-[#2f6688]">
+        <p className="m-0 shrink-0 border-t border-[#d8ebf6] bg-[#f4fbff] px-4 py-2 text-xs text-[#2f6688]">
           {conversation.streamStatusLabel}
         </p>
       ) : null}
       {sendBlockAlert ? (
         <p
           role="alert"
-          className="m-0 border-t border-[#f1cabd] bg-[#fff6f3] px-4 py-2 text-xs text-[#8a3f2b]"
+          className="m-0 shrink-0 border-t border-[#f1cabd] bg-[#fff6f3] px-4 py-2 text-xs text-[#8a3f2b]"
         >
           {sendBlockAlert}
         </p>
       ) : null}
       {conversation.messageSendError && !hasFailedMessages ? (
-        <p className="m-0 border-t border-[#f1cabd] bg-[#fff6f3] px-4 py-2 text-xs text-[#8a3f2b]">
+        <p className="m-0 shrink-0 border-t border-[#f1cabd] bg-[#fff6f3] px-4 py-2 text-xs text-[#8a3f2b]">
           Failed to send message: {conversation.messageSendError}
         </p>
       ) : null}
