@@ -229,6 +229,7 @@ describe('sendConversationTurn', () => {
       nodeId: 'n1',
       currentUserId: 'u1',
       userInput: 'hello',
+      currentTurnId: 't1',
     })
     expect(selectProviderMock).toHaveBeenCalledWith({ model: 'gpt-5' })
     expect(createMessageForAuthorMock).toHaveBeenNthCalledWith(1, {

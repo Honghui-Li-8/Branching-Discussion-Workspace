@@ -13,6 +13,7 @@ type BuildConversationContextInput = {
   nodeId: string
   currentUserId: string
   userInput: string
+  currentTurnId?: string
   recentMessageLimit?: number
 }
 
@@ -33,6 +34,7 @@ export const buildConversationContext = async ({
   nodeId,
   currentUserId,
   userInput,
+  currentTurnId,
   recentMessageLimit,
 }: BuildConversationContextInput): Promise<ConversationContext> => {
   const node = await getNodeByIdForAuthorRecord(nodeId, currentUserId)
@@ -44,7 +46,10 @@ export const buildConversationContext = async ({
   }
 
   const allMessages = await listMessagesForNodeForAuthorRecord(nodeId, currentUserId)
-  const boundedMessages = allMessages.slice(
+  const historyMessages = currentTurnId
+    ? allMessages.filter((message) => message.turnId !== currentTurnId)
+    : allMessages
+  const boundedMessages = historyMessages.slice(
     -normalizeRecentMessageLimit(recentMessageLimit),
   )
 

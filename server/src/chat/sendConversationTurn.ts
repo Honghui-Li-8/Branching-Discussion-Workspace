@@ -304,6 +304,7 @@ export const sendConversationTurn = async ({
       nodeId: input.nodeId,
       currentUserId,
       userInput: input.text,
+      currentTurnId: turnResult.turn.id,
     })
     logger.debug('[chat] conversation context built.', {
       turn_id: turnResult.turn.id,
