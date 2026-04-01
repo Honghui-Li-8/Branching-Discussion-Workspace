@@ -153,6 +153,7 @@ describe('conversation turn stream route handler', () => {
       idempotencyKey: 'idem-1',
       error: null,
       completedAt: null,
+      metadata: {},
       createdAt: '2026-03-31T00:00:00.000Z',
       updatedAt: '2026-03-31T00:00:00.000Z',
     })

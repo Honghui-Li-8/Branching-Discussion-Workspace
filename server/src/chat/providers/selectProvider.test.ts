@@ -39,8 +39,10 @@ describe('selectProvider', () => {
     await provider.generate({
       model: 'gpt-5',
       prompt: {
-        input: 'prebuilt prompt',
-        userInput: 'hello',
+        instructions: ['Node title: Root'],
+        conversation: [],
+        currentUserMessage: 'hello',
+        retrievalContext: [],
       },
     })
     expect(fetchMock).toHaveBeenCalledTimes(1)

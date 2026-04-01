@@ -5,7 +5,7 @@ import { emitTokenDeltas } from './tokenDeltas.js'
 export const createPlaceholderProvider = (): AssistantProvider => ({
   id: 'placeholder',
   generate: async (input) => {
-    const content = buildPlaceholderAssistantReply(input.prompt.userInput)
+    const content = buildPlaceholderAssistantReply(input.prompt.currentUserMessage)
     await emitTokenDeltas(content, input.onTokenDelta)
 
     return {

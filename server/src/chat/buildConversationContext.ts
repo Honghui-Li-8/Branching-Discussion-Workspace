@@ -3,6 +3,7 @@ import {
   getNodeByIdForAuthor as getNodeByIdForAuthorRecord,
   listMessagesForNodeForAuthor as listMessagesForNodeForAuthorRecord,
 } from '../db/index.js'
+import { buildConversationMemoryPlaceholder } from './conversationMemoryPlaceholder.js'
 import type { ConversationContext } from './types.js'
 
 export const DEFAULT_RECENT_MESSAGE_LIMIT = 12
@@ -13,6 +14,7 @@ type BuildConversationContextInput = {
   nodeId: string
   currentUserId: string
   userInput: string
+  currentTurnId?: string
   recentMessageLimit?: number
 }
 
@@ -33,6 +35,7 @@ export const buildConversationContext = async ({
   nodeId,
   currentUserId,
   userInput,
+  currentTurnId,
   recentMessageLimit,
 }: BuildConversationContextInput): Promise<ConversationContext> => {
   const node = await getNodeByIdForAuthorRecord(nodeId, currentUserId)
@@ -44,9 +47,19 @@ export const buildConversationContext = async ({
   }
 
   const allMessages = await listMessagesForNodeForAuthorRecord(nodeId, currentUserId)
-  const boundedMessages = allMessages.slice(
+  const historyMessages = currentTurnId
+    ? allMessages.filter((message) => message.turnId !== currentTurnId)
+    : allMessages
+  const boundedMessages = historyMessages.slice(
     -normalizeRecentMessageLimit(recentMessageLimit),
   )
+  const olderMessageCount = historyMessages.length - boundedMessages.length
+  const recentMessages = boundedMessages.map((message) => ({
+    id: message.id,
+    role: message.role,
+    content: message.content,
+    createdAt: message.createdAt,
+  }))
 
   return {
     node: {
@@ -61,12 +74,11 @@ export const buildConversationContext = async ({
       depth: node.depth,
       parentNodeId: node.parentNodeId,
     },
-    recentMessages: boundedMessages.map((message) => ({
-      id: message.id,
-      role: message.role,
-      content: message.content,
-      createdAt: message.createdAt,
-    })),
+    recentMessages,
     userInput,
+    memoryPlaceholder: buildConversationMemoryPlaceholder({
+      olderMessageCount,
+      recentMessages,
+    }),
   }
 }

@@ -14,6 +14,8 @@ import {
 } from './config.js'
 import { buildConversationContext } from './buildConversationContext.js'
 import { buildAssistantPrompt } from './promptBuilder.js'
+import { applyPromptBudget } from './promptBudget.js'
+import { summarizePromptSections } from './promptObservability.js'
 import { selectProvider } from './providers/selectProvider.js'
 import { applyContextPolicy } from './rag/contextPolicy.js'
 import {
@@ -125,6 +127,7 @@ const enqueuePostprocessJobsForTurn = async (
 
 type RetrievalStageState = {
   prompt: ReturnType<typeof buildAssistantPrompt>
+  promptBudgetSummary?: ReturnType<typeof applyPromptBudget>['summary']
   assistantMetadata?: Parameters<typeof createMessageForAuthorRecord>[0]['metadata']
   turnMetadata?: NonNullable<
     Parameters<typeof updateConversationTurnForAuthorRecord>[0]['metadata']
@@ -304,7 +307,18 @@ export const sendConversationTurn = async ({
       nodeId: input.nodeId,
       currentUserId,
       userInput: input.text,
+      currentTurnId: turnResult.turn.id,
     })
+    if (context.memoryPlaceholder) {
+      logger.warn('[chat] older conversation context would use a placeholder summary path.', {
+        turn_id: turnResult.turn.id,
+        node_id: input.nodeId,
+        author_user_id: currentUserId,
+        placeholder_status: context.memoryPlaceholder.status,
+        older_message_count: context.memoryPlaceholder.olderMessageCount,
+        retained_message_count: context.memoryPlaceholder.retainedMessageCount,
+      })
+    }
     logger.debug('[chat] conversation context built.', {
       turn_id: turnResult.turn.id,
       node_id: input.nodeId,
@@ -469,6 +483,31 @@ export const sendConversationTurn = async ({
       }
     }
 
+    const promptSectionsBeforeBudget = summarizePromptSections(retrievalState.prompt)
+    const budgetedPromptResult = applyPromptBudget(retrievalState.prompt)
+    const promptSectionsAfterBudget = summarizePromptSections(budgetedPromptResult.prompt)
+    retrievalState = {
+      ...retrievalState,
+      prompt: budgetedPromptResult.prompt,
+      promptBudgetSummary: budgetedPromptResult.summary,
+    }
+    logger.debug('[chat] prompt budget applied.', {
+      turn_id: turnResult.turn.id,
+      node_id: input.nodeId,
+      author_user_id: currentUserId,
+      prompt_sections_before_budget: promptSectionsBeforeBudget,
+      prompt_sections_after_budget: promptSectionsAfterBudget,
+      instruction_count: budgetedPromptResult.summary.instructionCount,
+      conversation_count_before: budgetedPromptResult.summary.conversationCountBefore,
+      conversation_count_after: budgetedPromptResult.summary.conversationCountAfter,
+      retrieval_count_before: budgetedPromptResult.summary.retrievalCountBefore,
+      retrieval_count_after: budgetedPromptResult.summary.retrievalCountAfter,
+      trimmed_conversation_count: budgetedPromptResult.summary.trimmedConversationCount,
+      trimmed_retrieval_count: budgetedPromptResult.summary.trimmedRetrievalCount,
+      estimated_tokens_before: budgetedPromptResult.summary.estimatedTokensBefore,
+      estimated_tokens_after: budgetedPromptResult.summary.estimatedTokensAfter,
+    })
+
     stage = 'generating_assistant_reply'
     publishTurnEvent({
       type: 'turn.status',
@@ -491,10 +530,18 @@ export const sendConversationTurn = async ({
       author_user_id: currentUserId,
       model: input.model,
       provider: provider.id,
-      prompt_input_length: retrievalState.prompt.input.length,
-      prompt_user_input_length: retrievalState.prompt.userInput.length,
-      prompt_input_preview: toDebugPreview(retrievalState.prompt.input),
-      prompt_user_input_preview: toDebugPreview(retrievalState.prompt.userInput),
+      instruction_count: retrievalState.promptBudgetSummary?.instructionCount ?? null,
+      conversation_count: retrievalState.prompt.conversation.length,
+      retrieval_count: retrievalState.prompt.retrievalContext.length,
+      prompt_sections: summarizePromptSections(retrievalState.prompt),
+      estimated_tokens_after_budget: retrievalState.promptBudgetSummary?.estimatedTokensAfter ?? null,
+      prompt_instruction_count: retrievalState.prompt.instructions.length,
+      prompt_conversation_turn_count: retrievalState.prompt.conversation.length,
+      prompt_retrieval_chunk_count: retrievalState.prompt.retrievalContext.length,
+      prompt_current_user_message_length: retrievalState.prompt.currentUserMessage.length,
+      prompt_current_user_message_preview: toDebugPreview(
+        retrievalState.prompt.currentUserMessage,
+      ),
     })
     const assistantOutput = await provider.generate({
       model: input.model,
