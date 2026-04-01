@@ -34,7 +34,7 @@ export const ConversationComposer = ({
 
   return (
     <form
-      className="border-t border-[#c2dfef] bg-white px-4 py-3"
+      className="shrink-0 border-t border-[#c2dfef] bg-white px-4 py-3"
       onSubmit={onConversationSubmit}
     >
       {/*

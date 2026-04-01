@@ -24,13 +24,36 @@ type NodeConversationPanelProps = {
   onToggleFullScreen: () => void
 }
 
+const formatStatusElapsed = (elapsedSeconds: number): string => {
+  if (elapsedSeconds < 60) {
+    return `${elapsedSeconds}s`
+  }
+
+  const minutes = Math.floor(elapsedSeconds / 60)
+  const seconds = elapsedSeconds % 60
+  return `${minutes}m ${String(seconds).padStart(2, '0')}s`
+}
+
 const getNodeConclusion = (messages: TreeMessage[] | undefined) => {
   if (!messages || messages.length === 0) {
     return 'No conclusion yet.'
   }
 
   const lastMessage = [...messages].reverse().find((message) => message.role === 'assistant')
-  return lastMessage?.content ?? messages[messages.length - 1].content
+  const rawConclusion = lastMessage?.content ?? messages[messages.length - 1].content
+  const normalizedConclusion = rawConclusion
+    .replace(/```[\s\S]*?```/g, '[code]')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  if (!normalizedConclusion.length) {
+    return 'No conclusion yet.'
+  }
+
+  const MAX_CONCLUSION_LENGTH = 140
+  return normalizedConclusion.length > MAX_CONCLUSION_LENGTH
+    ? `${normalizedConclusion.slice(0, MAX_CONCLUSION_LENGTH - 1)}…`
+    : normalizedConclusion
 }
 
 /**
@@ -60,9 +83,14 @@ export const NodeConversationPanel = ({
   const startWidthRef = useRef(0)
   const conversationScrollRef = useRef<HTMLDivElement | null>(null)
   const conversationInputRef = useRef<HTMLTextAreaElement | null>(null)
+  const [statusTimerStartedAtMs, setStatusTimerStartedAtMs] = useState<number | null>(null)
+  const [statusTimerNowMs, setStatusTimerNowMs] = useState(0)
 
   const messages = conversation.messages
   const hasFailedMessages = conversation.failedMessageIds.size > 0
+  const streamStatusLabel = conversation.streamStatusLabel
+  const hasActiveStreamStatus =
+    Boolean(streamStatusLabel) && !(streamStatusLabel?.startsWith('Error:') ?? false)
 
   const adjustConversationInputHeight = () => {
     const input = conversationInputRef.current
@@ -83,7 +111,6 @@ export const NodeConversationPanel = ({
       conversationInputRef.current.style.height = `${CHAT_INPUT_MIN_HEIGHT}px`
       conversationInputRef.current.style.overflowY = 'hidden'
     }
-    setSendBlockAlert(null)
   }, [node.id])
 
   useEffect(() => {
@@ -100,6 +127,20 @@ export const NodeConversationPanel = ({
   useEffect(() => {
     adjustConversationInputHeight()
   }, [conversationInputText])
+
+  useEffect(() => {
+    if (!hasActiveStreamStatus) {
+      return
+    }
+
+    const intervalId = window.setInterval(() => {
+      setStatusTimerNowMs(Date.now())
+    }, 1000)
+
+    return () => {
+      window.clearInterval(intervalId)
+    }
+  }, [hasActiveStreamStatus, node.id])
 
   useEffect(() => {
     if (!isResizing) {
@@ -156,6 +197,9 @@ export const NodeConversationPanel = ({
 
     setSendBlockAlert(null)
     setConversationInputText('')
+    const now = Date.now()
+    setStatusTimerStartedAtMs(now)
+    setStatusTimerNowMs(now)
 
     if (conversationInputRef.current) {
       conversationInputRef.current.style.overflowY = 'hidden'
@@ -175,9 +219,21 @@ export const NodeConversationPanel = ({
     }
   }
 
+  const streamStatusWithElapsed = (() => {
+    if (!streamStatusLabel || !hasActiveStreamStatus || statusTimerStartedAtMs === null) {
+      return streamStatusLabel
+    }
+
+    const elapsedSeconds = Math.max(
+      0,
+      Math.floor((statusTimerNowMs - statusTimerStartedAtMs) / 1000),
+    )
+    return `${streamStatusLabel} (${formatStatusElapsed(elapsedSeconds)})`
+  })()
+
   return (
     <aside
-      className="absolute inset-y-0 right-0 z-[80] flex w-full flex-col border-l border-[#8bb8cd] bg-[#fefefe] shadow-[-20px_0_38px_rgba(22,57,74,0.12)]"
+      className="absolute inset-y-0 right-0 z-[80] flex h-full min-h-0 w-full flex-col overflow-hidden border-l border-[#8bb8cd] bg-[#fefefe] shadow-[-20px_0_38px_rgba(22,57,74,0.12)]"
       style={{ width: `${width}px`, zIndex: zIndex.conversationPanel }}
     >
       <div
@@ -203,21 +259,21 @@ export const NodeConversationPanel = ({
         onDismissFailedMessage={conversation.dismissFailedMessage}
         conversationScrollRef={conversationScrollRef}
       />
-      {conversation.streamStatusLabel ? (
-        <p className="m-0 border-t border-[#d8ebf6] bg-[#f4fbff] px-4 py-2 text-xs text-[#2f6688]">
-          {conversation.streamStatusLabel}
+      {streamStatusWithElapsed ? (
+        <p className="m-0 shrink-0 border-t border-[#d8ebf6] bg-[#f4fbff] px-4 py-2 text-xs text-[#2f6688]">
+          {streamStatusWithElapsed}
         </p>
       ) : null}
       {sendBlockAlert ? (
         <p
           role="alert"
-          className="m-0 border-t border-[#f1cabd] bg-[#fff6f3] px-4 py-2 text-xs text-[#8a3f2b]"
+          className="m-0 shrink-0 border-t border-[#f1cabd] bg-[#fff6f3] px-4 py-2 text-xs text-[#8a3f2b]"
         >
           {sendBlockAlert}
         </p>
       ) : null}
       {conversation.messageSendError && !hasFailedMessages ? (
-        <p className="m-0 border-t border-[#f1cabd] bg-[#fff6f3] px-4 py-2 text-xs text-[#8a3f2b]">
+        <p className="m-0 shrink-0 border-t border-[#f1cabd] bg-[#fff6f3] px-4 py-2 text-xs text-[#8a3f2b]">
           Failed to send message: {conversation.messageSendError}
         </p>
       ) : null}

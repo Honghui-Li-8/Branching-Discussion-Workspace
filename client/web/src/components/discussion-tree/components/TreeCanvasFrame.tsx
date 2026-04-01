@@ -14,7 +14,7 @@ export const TreeCanvasFrame = ({ canvasRef, children }: TreeCanvasFrameProps) =
   return (
     <div
       ref={canvasRef}
-      className="relative flex-1 overflow-hidden"
+      className="relative min-h-0 flex-1 overflow-hidden"
       style={{
         background:
           'radial-gradient(circle at 1px 1px, rgba(125, 172, 195, 0.18) 1px, transparent 0) 0 0 / 22px 22px, linear-gradient(180deg, #f8fdff 0%, #fffefb 100%)',

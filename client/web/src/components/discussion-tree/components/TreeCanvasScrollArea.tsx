@@ -19,7 +19,7 @@ export const TreeCanvasScrollArea = ({
 }: TreeCanvasScrollAreaProps) => {
   return (
     <div
-      className="h-full overflow-auto"
+      className="h-full min-h-0 overflow-auto"
       style={{
         paddingRight:
           hasConversationPanel && !conversationPanelFullscreen
