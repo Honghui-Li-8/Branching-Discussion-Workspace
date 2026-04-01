@@ -150,8 +150,10 @@ const ownedMessageRecord = {
   id: '33333333-3333-4333-8333-333333333333',
   authorUserId: selfSessionUser.id,
   nodeId: ownedNodeRecord.id,
+  turnId: null,
   role: 'user' as const,
   content: 'hello',
+  metadata: {},
   createdAt: '2026-03-20T00:00:00.000Z',
 }
 
@@ -159,8 +161,10 @@ const ownedAssistantMessageRecord = {
   id: '55555555-5555-4555-8555-555555555555',
   authorUserId: selfSessionUser.id,
   nodeId: ownedNodeRecord.id,
+  turnId: null,
   role: 'assistant' as const,
   content: 'assistant reply',
+  metadata: {},
   createdAt: '2026-03-20T00:00:01.000Z',
 }
 
@@ -173,6 +177,7 @@ const ownedConversationTurnRecord = {
   idempotencyKey: 'idempotency-key-1',
   error: null,
   completedAt: null,
+  metadata: {},
   createdAt: '2026-03-20T00:00:00.000Z',
   updatedAt: '2026-03-20T00:00:00.000Z',
 }
@@ -478,12 +483,14 @@ describe('tRPC ownership integration', () => {
     expect(createMessageForAuthorMock).toHaveBeenCalledWith({
       nodeId: ownedNodeRecord.id,
       authorUserId: selfSessionUser.id,
+      turnId: ownedConversationTurnRecord.id,
       role: 'user',
       content: 'hello',
     })
     expect(createMessageForAuthorMock).toHaveBeenCalledWith({
       nodeId: ownedNodeRecord.id,
       authorUserId: selfSessionUser.id,
+      turnId: ownedConversationTurnRecord.id,
       role: 'assistant',
       content: ownedAssistantMessageRecord.content,
     })

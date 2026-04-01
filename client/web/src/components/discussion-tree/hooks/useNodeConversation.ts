@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import type { inferRouterOutputs } from '@trpc/server'
 import type { AppRouter } from '@branching/shared'
-import { parseMessageMetadata } from '@branching/shared/metadata'
+import { parseMessageMetadata } from '@branching/shared'
 import { trpc } from '../../../trpc'
 import type { TreeMessage } from '../../../types/tree'
 import { invalidateMessagesByNode } from './mutationInvalidation'

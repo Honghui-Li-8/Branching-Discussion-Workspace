@@ -1,7 +1,7 @@
 import {
   parseMessageMetadata,
   type Citation,
-} from '@branching/shared/metadata'
+} from '@branching/shared'
 import type { TreeMessage } from '../../types/tree'
 
 export const getRenderableCitations = (
