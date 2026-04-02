@@ -40,10 +40,17 @@ type OpenAIInputTextContent = {
   text: string
 }
 
+type OpenAIOutputTextContent = {
+  type: 'output_text'
+  text: string
+}
+
+type OpenAIMessageContent = OpenAIInputTextContent | OpenAIOutputTextContent
+
 type OpenAIInputMessage = {
   type: 'message'
   role: OpenAIInputRole
-  content: OpenAIInputTextContent[]
+  content: OpenAIMessageContent[]
 }
 
 type OpenAIRetrievalContextPlaceholder = {
@@ -94,9 +101,12 @@ const buildRetrievalContextPlaceholder = (
   })),
 })
 
-const toInputTextContent = (text: string): OpenAIInputTextContent[] => [
+const toMessageContent = (
+  role: OpenAIInputRole,
+  text: string,
+): OpenAIMessageContent[] => [
   {
-    type: 'input_text',
+    type: role === 'assistant' ? 'output_text' : 'input_text',
     text,
   },
 ]
@@ -108,7 +118,7 @@ const buildOpenAIInputMessages = (
   const messages: OpenAIInputMessage[] = prompt.conversation.map((message) => ({
     type: 'message',
     role: message.role,
-    content: toInputTextContent(message.content),
+    content: toMessageContent(message.role, message.content),
   }))
 
   if (prompt.retrievalContext.length > 0) {
@@ -121,14 +131,14 @@ const buildOpenAIInputMessages = (
     messages.push({
       type: 'message',
       role: 'developer',
-      content: toInputTextContent(JSON.stringify(placeholder, null, 2)),
+      content: toMessageContent('developer', JSON.stringify(placeholder, null, 2)),
     })
   }
 
   messages.push({
     type: 'message',
     role: 'user',
-    content: toInputTextContent(prompt.currentUserMessage),
+    content: toMessageContent('user', prompt.currentUserMessage),
   })
 
   return messages

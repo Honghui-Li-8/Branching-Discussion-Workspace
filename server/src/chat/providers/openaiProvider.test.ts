@@ -17,6 +17,12 @@ const makeInput = () => ({
         content: 'hello',
         createdAt: '2026-03-30T00:00:00.000Z',
       },
+      {
+        id: 'm2',
+        role: 'assistant' as const,
+        content: 'hi, what can I help with?',
+        createdAt: '2026-03-30T00:00:01.000Z',
+      },
     ],
     currentUserMessage: 'new question',
     retrievalContext: [],
@@ -97,6 +103,16 @@ describe('createOpenAIProvider', () => {
             {
               type: 'input_text',
               text: 'hello',
+            },
+          ],
+        },
+        {
+          type: 'message',
+          role: 'assistant',
+          content: [
+            {
+              type: 'output_text',
+              text: 'hi, what can I help with?',
             },
           ],
         },
