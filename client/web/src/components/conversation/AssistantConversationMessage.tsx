@@ -15,10 +15,10 @@ export const AssistantConversationMessage = ({
   const citations = getRenderableCitations(message)
 
   return (
-    <div className="flex justify-start">
+    <div className="mb-5 flex justify-start">
       <div className="w-full">
         <div
-          className="w-full rounded-[14px] border border-[#9fc4d8]/85 bg-white/55 px-3 py-2 text-sm leading-relaxed text-[#1f4f68] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] backdrop-blur-[2px]"
+          className="w-full rounded-[14px] border border-[#9fc4d8]/85 bg-white/55 px-5 py-4 text-sm leading-relaxed text-[#1f4f68] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] backdrop-blur-[2px]"
           style={{ overflowWrap: 'anywhere' }}
         >
           <ModelMarkdown content={message.content} />

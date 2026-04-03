@@ -1,18 +1,18 @@
-import type { RefObject } from 'react'
-import type { TreeMessage } from '../../types/tree'
-import { UserConversationMessage } from './UserConversationMessage'
-import { AssistantConversationMessage } from './AssistantConversationMessage'
+import type { RefObject } from "react";
+import type { TreeMessage } from "../../types/tree";
+import { UserConversationMessage } from "./UserConversationMessage";
+import { AssistantConversationMessage } from "./AssistantConversationMessage";
 
 type ConversationMessageListProps = {
-  messages: TreeMessage[]
-  isLoading: boolean
-  errorMessage: string | null
-  pendingMessageIds: Set<string>
-  failedMessageIds: Set<string>
-  onRetryFailedMessage: (messageId: string) => void
-  onDismissFailedMessage: (messageId: string) => void
-  conversationScrollRef: RefObject<HTMLDivElement | null>
-}
+  messages: TreeMessage[];
+  isLoading: boolean;
+  errorMessage: string | null;
+  pendingMessageIds: Set<string>;
+  failedMessageIds: Set<string>;
+  onRetryFailedMessage: (messageId: string) => void;
+  onDismissFailedMessage: (messageId: string) => void;
+  conversationScrollRef: RefObject<HTMLDivElement | null>;
+};
 
 export const ConversationMessageList = ({
   messages,
@@ -41,9 +41,9 @@ export const ConversationMessageList = ({
           </p>
         ) : messages.length ? (
           messages.map((message) => {
-            const isPending = pendingMessageIds.has(message.id)
-            const isFailed = failedMessageIds.has(message.id)
-            const isUser = message.role === 'user'
+            const isPending = pendingMessageIds.has(message.id);
+            const isFailed = failedMessageIds.has(message.id);
+            const isUser = message.role === "user";
 
             if (isUser) {
               return (
@@ -55,7 +55,7 @@ export const ConversationMessageList = ({
                   onRetryFailedMessage={onRetryFailedMessage}
                   onDismissFailedMessage={onDismissFailedMessage}
                 />
-              )
+              );
             }
 
             return (
@@ -63,14 +63,43 @@ export const ConversationMessageList = ({
                 key={message.id}
                 message={message}
               />
-            )
+            );
           })
         ) : (
           <p className="m-0 self-stretch rounded-lg border border-dashed border-[#bdd7eb] bg-white p-3 text-sm text-[#40657d]">
             No messages yet for this node. Start with your first thought below.
           </p>
         )}
+
+        {true && (
+          <AssistantConversationMessage
+            key={TEST_MARKDOWN_ASSISTANT_MESSAGE.id}
+            message={TEST_MARKDOWN_ASSISTANT_MESSAGE}
+          />
+        )}
       </div>
     </div>
-  )
-}
+  );
+};
+
+const TEST_MARKDOWN_ASSISTANT_MESSAGE: TreeMessage = {
+  id: "test-markdown-assistant-message",
+  role: "assistant",
+  content: `# Markdown Rendering Test
+
+This is a **bold** phrase, with _italic_ text, and \`inline code\`.
+
+## Checklist
+- [x] Completed item
+- [ ] Pending item
+
+## Code Block
+\`\`\`ts
+const answer = 'markdown render check';
+console.log(answer)
+\`\`\`
+
+> Blockquote test line.
+
+[OpenAI](https://openai.com)`,
+};
