@@ -18,6 +18,7 @@
     "test:e2e": "playwright test",
     "test:e2e:list": "playwright test --list",
     "check:ownership-boundary": "yarn test:unit --runInBand server/src/ownershipImportBoundary.test.ts",
+    "check:deprecations": "node ./scripts/check-deprecations.mjs",
     "spellcheck": "cspell lint --config cspell.json",
     "db:init": "yarn workspace server db:migrate",
     "db:seed": "yarn workspace server db:seed",

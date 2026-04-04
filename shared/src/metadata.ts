@@ -1,60 +1,64 @@
 import { z } from 'zod'
 
-export const citationSchema = z.object({
+const finiteNumberSchema = z
+  .number()
+  .refine((value) => Number.isFinite(value), 'Number must be finite.')
+
+export const citationSchema = z.looseObject({
   messageId: z.string().min(1),
   nodeId: z.string().min(1),
   chunkIndex: z.number().int().nonnegative().optional(),
   excerpt: z.string().min(1).optional(),
-  score: z.number().finite().optional(),
+  score: finiteNumberSchema.optional(),
   sourceLabel: z.string().min(1).optional(),
-}).passthrough()
+})
 
-export const retrieverInputSchema = z.object({
+export const retrieverInputSchema = z.looseObject({
   query: z.string().min(1),
   nodeId: z.string().min(1),
   authorUserId: z.string().min(1),
   workspaceId: z.string().min(1).optional(),
   maxChunks: z.number().int().positive().optional(),
-}).passthrough()
+})
 
-export const retrievedChunkSchema = z.object({
+export const retrievedChunkSchema = z.looseObject({
   messageId: z.string().min(1),
   nodeId: z.string().min(1),
   chunkIndex: z.number().int().nonnegative(),
   content: z.string(),
   tokenCount: z.number().int().nonnegative().optional(),
-  score: z.number().finite().optional(),
-}).passthrough()
+  score: finiteNumberSchema.optional(),
+})
 
-export const retrieverDiagnosticsSchema = z.object({
+export const retrieverDiagnosticsSchema = z.looseObject({
   retriever: z.string().min(1).optional(),
   query: z.string().min(1).optional(),
   totalChunks: z.number().int().nonnegative().optional(),
   selectedChunks: z.number().int().nonnegative().optional(),
   fallbackReason: z.string().min(1).optional(),
-}).passthrough()
+})
 
-export const retrieverResultSchema = z.object({
+export const retrieverResultSchema = z.looseObject({
   chunks: z.array(retrievedChunkSchema).default([]),
   diagnostics: retrieverDiagnosticsSchema.optional(),
-}).passthrough()
+})
 
-export const contextSnapshotSchema = z.object({
+export const contextSnapshotSchema = z.looseObject({
   id: z.string().min(1).optional(),
   chunks: z.array(retrievedChunkSchema).default([]),
   totalTokenCount: z.number().int().nonnegative().optional(),
   createdAt: z.iso.datetime().optional(),
-}).passthrough()
+})
 
-export const messageMetadataSchema = z.object({
+export const messageMetadataSchema = z.looseObject({
   citations: z.array(citationSchema).optional(),
-}).passthrough()
+})
 
-export const conversationTurnMetadataSchema = z.object({
+export const conversationTurnMetadataSchema = z.looseObject({
   contextSnapshotId: z.string().min(1).optional(),
   contextSnapshot: contextSnapshotSchema.optional(),
   retrievalDiagnostics: retrieverDiagnosticsSchema.optional(),
-}).passthrough()
+})
 
 export type Citation = z.infer<typeof citationSchema>
 export type RetrieverInput = z.infer<typeof retrieverInputSchema>

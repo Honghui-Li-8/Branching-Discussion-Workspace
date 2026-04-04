@@ -38,10 +38,11 @@ const getTextOffsetWithinElement = (
 }
 
 const getCaretPoint = (doc: Document, x: number, y: number): CaretPoint | null => {
-  const docWithRange = doc as Document & {
-    caretRangeFromPoint?: (pointX: number, pointY: number) => Range | null
-  }
-  const range = docWithRange.caretRangeFromPoint?.(x, y)
+  const caretRangeFromPoint = (doc as unknown as Record<string, unknown>)['caretRangeFromPoint']
+  const range =
+    typeof caretRangeFromPoint === 'function'
+      ? (caretRangeFromPoint as (pointX: number, pointY: number) => Range | null)(x, y)
+      : null
   if (range) {
     return {
       node: range.startContainer,
