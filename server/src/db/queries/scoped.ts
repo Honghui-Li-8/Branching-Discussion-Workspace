@@ -36,3 +36,12 @@ export {
 export {
   listConversationTurnEventsAfterIdForAuthor,
 } from './conversationTurnEvent.js'
+
+export {
+  createMessageAnnotationForAuthor,
+  getMessageAnnotationByIdForAuthor,
+  getMessageAnnotationByIdempotencyKeyForAuthor,
+  linkMessageAnnotationToNodeForAuthor,
+  listMessageAnnotationsByMessageForAuthor,
+  softDeleteMessageAnnotationForAuthor,
+} from './messageAnnotation.js'
