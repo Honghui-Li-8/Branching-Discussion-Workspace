@@ -7,6 +7,7 @@ import {
 import {
   TextAnnotationPopup,
   TextAnnotator,
+  UserSelectAction,
   W3CTextFormat,
   type RecogitoTextAnnotator,
   type TextAnnotation,
@@ -15,16 +16,25 @@ import {
 import type { ReactNode } from 'react'
 import { useEffect, useMemo, useRef } from 'react'
 import { AssistantSelectionMenu } from './AssistantSelectionMenu'
+import {
+  getBranchActionKind,
+  parseAnnotationKindTag,
+  resolveAnnotationKind,
+  type AssistantAnnotationKind,
+} from './assistantAnnotationLogic'
+import { useAssistantAnnotationSession } from './assistantAnnotationSession'
+import { findAnnotationIdFromClick } from './assistantAnnotationHitTest'
 
 type AssistantMessageAnnotationWrapperProps = {
   messageId: string
   children: ReactNode
 }
 
-type AssistantAnnotationKind = 'suggestion' | 'branch' | 'suggestion-branch'
-
 const ANNOTATION_STORAGE_PREFIX = 'assistant-message-annotations-v1'
-const ASSISTANT_ANNOTATION_KIND_PREFIX = 'assistant-kind:'
+const LOCAL_ANNOTATION_USER = {
+  id: 'local-assistant-annotation-user',
+  name: 'Local Assistant Annotator',
+}
 
 const buildAnnotationStorageKey = (messageId: string) =>
   `${ANNOTATION_STORAGE_PREFIX}:${messageId}`
@@ -62,33 +72,14 @@ const getAnnotationTextLength = (annotation: TextAnnotation): number =>
     0,
   )
 
-const toKindFromTag = (value?: string): AssistantAnnotationKind | null => {
-  if (!value || !value.startsWith(ASSISTANT_ANNOTATION_KIND_PREFIX)) {
-    return null
-  }
-
-  const nextKind = value.slice(ASSISTANT_ANNOTATION_KIND_PREFIX.length)
-  return nextKind === 'branch' ||
-    nextKind === 'suggestion' ||
-    nextKind === 'suggestion-branch'
-    ? nextKind
-    : null
-}
-
 const getKindBody = (annotation: TextAnnotation) =>
-  annotation.bodies.find((body) => toKindFromTag(body.value) !== null)
-
-const isAnnotationKind = (kind: string): kind is AssistantAnnotationKind =>
-  kind === 'suggestion' || kind === 'branch' || kind === 'suggestion-branch'
+  annotation.bodies.find((body) => parseAnnotationKindTag(body.value) !== null)
 
 const getAnnotationKind = (annotation: TextAnnotation): AssistantAnnotationKind => {
-  const kindFromProperties = annotation.properties?.kind
-  if (typeof kindFromProperties === 'string' && isAnnotationKind(kindFromProperties)) {
-    return kindFromProperties
-  }
-
-  const kindFromBody = toKindFromTag(getKindBody(annotation)?.value)
-  return kindFromBody ?? 'branch'
+  return resolveAnnotationKind({
+    propertiesKind: annotation.properties?.kind,
+    legacyTagValue: getKindBody(annotation)?.value,
+  })
 }
 
 const setAnnotationKind = (
@@ -289,53 +280,16 @@ const AssistantAnnotationPopup = ({
   const annotator = useAnnotator<
     RecogitoTextAnnotator<TextAnnotation, W3CTextAnnotation> | undefined
   >()
-  const transientAnnotationIdsRef = useRef<Set<string>>(new Set())
-  const persistedAnnotationIdsRef = useRef<Set<string>>(
-    new Set(initiallyPersistedAnnotationIds),
-  )
-  const pendingDismissAnnotationIdRef = useRef<string | null>(null)
-  const pendingDismissShouldDeleteRef = useRef(false)
-  const lastPopupAnnotationIdRef = useRef<string | null>(null)
-
-  const clearPendingDismissState = () => {
-    pendingDismissAnnotationIdRef.current = null
-    pendingDismissShouldDeleteRef.current = false
-    lastPopupAnnotationIdRef.current = null
-  }
-
-  useEffect(() => {
-    if (!annotator) {
-      return
-    }
-
-    const handleCreateAnnotation = (annotation: W3CTextAnnotation) => {
-      transientAnnotationIdsRef.current.add(annotation.id)
-    }
-
-    const handleDeleteAnnotation = (annotation: W3CTextAnnotation) => {
-      transientAnnotationIdsRef.current.delete(annotation.id)
-    }
-
-    annotator.on('createAnnotation', handleCreateAnnotation)
-    annotator.on('deleteAnnotation', handleDeleteAnnotation)
-
-    return () => {
-      annotator.off('createAnnotation', handleCreateAnnotation)
-      annotator.off('deleteAnnotation', handleDeleteAnnotation)
-    }
-  }, [annotator])
-
-  const markAnnotationPersisted = (annotationId: string) => {
-    transientAnnotationIdsRef.current.delete(annotationId)
-    persistedAnnotationIdsRef.current.add(annotationId)
-  }
-
-  const shouldDeleteOnDismiss = (annotationId: string): boolean => {
-    return (
-      transientAnnotationIdsRef.current.has(annotationId) ||
-      !persistedAnnotationIdsRef.current.has(annotationId)
-    )
-  }
+  const {
+    clearPendingDismissState,
+    consumePendingDismiss,
+    markAnnotationPersisted,
+    removeAnnotationTracking,
+    setPendingDismissAnnotation,
+  } = useAssistantAnnotationSession({
+    annotator,
+    initiallyPersistedAnnotationIds,
+  })
 
   return (
     <TextAnnotationPopup
@@ -345,24 +299,17 @@ const AssistantAnnotationPopup = ({
           return
         }
 
-        const annotationId = pendingDismissAnnotationIdRef.current
-        const shouldDelete = pendingDismissShouldDeleteRef.current
+        const { annotationId, shouldDelete } = consumePendingDismiss()
         if (!annotationId || !shouldDelete) {
-          clearPendingDismissState()
           return
         }
 
         annotator.removeAnnotation(annotationId)
-        transientAnnotationIdsRef.current.delete(annotationId)
-        clearPendingDismissState()
+        removeAnnotationTracking(annotationId)
       }}
       popup={({ annotation }) => {
         const selectedText = getSelectedTextFromAnnotation(annotation)
-        if (lastPopupAnnotationIdRef.current !== annotation.id) {
-          pendingDismissAnnotationIdRef.current = annotation.id
-          pendingDismissShouldDeleteRef.current = shouldDeleteOnDismiss(annotation.id)
-          lastPopupAnnotationIdRef.current = annotation.id
-        }
+        setPendingDismissAnnotation(annotation.id)
 
         const handleDismissSelection = () => {
           if (!annotator) {
@@ -371,17 +318,14 @@ const AssistantAnnotationPopup = ({
 
           clearPendingDismissState()
           annotator.removeAnnotation(annotation.id)
-          transientAnnotationIdsRef.current.delete(annotation.id)
-          persistedAnnotationIdsRef.current.delete(annotation.id)
+          removeAnnotationTracking(annotation.id)
 
           annotator.cancelSelected()
         }
 
         const handleConfirmSelection = () => {
           const currentKind = getAnnotationKind(annotation)
-          const nextKind: AssistantAnnotationKind = currentKind === 'suggestion'
-            ? 'suggestion-branch'
-            : 'branch'
+          const nextKind = getBranchActionKind(currentKind)
 
           if (annotator) {
             setAnnotationKind(annotator, annotation, nextKind)
@@ -452,6 +396,40 @@ const AssistantWholeWordSelectionEnforcer = () => {
 
     annotator.state.store.updateTarget(wholeWordTarget)
   }, [annotator, selected])
+
+  return null
+}
+
+const AssistantExistingAnnotationClickHandler = () => {
+  const annotator = useAnnotator<
+    RecogitoTextAnnotator<TextAnnotation, W3CTextAnnotation> | undefined
+  >()
+
+  useEffect(() => {
+    if (!annotator) {
+      return
+    }
+
+    const handleClick = (event: MouseEvent) => {
+      const annotationId = findAnnotationIdFromClick({
+        target: event.target,
+        clientX: event.clientX,
+        clientY: event.clientY,
+        doc: document,
+        annotatorElement: annotator.element,
+        annotations: annotator.state.store.all(),
+      })
+
+      if (annotationId) {
+        annotator.setSelected(annotationId, true)
+      }
+    }
+
+    annotator.element.addEventListener('click', handleClick)
+    return () => {
+      annotator.element.removeEventListener('click', handleClick)
+    }
+  }, [annotator])
 
   return null
 }
@@ -580,6 +558,8 @@ export const AssistantMessageAnnotationWrapper = ({
       <TextAnnotator
         className="assistant-annotation-scope"
         adapter={(container) => W3CTextFormat(annotationSource, container)}
+        user={LOCAL_ANNOTATION_USER}
+        userSelectAction={UserSelectAction.EDIT}
         style={(annotation) => {
           const kind = getAnnotationKind(annotation)
 
@@ -604,6 +584,7 @@ export const AssistantMessageAnnotationWrapper = ({
         <AssistantAnnotationLoadAnimator
           shouldAnimateOnLoad={initialAnnotations.length > 0}
         />
+        <AssistantExistingAnnotationClickHandler />
         <AssistantWholeWordSelectionEnforcer />
         <AssistantAnnotationPopup
           messageId={messageId}
