@@ -56,6 +56,12 @@ const getSelectedTextFromAnnotation = (annotation: TextAnnotation): string =>
     .filter(Boolean)
     .join(' ')
 
+const getAnnotationTextLength = (annotation: TextAnnotation): number =>
+  annotation.target.selector.reduce(
+    (total, selector) => total + selector.quote.trim().length,
+    0,
+  )
+
 const toKindFromTag = (value?: string): AssistantAnnotationKind | null => {
   if (!value || !value.startsWith(ASSISTANT_ANNOTATION_KIND_PREFIX)) {
     return null
@@ -440,6 +446,110 @@ const AssistantWholeWordSelectionEnforcer = () => {
   return null
 }
 
+type AssistantAnnotationLoadAnimatorProps = {
+  shouldAnimateOnLoad: boolean
+}
+
+const AssistantAnnotationLoadAnimator = ({
+  shouldAnimateOnLoad,
+}: AssistantAnnotationLoadAnimatorProps) => {
+  const annotator = useAnnotator<
+    RecogitoTextAnnotator<TextAnnotation, W3CTextAnnotation> | undefined
+  >()
+  const annotations = useAnnotations<TextAnnotation>()
+  const hasAnimatedRef = useRef(false)
+  const animationCleanupTimeoutRef = useRef<number | null>(null)
+  const animationFrameRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    if (
+      !shouldAnimateOnLoad ||
+      !annotator ||
+      hasAnimatedRef.current ||
+      annotations.length === 0
+    ) {
+      return
+    }
+
+    let attempts = 0
+    const maxAttempts = 12
+
+    const applyLoadAnimation = () => {
+      if (typeof window === 'undefined') {
+        return
+      }
+
+      const highlightSegments = Array.from(
+        annotator.element.querySelectorAll<HTMLElement>(
+          '.r6o-span-highlight-layer .r6o-annotation',
+        ),
+      )
+
+      if (highlightSegments.length === 0) {
+        attempts += 1
+        if (attempts < maxAttempts) {
+          animationFrameRef.current = window.requestAnimationFrame(applyLoadAnimation)
+        }
+        return
+      }
+
+      hasAnimatedRef.current = true
+
+      const lengthByAnnotationId = new Map<string, number>(
+        annotations.map((annotation) => [annotation.id, getAnnotationTextLength(annotation)]),
+      )
+
+      let maxDurationMs = 0
+      highlightSegments.forEach((segment) => {
+        const annotationId = segment.dataset.annotation
+        const textLength = annotationId ? lengthByAnnotationId.get(annotationId) ?? 0 : 0
+        const durationMs = Math.max(
+          320,
+          Math.min(900, Math.round(320 + Math.sqrt(textLength) * 34)),
+        )
+
+        segment.classList.remove('assistant-annotation-load-anim')
+        segment.style.setProperty('--assistant-annotation-delay', '0ms')
+        segment.style.setProperty('--assistant-annotation-duration', `${durationMs}ms`)
+        segment.classList.add('assistant-annotation-load-anim')
+
+        if (durationMs > maxDurationMs) {
+          maxDurationMs = durationMs
+        }
+      })
+
+      const totalDurationMs = maxDurationMs + 80
+      animationCleanupTimeoutRef.current = window.setTimeout(() => {
+        highlightSegments.forEach((segment) => {
+          segment.classList.remove('assistant-annotation-load-anim')
+          segment.style.removeProperty('--assistant-annotation-delay')
+          segment.style.removeProperty('--assistant-annotation-duration')
+        })
+      }, totalDurationMs)
+    }
+
+    if (typeof window !== 'undefined') {
+      animationFrameRef.current = window.requestAnimationFrame(applyLoadAnimation)
+    }
+
+    return () => {
+      if (typeof window === 'undefined') {
+        return
+      }
+
+      if (animationFrameRef.current !== null) {
+        window.cancelAnimationFrame(animationFrameRef.current)
+      }
+
+      if (animationCleanupTimeoutRef.current !== null) {
+        window.clearTimeout(animationCleanupTimeoutRef.current)
+      }
+    }
+  }, [shouldAnimateOnLoad, annotator, annotations])
+
+  return null
+}
+
 export const AssistantMessageAnnotationWrapper = ({
   messageId,
   children,
@@ -477,6 +587,9 @@ export const AssistantMessageAnnotationWrapper = ({
         }}
       >
         {children}
+        <AssistantAnnotationLoadAnimator
+          shouldAnimateOnLoad={initialAnnotations.length > 0}
+        />
         <AssistantWholeWordSelectionEnforcer />
         <AssistantAnnotationPopup messageId={messageId} />
       </TextAnnotator>
