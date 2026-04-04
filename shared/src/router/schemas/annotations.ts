@@ -1,30 +1,33 @@
 import { z } from 'zod'
-import { createNodeInputSchema } from './core.js'
 
-const finiteNumberSchema = z
-  .number()
-  .refine((value) => Number.isFinite(value), 'Number must be finite.')
+const nonEmptyTrimmedStringSchema = z
+  .string()
+  .refine((value) => value.trim().length > 0, 'Value must not be empty.')
 
-type JsonPrimitive = string | number | boolean | null
-type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue }
-
-const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
-  z.union([
-    z.string(),
-    finiteNumberSchema,
-    z.boolean(),
-    z.null(),
-    z.array(jsonValueSchema),
-    z.record(z.string(), jsonValueSchema),
-  ]),
-)
+export type SelectorRange = {
+  quote: string
+  start: number
+  end: number
+}
+export type SelectorJson = {
+  selector: SelectorRange[]
+}
 
 export const assistantAnnotationKindSchema = z.enum(['suggestion', 'branch', 'suggestion-branch'])
 
-export const annotationSelectorJsonSchema = z.union([
-  z.record(z.string(), jsonValueSchema),
-  z.array(jsonValueSchema),
-])
+const selectorRangeSchema = z
+  .object({
+    quote: nonEmptyTrimmedStringSchema,
+    start: z.int().nonnegative(),
+    end: z.int().nonnegative(),
+  })
+  .refine((value) => value.end > value.start, {
+    message: 'Selector end must be greater than start.',
+  })
+
+export const annotationSelectorJsonSchema: z.ZodType<SelectorJson> = z.object({
+  selector: z.array(selectorRangeSchema).min(1),
+})
 
 export const messageAnnotationSchema = z.object({
   id: z.string(),
@@ -42,12 +45,16 @@ export const messageAnnotationSchema = z.object({
 })
 
 export const annotationSelectionInputSchema = z.object({
-  quote: z
-    .string()
-    .refine((value) => value.trim().length > 0, 'Quote must not be empty.'),
+  quote: nonEmptyTrimmedStringSchema,
   selectorJson: annotationSelectorJsonSchema,
   startOffset: z.number().int().nonnegative().nullable().optional(),
   endOffset: z.number().int().nonnegative().nullable().optional(),
+})
+
+export const messageBranchNewNodeMetaSchema = z.object({
+  title: z.string().min(1).optional(),
+  summary: z.string().optional(),
+  type: z.enum(['decision', 'question', 'option', 'constraint']).optional(),
 })
 
 export const messageAnnotationsByMessageInputSchema = z.object({
@@ -58,16 +65,9 @@ export const messageBranchFromSelectionInputSchema = z
   .object({
     messageId: z.string(),
     selection: annotationSelectionInputSchema,
-    targetNodeId: z.string().optional(),
-    createNode: createNodeInputSchema.omit({ workspaceId: true }).optional(),
+    newNodeMeta: messageBranchNewNodeMetaSchema.optional(),
     idempotencyKey: z.string().min(1),
   })
-  .refine(
-    (value) =>
-      (value.targetNodeId !== undefined ? 1 : 0) + (value.createNode !== undefined ? 1 : 0) ===
-      1,
-    { message: 'Provide exactly one of targetNodeId or createNode.' },
-  )
 
 export const messageBranchFromSelectionResultSchema = z.object({
   annotation: messageAnnotationSchema,

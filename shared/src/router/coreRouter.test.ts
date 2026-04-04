@@ -86,7 +86,7 @@ const makeContext = (): AppRouterContext => {
         kind: 'branch' as const,
         quote: 'hello',
         selectorJson: {
-          selector: [],
+          selector: [{ quote: 'hello', start: 0, end: 5 }],
         },
         createdByUserId: user.id,
         createdAt: fixedNow,

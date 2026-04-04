@@ -89,9 +89,13 @@ describe('appRouter annotation routes', () => {
         messageId: 'm1',
         selection: {
           quote: 'hello',
-          selectorJson: { selector: [] },
+          selectorJson: {
+            selector: [{ quote: 'hello', start: 0, end: 5 }],
+          },
         },
-        targetNodeId: 'n-child-1',
+        newNodeMeta: {
+          type: 'question',
+        },
         idempotencyKey: 'branch-idem-1',
       }),
     ).rejects.toThrow('Authentication required.')
@@ -117,7 +121,11 @@ describe('appRouter annotation routes', () => {
         startOffset: 0,
         endOffset: 5,
       },
-      targetNodeId: 'n-child-1',
+      newNodeMeta: {
+        title: 'Branch node title',
+        summary: 'Branch summary',
+        type: 'question' as const,
+      },
       idempotencyKey: 'branch-idem-1',
     }
 
@@ -142,9 +150,10 @@ describe('appRouter annotation routes', () => {
         messageId: 'm1',
         selection: {
           quote: '   ',
-          selectorJson: { selector: [] },
+          selectorJson: {
+            selector: [{ quote: 'hello', start: 0, end: 5 }],
+          },
         },
-        targetNodeId: 'n-child-1',
         idempotencyKey: 'branch-idem-1',
       }),
     ).rejects.toThrow()
@@ -154,40 +163,84 @@ describe('appRouter annotation routes', () => {
         messageId: 'm1',
         selection: {
           quote: 'hello',
-          selectorJson: { selector: [] },
+          selectorJson: {
+            selector: [{ quote: 'hello', start: 0, end: 5 }],
+          },
         },
-        idempotencyKey: 'branch-idem-1',
-      } as never),
-    ).rejects.toThrow()
-
-    await expect(
-      caller.messageBranchFromSelection({
-        messageId: 'm1',
-        selection: {
-          quote: 'hello',
-          selectorJson: { selector: [] },
-        },
-        targetNodeId: 'n-child-1',
-        createNode: {
-          parentNodeId: 'n1',
-          type: 'decision',
-          title: 'Branch node title',
-          summary: 'Branch summary',
-        },
-        idempotencyKey: 'branch-idem-1',
-      } as never),
-    ).rejects.toThrow()
-
-    await expect(
-      caller.messageBranchFromSelection({
-        messageId: 'm1',
-        selection: {
-          quote: 'hello',
-          selectorJson: { selector: [] },
-        },
-        targetNodeId: 'n-child-1',
         idempotencyKey: '',
+      } as never),
+    ).rejects.toThrow()
+
+    await expect(
+      caller.messageBranchFromSelection({
+        messageId: 'm1',
+        selection: {
+          quote: 'hello',
+          selectorJson: {
+            selector: [{ quote: 'hello', start: 0, end: 5 }],
+          },
+        },
+        newNodeMeta: {
+          title: '',
+        },
+        idempotencyKey: 'branch-idem-1',
       }),
+    ).rejects.toThrow()
+
+    await expect(
+      caller.messageBranchFromSelection({
+        messageId: 'm1',
+        selection: {
+          quote: 'hello',
+          selectorJson: 42,
+        },
+        idempotencyKey: 'branch-idem-1',
+      } as never),
+    ).rejects.toThrow()
+
+    await expect(
+      caller.messageBranchFromSelection({
+        messageId: 'm1',
+        selection: {
+          quote: 'hello',
+          selectorJson: {
+            selector: [
+              {
+                start: Number.POSITIVE_INFINITY,
+                quote: 'hello',
+                end: 5,
+              },
+            ],
+          },
+        },
+        idempotencyKey: 'branch-idem-1',
+      } as never),
+    ).rejects.toThrow()
+
+    await expect(
+      caller.messageBranchFromSelection({
+        messageId: 'm1',
+        selection: {
+          quote: 'hello',
+          selectorJson: {
+            selector: [{ quote: 'hello', start: 4, end: 4 }],
+          },
+        },
+        idempotencyKey: 'branch-idem-1',
+      } as never),
+    ).rejects.toThrow()
+
+    await expect(
+      caller.messageBranchFromSelection({
+        messageId: 'm1',
+        selection: {
+          quote: 'hello',
+          selectorJson: {
+            selector: [],
+          },
+        },
+        idempotencyKey: 'branch-idem-1',
+      } as never),
     ).rejects.toThrow()
   })
 })

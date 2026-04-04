@@ -59,7 +59,9 @@ const makeContext = (): AppRouterContext => ({
       leadsToNodeId: 'n2',
       kind: 'branch' as const,
       quote: 'hello',
-      selectorJson: { selector: [] },
+      selectorJson: {
+        selector: [{ quote: 'hello', start: 0, end: 5 }],
+      },
       createdByUserId: 'u1',
       createdAt: fixedNow,
       updatedAt: fixedNow,
