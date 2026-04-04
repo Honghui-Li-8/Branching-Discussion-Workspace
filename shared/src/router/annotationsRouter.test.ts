@@ -1,3 +1,4 @@
+import { describe, expect, jest, test } from '@jest/globals'
 import { appRouter, type AppRouterContext } from '../index'
 
 const fixedNow = '2026-03-17T00:00:00.000Z'
@@ -124,7 +125,10 @@ describe('appRouter annotation routes', () => {
     const branchResult = await caller.messageBranchFromSelection(branchInput)
 
     expect(ctx.listMessageAnnotationsByMessage).toHaveBeenCalledWith('m1')
-    expect(ctx.messageBranchFromSelection).toHaveBeenCalledWith(branchInput)
+    expect(ctx.messageBranchFromSelection).toHaveBeenCalledTimes(1)
+    const messageBranchFromSelectionCalls = (ctx.messageBranchFromSelection as jest.Mock).mock
+      .calls
+    expect(messageBranchFromSelectionCalls[0]?.[0]).toEqual(branchInput)
     expect(listResult[0]?.id).toBe('a1')
     expect(branchResult.annotation.id).toBe('a1')
     expect(branchResult.branchNodeId).toBe('n-child-1')
