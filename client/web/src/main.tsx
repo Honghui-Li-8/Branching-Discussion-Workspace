@@ -7,6 +7,8 @@ import { AuthProvider } from './components/AuthProvider'
 import { WorkspaceSync } from './components/WorkspaceSync'
 import { store } from './store'
 
+import '@recogito/react-text-annotator/react-text-annotator.css'
+import '@recogito/text-annotator/text-annotator.css'
 import './index.css'
 import App from './App.tsx'
 

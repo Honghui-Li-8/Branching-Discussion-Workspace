@@ -3,6 +3,7 @@ import {
   formatCitationLabel,
   getRenderableCitations,
 } from './citationMetadata'
+import { AssistantMessageAnnotationWrapper } from './AssistantMessageAnnotations'
 import { ModelMarkdown } from './ModelMarkdown'
 
 type AssistantConversationMessageProps = {
@@ -21,7 +22,9 @@ export const AssistantConversationMessage = ({
           className="w-full rounded-[14px] border border-[#9fc4d8]/85 bg-white/55 px-5 py-4 text-sm leading-relaxed text-[#1f4f68] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] backdrop-blur-[2px]"
           style={{ overflowWrap: 'anywhere' }}
         >
-          <ModelMarkdown content={message.content} />
+          <AssistantMessageAnnotationWrapper messageId={message.id}>
+            <ModelMarkdown content={message.content} />
+          </AssistantMessageAnnotationWrapper>
         </div>
 
         {citations.length > 0 ? (

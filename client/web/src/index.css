@@ -21,3 +21,16 @@
     text-rendering: optimizeLegibility;
   }
 }
+
+.assistant-annotation-scope .r6o-span-highlight-layer .r6o-annotation {
+  border-radius: px;
+  overflow: visible;
+}
+
+.assistant-annotation-scope .r6o-span-highlight-layer .r6o-annotation::before {
+  content: '';
+  position: absolute;
+  inset: -1px -2px;
+  border-radius: 3px;
+  background: rgba(245, 158, 11, 0.2);
+}
