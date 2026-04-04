@@ -49,6 +49,29 @@ const makeContext = (): AppRouterContext => {
     createdAt: fixedNow,
   }
 
+  const annotation = {
+    id: 'a1',
+    messageId: message.id,
+    leadsToNodeId: 'n-child-1',
+    kind: 'branch' as const,
+    quote: 'hello',
+    startOffset: 0,
+    endOffset: 5,
+    selectorJson: {
+      selector: [
+        {
+          quote: 'hello',
+          start: 0,
+          end: 5,
+        },
+      ],
+    },
+    createdByUserId: user.id,
+    createdAt: fixedNow,
+    updatedAt: fixedNow,
+    deletedAt: null,
+  }
+
   return {
     sessionUserId: 'u1',
     listUsers: jest.fn(async () => [user]),
@@ -76,6 +99,11 @@ const makeContext = (): AppRouterContext => {
     createMessage: jest.fn(async () => message),
     updateMessage: jest.fn(async () => message),
     deleteMessage: jest.fn(async () => ({ id: message.id })),
+    listMessageAnnotationsByMessage: jest.fn(async () => [annotation]),
+    messageBranchFromSelection: jest.fn(async () => ({
+      annotation,
+      branchNodeId: annotation.leadsToNodeId ?? 'n-child-1',
+    })),
     conversationSend: jest.fn(async () => ({
       turnId: 't1',
       status: 'completed' as const,
@@ -129,6 +157,22 @@ describe('appRouter', () => {
         idempotencyKey: 'idempotency-key-1',
       }),
     ).rejects.toThrow('Authentication required.')
+    await expect(
+      caller.messageAnnotationsByMessage({
+        messageId: 'm1',
+      }),
+    ).rejects.toThrow('Authentication required.')
+    await expect(
+      caller.messageBranchFromSelection({
+        messageId: 'm1',
+        selection: {
+          quote: 'hello',
+          selectorJson: { selector: [] },
+        },
+        targetNodeId: 'n-child-1',
+        idempotencyKey: 'branch-idem-1',
+      }),
+    ).rejects.toThrow('Authentication required.')
   })
 
   test('nodeCreate validates input', async () => {
@@ -180,6 +224,97 @@ describe('appRouter', () => {
   test('messageUpdate validates patch payload', async () => {
     const caller = appRouter.createCaller(makeContext())
     await expect(caller.messageUpdate({ id: 'm1' } as never)).rejects.toThrow()
+  })
+
+  test('message annotation procedures delegate to context', async () => {
+    const ctx = makeContext()
+    const caller = appRouter.createCaller(ctx)
+    const listInput = { messageId: 'm1' }
+    const branchInput = {
+      messageId: 'm1',
+      selection: {
+        quote: 'hello',
+        selectorJson: {
+          selector: [
+            {
+              quote: 'hello',
+              start: 0,
+              end: 5,
+            },
+          ],
+        },
+        startOffset: 0,
+        endOffset: 5,
+      },
+      targetNodeId: 'n-child-1',
+      idempotencyKey: 'branch-idem-1',
+    }
+
+    const listResult = await caller.messageAnnotationsByMessage(listInput)
+    const branchResult = await caller.messageBranchFromSelection(branchInput)
+
+    expect(ctx.listMessageAnnotationsByMessage).toHaveBeenCalledWith('m1')
+    expect(ctx.messageBranchFromSelection).toHaveBeenCalledWith(branchInput)
+    expect(listResult[0]?.id).toBe('a1')
+    expect(branchResult.annotation.id).toBe('a1')
+    expect(branchResult.branchNodeId).toBe('n-child-1')
+  })
+
+  test('messageBranchFromSelection validates input', async () => {
+    const caller = appRouter.createCaller(makeContext())
+
+    await expect(
+      caller.messageBranchFromSelection({
+        messageId: 'm1',
+        selection: {
+          quote: '   ',
+          selectorJson: { selector: [] },
+        },
+        targetNodeId: 'n-child-1',
+        idempotencyKey: 'branch-idem-1',
+      }),
+    ).rejects.toThrow()
+
+    await expect(
+      caller.messageBranchFromSelection({
+        messageId: 'm1',
+        selection: {
+          quote: 'hello',
+          selectorJson: { selector: [] },
+        },
+        idempotencyKey: 'branch-idem-1',
+      } as never),
+    ).rejects.toThrow()
+
+    await expect(
+      caller.messageBranchFromSelection({
+        messageId: 'm1',
+        selection: {
+          quote: 'hello',
+          selectorJson: { selector: [] },
+        },
+        targetNodeId: 'n-child-1',
+        createNode: {
+          parentNodeId: 'n1',
+          type: 'decision',
+          title: 'Branch node title',
+          summary: 'Branch summary',
+        },
+        idempotencyKey: 'branch-idem-1',
+      } as never),
+    ).rejects.toThrow()
+
+    await expect(
+      caller.messageBranchFromSelection({
+        messageId: 'm1',
+        selection: {
+          quote: 'hello',
+          selectorJson: { selector: [] },
+        },
+        targetNodeId: 'n-child-1',
+        idempotencyKey: '',
+      }),
+    ).rejects.toThrow()
   })
 
   test('delete procedures delegate to context', async () => {

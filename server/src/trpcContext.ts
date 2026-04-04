@@ -61,6 +61,13 @@ export const createAppRouterContext = (req: ContextRequest): AppRouterContext =>
     })
   }
 
+  const throwAnnotationFeatureNotImplemented = (): never => {
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Message annotation backend feature is not implemented yet.',
+    })
+  }
+
   const resolveOwnedRecordOrNull = async <T>(
     record: T | null,
     resourceId: string,
@@ -263,6 +270,14 @@ export const createAppRouterContext = (req: ContextRequest): AppRouterContext =>
         id,
         messageExistsRecord,
       )
+    },
+    listMessageAnnotationsByMessage: async (_messageId) => {
+      requireSessionUserId()
+      return throwAnnotationFeatureNotImplemented()
+    },
+    messageBranchFromSelection: async (_input) => {
+      requireSessionUserId()
+      return throwAnnotationFeatureNotImplemented()
     },
     conversationSend: async (input) => {
       const currentUserId = requireSessionUserId()

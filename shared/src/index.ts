@@ -52,6 +52,53 @@ const messageSchema = z.object({
   createdAt: z.string(),
 })
 
+const assistantAnnotationKindSchema = z.enum(['suggestion', 'branch', 'suggestion-branch'])
+const finiteNumberSchema = z
+  .number()
+  .refine((value) => Number.isFinite(value), 'Number must be finite.')
+
+type JsonPrimitive = string | number | boolean | null
+type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue }
+const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
+  z.union([
+    z.string(),
+    finiteNumberSchema,
+    z.boolean(),
+    z.null(),
+    z.array(jsonValueSchema),
+    z.record(z.string(), jsonValueSchema),
+  ]),
+)
+
+const annotationSelectorJsonSchema = z.union([
+  z.record(z.string(), jsonValueSchema),
+  z.array(jsonValueSchema),
+])
+
+const messageAnnotationSchema = z.object({
+  id: z.string(),
+  messageId: z.string(),
+  leadsToNodeId: z.string().nullable(),
+  kind: assistantAnnotationKindSchema,
+  quote: z.string(),
+  startOffset: z.number().int().nonnegative().nullable().optional(),
+  endOffset: z.number().int().nonnegative().nullable().optional(),
+  selectorJson: annotationSelectorJsonSchema,
+  createdByUserId: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  deletedAt: z.string().nullable().optional(),
+})
+
+const annotationSelectionInputSchema = z.object({
+  quote: z
+    .string()
+    .refine((value) => value.trim().length > 0, 'Quote must not be empty.'),
+  selectorJson: annotationSelectorJsonSchema,
+  startOffset: z.number().int().nonnegative().nullable().optional(),
+  endOffset: z.number().int().nonnegative().nullable().optional(),
+})
+
 const createWorkspaceInputSchema = z.object({
   title: z.string(),
   rootNodeTitle: z.string().optional(),
@@ -127,6 +174,30 @@ const deleteMessageInputSchema = z.object({
   id: z.string(),
 })
 
+const messageAnnotationsByMessageInputSchema = z.object({
+  messageId: z.string(),
+})
+
+const messageBranchFromSelectionInputSchema = z
+  .object({
+    messageId: z.string(),
+    selection: annotationSelectionInputSchema,
+    targetNodeId: z.string().optional(),
+    createNode: createNodeInputSchema.omit({ workspaceId: true }).optional(),
+    idempotencyKey: z.string().min(1),
+  })
+  .refine(
+    (value) =>
+      (value.targetNodeId !== undefined ? 1 : 0) + (value.createNode !== undefined ? 1 : 0) ===
+      1,
+    { message: 'Provide exactly one of targetNodeId or createNode.' },
+  )
+
+const messageBranchFromSelectionResultSchema = z.object({
+  annotation: messageAnnotationSchema,
+  branchNodeId: z.string(),
+})
+
 const conversationTurnStatusSchema = z.enum([
   'pending',
   'processing',
@@ -153,6 +224,7 @@ type User = z.infer<typeof userSchema>
 type Workspace = z.infer<typeof workspaceSchema>
 type Node = z.infer<typeof nodeSchema>
 type Message = z.infer<typeof messageSchema>
+type MessageAnnotation = z.infer<typeof messageAnnotationSchema>
 type CreateWorkspaceInput = z.infer<typeof createWorkspaceInputSchema>
 type UpdateWorkspaceInput = z.infer<typeof updateWorkspaceInputSchema>
 type CreateNodeInput = z.infer<typeof createNodeInputSchema>
@@ -161,6 +233,8 @@ type CreateMessageInput = z.infer<typeof createMessageInputSchema>
 type UpdateMessageInput = z.infer<typeof updateMessageInputSchema>
 type ConversationSendInput = z.infer<typeof conversationSendInputSchema>
 type ConversationSendResult = z.infer<typeof conversationSendResultSchema>
+type MessageBranchFromSelectionInput = z.infer<typeof messageBranchFromSelectionInputSchema>
+type MessageBranchFromSelectionResult = z.infer<typeof messageBranchFromSelectionResultSchema>
 
 export type AppRouterContext = {
   sessionUserId: string | null
@@ -195,6 +269,10 @@ export type AppRouterContext = {
   createMessage: (input: CreateMessageInput) => Promise<Message>
   updateMessage: (input: UpdateMessageInput) => Promise<Message | null>
   deleteMessage: (id: string) => Promise<{ id: string } | null>
+  listMessageAnnotationsByMessage: (messageId: string) => Promise<MessageAnnotation[]>
+  messageBranchFromSelection: (
+    input: MessageBranchFromSelectionInput,
+  ) => Promise<MessageBranchFromSelectionResult>
   conversationSend: (
     input: ConversationSendInput,
   ) => Promise<ConversationSendResult>
@@ -269,6 +347,13 @@ export const appRouter = t.router({
   messageDelete: protectedProcedure
     .input(deleteMessageInputSchema)
     .mutation(({ ctx, input }) => ctx.deleteMessage(input.id)),
+  messageAnnotationsByMessage: protectedProcedure
+    .input(messageAnnotationsByMessageInputSchema)
+    .query(({ ctx, input }) => ctx.listMessageAnnotationsByMessage(input.messageId)),
+  messageBranchFromSelection: protectedProcedure
+    .input(messageBranchFromSelectionInputSchema)
+    .output(messageBranchFromSelectionResultSchema)
+    .mutation(({ ctx, input }) => ctx.messageBranchFromSelection(input)),
   conversationSend: protectedProcedure
     .input(conversationSendInputSchema)
     .mutation(({ ctx, input }) => ctx.conversationSend(input)),
