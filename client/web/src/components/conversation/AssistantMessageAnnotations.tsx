@@ -279,13 +279,20 @@ const AssistantAnnotationPersistence = ({
 
 type AssistantAnnotationPopupProps = {
   messageId: string
+  initiallyPersistedAnnotationIds: string[]
 }
 
-const AssistantAnnotationPopup = ({ messageId }: AssistantAnnotationPopupProps) => {
+const AssistantAnnotationPopup = ({
+  messageId,
+  initiallyPersistedAnnotationIds,
+}: AssistantAnnotationPopupProps) => {
   const annotator = useAnnotator<
     RecogitoTextAnnotator<TextAnnotation, W3CTextAnnotation> | undefined
   >()
   const transientAnnotationIdsRef = useRef<Set<string>>(new Set())
+  const persistedAnnotationIdsRef = useRef<Set<string>>(
+    new Set(initiallyPersistedAnnotationIds),
+  )
   const pendingDismissAnnotationIdRef = useRef<string | null>(null)
   const pendingDismissShouldDeleteRef = useRef(false)
   const lastPopupAnnotationIdRef = useRef<string | null>(null)
@@ -320,6 +327,14 @@ const AssistantAnnotationPopup = ({ messageId }: AssistantAnnotationPopupProps) 
 
   const markAnnotationPersisted = (annotationId: string) => {
     transientAnnotationIdsRef.current.delete(annotationId)
+    persistedAnnotationIdsRef.current.add(annotationId)
+  }
+
+  const shouldDeleteOnDismiss = (annotationId: string): boolean => {
+    return (
+      transientAnnotationIdsRef.current.has(annotationId) ||
+      !persistedAnnotationIdsRef.current.has(annotationId)
+    )
   }
 
   return (
@@ -345,9 +360,7 @@ const AssistantAnnotationPopup = ({ messageId }: AssistantAnnotationPopupProps) 
         const selectedText = getSelectedTextFromAnnotation(annotation)
         if (lastPopupAnnotationIdRef.current !== annotation.id) {
           pendingDismissAnnotationIdRef.current = annotation.id
-          pendingDismissShouldDeleteRef.current = transientAnnotationIdsRef.current.has(
-            annotation.id,
-          )
+          pendingDismissShouldDeleteRef.current = shouldDeleteOnDismiss(annotation.id)
           lastPopupAnnotationIdRef.current = annotation.id
         }
 
@@ -356,13 +369,10 @@ const AssistantAnnotationPopup = ({ messageId }: AssistantAnnotationPopupProps) 
             return
           }
 
-          const shouldDelete = transientAnnotationIdsRef.current.has(annotation.id)
           clearPendingDismissState()
-
-          if (shouldDelete) {
-            annotator.removeAnnotation(annotation.id)
-            transientAnnotationIdsRef.current.delete(annotation.id)
-          }
+          annotator.removeAnnotation(annotation.id)
+          transientAnnotationIdsRef.current.delete(annotation.id)
+          persistedAnnotationIdsRef.current.delete(annotation.id)
 
           annotator.cancelSelected()
         }
@@ -560,6 +570,10 @@ export const AssistantMessageAnnotationWrapper = ({
     () => readStoredAnnotations(storageKey),
     [storageKey],
   )
+  const initialPersistedAnnotationIds = useMemo(
+    () => initialAnnotations.map((annotation) => annotation.id),
+    [initialAnnotations],
+  )
 
   return (
     <Annotorious>
@@ -591,7 +605,10 @@ export const AssistantMessageAnnotationWrapper = ({
           shouldAnimateOnLoad={initialAnnotations.length > 0}
         />
         <AssistantWholeWordSelectionEnforcer />
-        <AssistantAnnotationPopup messageId={messageId} />
+        <AssistantAnnotationPopup
+          messageId={messageId}
+          initiallyPersistedAnnotationIds={initialPersistedAnnotationIds}
+        />
       </TextAnnotator>
       <AssistantAnnotationPersistence
         storageKey={storageKey}
