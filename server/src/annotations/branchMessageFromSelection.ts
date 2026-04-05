@@ -5,8 +5,10 @@ import type { MessageAnnotationRecord } from '../db/models/messageAnnotation.js'
 import { getMessageBranchSourceContextForAuthorInTransaction } from '../db/queries/message.js'
 import {
   createMessageAnnotationForAuthorInTransaction,
+  getMessageAnnotationByIdForAuthorInTransaction,
   getMessageAnnotationByIdempotencyKeyForAuthorInTransaction,
   linkMessageAnnotationToNodeForAuthorInTransaction,
+  transitionMessageAnnotationToSuggestionBranchForAuthorInTransaction,
 } from '../db/queries/messageAnnotation.js'
 import { createNodeForAuthorInTransaction } from '../db/queries/node.js'
 import { createLogger } from '../logging/logger.js'
@@ -19,6 +21,9 @@ type MessageBranchFromSelectionResult = Awaited<
 const DEFAULT_BRANCH_TYPE: NonNullable<
   MessageBranchFromSelectionInput['newNodeMeta']
 >['type'] = 'option'
+const DEFAULT_BRANCH_ANNOTATION_KIND: NonNullable<
+  MessageBranchFromSelectionInput['annotationKind']
+> = 'branch'
 
 const DEFAULT_BRANCH_SUMMARY = 'Branch generated from assistant message selection.'
 const MAX_BRANCH_TITLE_LENGTH = 96
@@ -87,6 +92,29 @@ const mapAnnotationToResult = (
   deletedAt: annotation.deletedAt,
 })
 
+const selectionMatchesAnnotation = (
+  input: MessageBranchFromSelectionInput,
+  annotation: MessageAnnotationRecord,
+): boolean => {
+  if (annotation.messageId !== input.messageId) {
+    return false
+  }
+
+  if (annotation.quote !== input.selection.quote) {
+    return false
+  }
+
+  if ((annotation.startOffset ?? null) !== (input.selection.startOffset ?? null)) {
+    return false
+  }
+
+  if ((annotation.endOffset ?? null) !== (input.selection.endOffset ?? null)) {
+    return false
+  }
+
+  return JSON.stringify(annotation.selectorJson) === JSON.stringify(input.selection.selectorJson)
+}
+
 type BranchMessageFromSelectionParams = {
   input: MessageBranchFromSelectionInput
   currentUserId: string
@@ -146,17 +174,115 @@ export const branchMessageFromSelectionInTransaction = async ({
       }
     }
 
+    if (input.annotationKind === 'suggestion-branch' && !input.sourceAnnotationId) {
+      throw new MessageBranchSelectionConflictError(
+        'sourceAnnotationId is required for suggestion-to-branch conversion.',
+      )
+    }
+
+    if (input.annotationKind === 'suggestion-branch' && input.sourceAnnotationId) {
+      const sourceAnnotation = await getMessageAnnotationByIdForAuthorInTransaction(
+        client,
+        input.sourceAnnotationId,
+        currentUserId,
+      )
+      if (!sourceAnnotation) {
+        throw new MessageBranchSelectionConflictError(
+          'Source suggestion annotation was not found for conversion.',
+        )
+      }
+
+      if (sourceAnnotation.messageId !== input.messageId) {
+        throw new MessageBranchSelectionConflictError(
+          'Source annotation does not belong to the requested message.',
+        )
+      }
+
+      if (!selectionMatchesAnnotation(input, sourceAnnotation)) {
+        logger.warn(
+          '[annotations] suggestion conversion received selection payload that differs from source annotation.',
+          {
+            message_id: input.messageId,
+            author_user_id: currentUserId,
+            source_annotation_id: sourceAnnotation.id,
+          },
+        )
+      }
+
+      if (sourceAnnotation.kind === 'suggestion-branch') {
+        if (!sourceAnnotation.leadsToNodeId) {
+          throw new MessageBranchSelectionConflictError(
+            'Source suggestion-branch annotation has no linked node.',
+          )
+        }
+
+        await client.query('COMMIT')
+        return {
+          annotation: mapAnnotationToResult(sourceAnnotation),
+          branchNodeId: sourceAnnotation.leadsToNodeId,
+        }
+      }
+
+      if (sourceAnnotation.kind !== 'suggestion') {
+        throw new MessageBranchSelectionConflictError(
+          'Only suggestion annotations can be converted into suggestion-branch.',
+        )
+      }
+
+      const branchMeta = resolveBranchNodeMeta(input)
+      const branchNode = await createNodeForAuthorInTransaction(client, {
+        workspaceId: source.workspaceId,
+        authorUserId: currentUserId,
+        parentNodeId: source.parentNodeId,
+        type: branchMeta.type,
+        title: branchMeta.title,
+        summary: branchMeta.summary,
+      })
+      if (!branchNode) {
+        throw new Error('Failed to create branch node.')
+      }
+
+      const transitionedAnnotation =
+        await transitionMessageAnnotationToSuggestionBranchForAuthorInTransaction(
+          client,
+          {
+            id: sourceAnnotation.id,
+            leadsToNodeId: branchNode.id,
+            idempotencyKey: input.idempotencyKey,
+            messageId: input.messageId,
+          },
+          currentUserId,
+        )
+      if (!transitionedAnnotation) {
+        throw new MessageBranchSelectionConflictError(
+          'Failed to convert suggestion annotation into suggestion-branch.',
+        )
+      }
+
+      await client.query('COMMIT')
+      logger.debug('[annotations] suggestion converted to suggestion-branch.', {
+        message_id: input.messageId,
+        author_user_id: currentUserId,
+        annotation_id: transitionedAnnotation.id,
+        branch_node_id: branchNode.id,
+      })
+      return {
+        annotation: mapAnnotationToResult(transitionedAnnotation),
+        branchNodeId: branchNode.id,
+      }
+    }
+
     logger.debug('[annotations] creating annotation record.', {
       message_id: input.messageId,
       author_user_id: currentUserId,
-      kind: 'branch',
+      kind: input.annotationKind ?? DEFAULT_BRANCH_ANNOTATION_KIND,
       idempotency_key: input.idempotencyKey,
       quote_length: input.selection.quote.length,
       selector_count: input.selection.selectorJson.selector.length,
     })
     const insertedAnnotation = await createMessageAnnotationForAuthorInTransaction(client, {
       messageId: input.messageId,
-      kind: 'branch',
+      kind: input.annotationKind ?? DEFAULT_BRANCH_ANNOTATION_KIND,
       quote: input.selection.quote,
       startOffset: input.selection.startOffset ?? null,
       endOffset: input.selection.endOffset ?? null,

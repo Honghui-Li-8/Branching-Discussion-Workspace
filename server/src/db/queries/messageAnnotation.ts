@@ -143,7 +143,22 @@ export const getMessageAnnotationByIdForAuthor = async (
   id: string,
   authorUserId: string,
 ): Promise<MessageAnnotationRecord | null> => {
-  const result = await query<MessageAnnotationRow>(
+  return getMessageAnnotationByIdForAuthorWithExecutor(
+    (sql, params) => query<MessageAnnotationRow>(sql, params),
+    id,
+    authorUserId,
+    { lockForUpdate: false },
+  )
+}
+
+const getMessageAnnotationByIdForAuthorWithExecutor = async (
+  runQuery: MessageAnnotationRowQueryExecutor,
+  id: string,
+  authorUserId: string,
+  options: { lockForUpdate: boolean },
+): Promise<MessageAnnotationRecord | null> => {
+  const lockClause = options.lockForUpdate ? 'FOR UPDATE' : ''
+  const result = await runQuery(
     `
     SELECT
       ${scopedMessageAnnotationColumns}
@@ -154,6 +169,7 @@ export const getMessageAnnotationByIdForAuthor = async (
     WHERE a.id = $1
       AND w.author_user_id = $2
       AND a.deleted_at IS NULL
+    ${lockClause}
     `,
     [id, authorUserId],
   )
@@ -164,6 +180,18 @@ export const getMessageAnnotationByIdForAuthor = async (
 
   return mapMessageAnnotationRow(result.rows[0])
 }
+
+export const getMessageAnnotationByIdForAuthorInTransaction = async (
+  client: Pick<PoolClient, 'query'>,
+  id: string,
+  authorUserId: string,
+): Promise<MessageAnnotationRecord | null> =>
+  getMessageAnnotationByIdForAuthorWithExecutor(
+    (sql, params) => client.query<MessageAnnotationRow>(sql, params),
+    id,
+    authorUserId,
+    { lockForUpdate: true },
+  )
 
 export const getMessageAnnotationByIdempotencyKeyForAuthor = async (
   input: MessageAnnotationIdempotencyLookupInput,
@@ -239,6 +267,14 @@ type QueryableCreateMessageAnnotationInput =
 const resolveCreateActorUserId = (input: QueryableCreateMessageAnnotationInput): string =>
   'createdByUserId' in input ? input.createdByUserId : input.authorUserId
 
+const assertCreateMessageAnnotationInputIsValid = (
+  input: QueryableCreateMessageAnnotationInput,
+): void => {
+  if (input.kind === 'suggestion' && input.leadsToNodeId != null) {
+    throw new Error('Suggestion annotations cannot be created with a linked node.')
+  }
+}
+
 const createMessageAnnotationParams = (
   input: QueryableCreateMessageAnnotationInput,
 ): [
@@ -251,25 +287,29 @@ const createMessageAnnotationParams = (
   string,
   string,
   string,
-] => [
-  input.messageId,
-  input.leadsToNodeId ?? null,
-  input.kind,
-  input.quote,
-  input.startOffset ?? null,
-  input.endOffset ?? null,
-  JSON.stringify(input.selectorJson),
-  resolveCreateActorUserId(input),
-  input.idempotencyKey,
-]
+] => {
+  assertCreateMessageAnnotationInputIsValid(input)
+
+  return [
+    input.messageId,
+    input.leadsToNodeId ?? null,
+    input.kind,
+    input.quote,
+    input.startOffset ?? null,
+    input.endOffset ?? null,
+    JSON.stringify(input.selectorJson),
+    resolveCreateActorUserId(input),
+    input.idempotencyKey,
+  ]
+}
 
 const buildCreateMessageAnnotationSql = (options: {
   scopedToWorkspaceOwner: boolean
   returnExistingOnConflict: boolean
 }): string => {
   const ownershipGuard = options.scopedToWorkspaceOwner
-    ? 'w.author_user_id = c.actor_user_id AND'
-    : ''
+    ? 'w.author_user_id = c.actor_user_id'
+    : 'TRUE'
   const resultSelectSql = options.returnExistingOnConflict
     ? `
   SELECT
@@ -336,7 +376,8 @@ const buildCreateMessageAnnotationSql = (options: {
     JOIN workspaces w ON w.id = source_node.workspace_id
     LEFT JOIN nodes target_node ON target_node.id = c.leads_to_node_id
     WHERE ${ownershipGuard}
-      (c.leads_to_node_id IS NULL OR target_node.workspace_id = source_node.workspace_id)
+      AND NOT (c.kind = 'suggestion' AND c.leads_to_node_id IS NOT NULL)
+      AND (c.leads_to_node_id IS NULL OR target_node.workspace_id = source_node.workspace_id)
     ON CONFLICT (created_by_user_id, message_id, idempotency_key)
       WHERE deleted_at IS NULL
       DO NOTHING
@@ -413,6 +454,108 @@ export const createMessageAnnotationForAuthorInTransaction = async (
     { insertOnly: true },
   )
 
+const transitionMessageAnnotationToSuggestionBranchForAuthorSql = `
+  UPDATE message_annotations a
+  SET
+    kind = 'suggestion-branch',
+    leads_to_node_id = $2,
+    idempotency_key = $3
+  FROM messages m
+  JOIN nodes source_node ON source_node.id = m.node_id
+  JOIN workspaces w ON w.id = source_node.workspace_id
+  JOIN nodes target_node ON target_node.id = $2
+  WHERE a.id = $1
+    AND a.message_id = m.id
+    AND a.message_id = $4
+    AND w.author_user_id = $5
+    AND a.deleted_at IS NULL
+    AND a.kind = 'suggestion'
+    AND target_node.workspace_id = source_node.workspace_id
+  RETURNING
+    ${scopedMessageAnnotationColumns}
+`
+
+type TransitionMessageAnnotationToSuggestionBranchInput = {
+  id: string
+  leadsToNodeId: string
+  idempotencyKey: string
+  messageId: string
+}
+
+const transitionMessageAnnotationToSuggestionBranchForAuthorWithExecutor = async (
+  runQuery: MessageAnnotationRowQueryExecutor,
+  input: TransitionMessageAnnotationToSuggestionBranchInput,
+  authorUserId: string,
+): Promise<MessageAnnotationRecord | null> => {
+  const result = await runQuery(transitionMessageAnnotationToSuggestionBranchForAuthorSql, [
+    input.id,
+    input.leadsToNodeId,
+    input.idempotencyKey,
+    input.messageId,
+    authorUserId,
+  ])
+  if (result.rows.length === 0) {
+    return null
+  }
+
+  return mapMessageAnnotationRow(result.rows[0])
+}
+
+export const transitionMessageAnnotationToSuggestionBranchForAuthorInTransaction = async (
+  client: Pick<PoolClient, 'query'>,
+  input: TransitionMessageAnnotationToSuggestionBranchInput,
+  authorUserId: string,
+): Promise<MessageAnnotationRecord | null> =>
+  transitionMessageAnnotationToSuggestionBranchForAuthorWithExecutor(
+    (sql, params) => client.query<MessageAnnotationRow>(sql, params),
+    input,
+    authorUserId,
+  )
+
+const transitionMessageAnnotationToSuggestionForAuthorSql = `
+  UPDATE message_annotations a
+  SET
+    kind = 'suggestion',
+    leads_to_node_id = NULL
+  FROM messages m
+  JOIN nodes source_node ON source_node.id = m.node_id
+  JOIN workspaces w ON w.id = source_node.workspace_id
+  WHERE a.id = $1
+    AND a.message_id = m.id
+    AND w.author_user_id = $2
+    AND a.deleted_at IS NULL
+    AND a.kind = 'suggestion-branch'
+  RETURNING
+    ${scopedMessageAnnotationColumns}
+`
+
+const transitionMessageAnnotationToSuggestionForAuthorWithExecutor = async (
+  runQuery: MessageAnnotationRowQueryExecutor,
+  id: string,
+  authorUserId: string,
+): Promise<MessageAnnotationRecord | null> => {
+  const result = await runQuery(transitionMessageAnnotationToSuggestionForAuthorSql, [
+    id,
+    authorUserId,
+  ])
+
+  if (result.rows.length === 0) {
+    return null
+  }
+
+  return mapMessageAnnotationRow(result.rows[0])
+}
+
+export const transitionMessageAnnotationToSuggestionForAuthor = async (
+  id: string,
+  authorUserId: string,
+): Promise<MessageAnnotationRecord | null> =>
+  transitionMessageAnnotationToSuggestionForAuthorWithExecutor(
+    (sql, params) => query<MessageAnnotationRow>(sql, params),
+    id,
+    authorUserId,
+  )
+
 const buildLinkMessageAnnotationSql = (options: { scopedToWorkspaceOwner: boolean }): string => {
   const ownershipGuard = options.scopedToWorkspaceOwner ? 'AND w.author_user_id = $3' : ''
 
@@ -427,6 +570,7 @@ const buildLinkMessageAnnotationSql = (options: { scopedToWorkspaceOwner: boolea
       AND a.message_id = m.id
       ${ownershipGuard}
       AND a.deleted_at IS NULL
+      AND ($2::uuid IS NULL OR a.kind IN ('branch', 'suggestion-branch'))
       AND ($2::uuid IS NULL OR target_node.workspace_id = source_node.workspace_id)
     RETURNING
       ${scopedMessageAnnotationColumns}

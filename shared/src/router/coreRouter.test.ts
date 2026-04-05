@@ -78,6 +78,20 @@ const makeContext = (): AppRouterContext => {
     updateMessage: jest.fn(async () => message),
     deleteMessage: jest.fn(async () => ({ id: message.id })),
     listMessageAnnotationsByMessage: jest.fn(async () => []),
+    messageSuggestFromSelection: jest.fn(async () => ({
+      id: 'a2',
+      messageId: message.id,
+      leadsToNodeId: null,
+      kind: 'suggestion' as const,
+      quote: 'hello',
+      selectorJson: {
+        selector: [{ quote: 'hello', start: 0, end: 5 }],
+      },
+      createdByUserId: user.id,
+      createdAt: fixedNow,
+      updatedAt: fixedNow,
+      deletedAt: null,
+    })),
     messageAnnotationDelete: jest.fn(async () => ({
       annotationId: 'a1',
       deletedBranchNodeId: 'n-child-1',

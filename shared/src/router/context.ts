@@ -16,6 +16,7 @@ import type {
   MessageAnnotationDeleteResult,
   MessageBranchFromSelectionInput,
   MessageBranchFromSelectionResult,
+  MessageSuggestFromSelectionInput,
 } from './schemas/annotations.js'
 import type {
   ConversationSendInput,
@@ -56,6 +57,9 @@ export type AppRouterContext = {
   updateMessage: (input: UpdateMessageInput) => Promise<Message | null>
   deleteMessage: (id: string) => Promise<{ id: string } | null>
   listMessageAnnotationsByMessage: (messageId: string) => Promise<MessageAnnotation[]>
+  messageSuggestFromSelection: (
+    input: MessageSuggestFromSelectionInput,
+  ) => Promise<MessageAnnotation>
   messageAnnotationDelete: (
     input: MessageAnnotationDeleteInput,
   ) => Promise<MessageAnnotationDeleteResult>

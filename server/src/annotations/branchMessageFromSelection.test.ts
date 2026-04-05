@@ -42,6 +42,12 @@ const buildInput = () => ({
   idempotencyKey: 'idem-1',
 })
 
+const buildSuggestionConversionInput = () => ({
+  ...buildInput(),
+  annotationKind: 'suggestion-branch' as const,
+  sourceAnnotationId: 'a-suggest-1',
+})
+
 const sourceRow = {
   message_id: 'm1',
   parent_node_id: 'n-parent',
@@ -192,6 +198,112 @@ describe('branchMessageFromSelectionInTransaction', () => {
     ).rejects.toThrow('insert node failed')
 
     expect(queryMock).toHaveBeenLastCalledWith('ROLLBACK')
+    expect(releaseMock).toHaveBeenCalledTimes(1)
+  })
+
+  test('converts existing suggestion annotation into suggestion-branch with linked node', async () => {
+    const { queryMock, releaseMock } = createMockClient()
+
+    queryMock
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({ rows: [sourceRow] }) // source
+      .mockResolvedValueOnce({ rows: [] }) // existing idempotent row
+      .mockResolvedValueOnce({
+        rows: [{ ...baseAnnotationRow, id: 'a-suggest-1', kind: 'suggestion', leads_to_node_id: null }],
+      }) // source suggestion annotation lock
+      .mockResolvedValueOnce({ rows: [{ id: 'n-child-2' }] }) // inserted node
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            ...baseAnnotationRow,
+            id: 'a-suggest-1',
+            kind: 'suggestion-branch',
+            leads_to_node_id: 'n-child-2',
+            idempotency_key: 'idem-1',
+          },
+        ],
+      }) // transitioned annotation
+      .mockResolvedValueOnce({ rows: [] }) // COMMIT
+
+    const result = await branchMessageFromSelectionInTransaction({
+      input: buildSuggestionConversionInput(),
+      currentUserId: 'u1',
+    })
+
+    expect(result).toEqual({
+      annotation: {
+        id: 'a-suggest-1',
+        messageId: 'm1',
+        leadsToNodeId: 'n-child-2',
+        kind: 'suggestion-branch',
+        quote: 'hello world',
+        startOffset: 0,
+        endOffset: 11,
+        selectorJson: {
+          selector: [{ quote: 'hello world', start: 0, end: 11 }],
+        },
+        createdByUserId: 'u1',
+        createdAt: '2026-04-04T00:00:00.000Z',
+        updatedAt: '2026-04-04T00:00:00.000Z',
+        deletedAt: null,
+      },
+      branchNodeId: 'n-child-2',
+    })
+
+    expect(queryMock).toHaveBeenLastCalledWith('COMMIT')
+    expect(releaseMock).toHaveBeenCalledTimes(1)
+  })
+
+  test('converts suggestion even when request selection payload differs from stored annotation', async () => {
+    const { queryMock, releaseMock } = createMockClient()
+
+    queryMock
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({ rows: [sourceRow] }) // source
+      .mockResolvedValueOnce({ rows: [] }) // existing idempotent row
+      .mockResolvedValueOnce({
+        rows: [{ ...baseAnnotationRow, id: 'a-suggest-1', kind: 'suggestion', quote: 'different' }],
+      }) // source suggestion annotation lock
+      .mockResolvedValueOnce({ rows: [{ id: 'n-child-3' }] }) // inserted node
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            ...baseAnnotationRow,
+            id: 'a-suggest-1',
+            kind: 'suggestion-branch',
+            leads_to_node_id: 'n-child-3',
+            idempotency_key: 'idem-1',
+          },
+        ],
+      }) // transitioned annotation
+      .mockResolvedValueOnce({ rows: [] }) // COMMIT
+
+    await expect(
+      branchMessageFromSelectionInTransaction({
+        input: buildSuggestionConversionInput(),
+        currentUserId: 'u1',
+      }),
+    ).resolves.toEqual({
+      annotation: {
+        id: 'a-suggest-1',
+        messageId: 'm1',
+        leadsToNodeId: 'n-child-3',
+        kind: 'suggestion-branch',
+        quote: 'hello world',
+        startOffset: 0,
+        endOffset: 11,
+        selectorJson: {
+          selector: [{ quote: 'hello world', start: 0, end: 11 }],
+        },
+        createdByUserId: 'u1',
+        createdAt: '2026-04-04T00:00:00.000Z',
+        updatedAt: '2026-04-04T00:00:00.000Z',
+        deletedAt: null,
+      },
+      branchNodeId: 'n-child-3',
+    })
+
+    expect(queryMock).toHaveBeenLastCalledWith('COMMIT')
     expect(releaseMock).toHaveBeenCalledTimes(1)
   })
 })

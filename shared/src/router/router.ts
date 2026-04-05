@@ -16,6 +16,7 @@ import {
   messageAnnotationsByMessageInputSchema,
   messageBranchFromSelectionInputSchema,
   messageBranchFromSelectionResultSchema,
+  messageSuggestFromSelectionInputSchema,
 } from './schemas/annotations.js'
 import { conversationSendInputSchema } from './schemas/conversation.js'
 import { protectedProcedure, t } from './trpc.js'
@@ -81,6 +82,9 @@ export const appRouter = t.router({
   messageAnnotationsByMessage: protectedProcedure
     .input(messageAnnotationsByMessageInputSchema)
     .query(({ ctx, input }) => ctx.listMessageAnnotationsByMessage(input.messageId)),
+  messageSuggestFromSelection: protectedProcedure
+    .input(messageSuggestFromSelectionInputSchema)
+    .mutation(({ ctx, input }) => ctx.messageSuggestFromSelection(input)),
   messageAnnotationDelete: protectedProcedure
     .input(messageAnnotationDeleteInputSchema)
     .output(messageAnnotationDeleteResultSchema)

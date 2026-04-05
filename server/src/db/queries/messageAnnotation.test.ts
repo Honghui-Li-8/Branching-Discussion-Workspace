@@ -6,6 +6,7 @@ import {
   createMessageAnnotationForAuthorInTransaction,
   getMessageAnnotationById,
   getMessageAnnotationByIdForAuthor,
+  getMessageAnnotationByIdForAuthorInTransaction,
   getMessageAnnotationByIdempotencyKeyForAuthor,
   getMessageAnnotationByIdempotencyKeyForAuthorInTransaction,
   linkMessageAnnotationToNodeForAuthor,
@@ -14,6 +15,8 @@ import {
   listMessageAnnotationsByMessageForAuthor,
   messageAnnotationExists,
   softDeleteMessageAnnotationForAuthor,
+  transitionMessageAnnotationToSuggestionBranchForAuthorInTransaction,
+  transitionMessageAnnotationToSuggestionForAuthor,
 } from './messageAnnotation'
 
 jest.mock('../client.js', () => ({
@@ -127,6 +130,26 @@ describe('message annotation queries', () => {
     )
   })
 
+  test('getMessageAnnotationByIdForAuthorInTransaction uses client query with row lock', async () => {
+    const transactionQueryMock = jest.fn(async (_sql: string, _params: unknown[]) => ({
+      rows: [annotationRow],
+    }))
+
+    const result = await getMessageAnnotationByIdForAuthorInTransaction(
+      {
+        query: transactionQueryMock,
+      } as never,
+      'a1',
+      'u1',
+    )
+
+    expect(result?.id).toBe('a1')
+    expect(transactionQueryMock).toHaveBeenCalledWith(
+      expect.stringContaining('FOR UPDATE'),
+      ['a1', 'u1'],
+    )
+  })
+
   test('getMessageAnnotationByIdempotencyKeyForAuthor returns matching row', async () => {
     queryMock.mockResolvedValueOnce({ rows: [annotationRow] } as never)
 
@@ -227,6 +250,24 @@ describe('message annotation queries', () => {
     ).rejects.toThrow('Message not found or target node is outside message workspace')
   })
 
+  test('createMessageAnnotation rejects suggestion with linked node', async () => {
+    await expect(
+      createMessageAnnotation({
+        messageId: 'm1',
+        leadsToNodeId: 'n2',
+        kind: 'suggestion',
+        quote: 'hello',
+        selectorJson: {
+          selector: [{ quote: 'hello', start: 0, end: 5 }],
+        },
+        createdByUserId: 'u1',
+        idempotencyKey: 'idem-1',
+      }),
+    ).rejects.toThrow('Suggestion annotations cannot be created with a linked node.')
+
+    expect(queryMock).not.toHaveBeenCalled()
+  })
+
   test('createMessageAnnotationForAuthor returns null for non-owner', async () => {
     queryMock.mockResolvedValueOnce({ rows: [] } as never)
 
@@ -246,6 +287,8 @@ describe('message annotation queries', () => {
       expect.stringContaining('WHERE w.author_user_id = c.actor_user_id'),
       ['m1', null, 'branch', 'hello', null, null, '{"selector":[{"quote":"hello","start":0,"end":5}]}', 'u2', 'idem-1'],
     )
+    const sql = queryMock.mock.calls[0]?.[0]
+    expect(sql).toEqual(expect.not.stringContaining('AND AND'))
   })
 
   test('createMessageAnnotationForAuthorInTransaction uses provided client query executor', async () => {
@@ -274,6 +317,24 @@ describe('message annotation queries', () => {
       expect.stringContaining('INSERT INTO message_annotations'),
       ['m1', null, 'branch', 'hello', null, null, '{"selector":[{"quote":"hello","start":0,"end":5}]}', 'u1', 'idem-1'],
     )
+  })
+
+  test('createMessageAnnotationForAuthor rejects suggestion with linked node', async () => {
+    await expect(
+      createMessageAnnotationForAuthor({
+        messageId: 'm1',
+        leadsToNodeId: 'n2',
+        kind: 'suggestion',
+        quote: 'hello',
+        selectorJson: {
+          selector: [{ quote: 'hello', start: 0, end: 5 }],
+        },
+        authorUserId: 'u1',
+        idempotencyKey: 'idem-1',
+      }),
+    ).rejects.toThrow('Suggestion annotations cannot be created with a linked node.')
+
+    expect(queryMock).not.toHaveBeenCalled()
   })
 
   test('linkMessageAnnotationToNodeForAuthor returns null for non-owner', async () => {
@@ -312,7 +373,7 @@ describe('message annotation queries', () => {
 
     expect(result?.id).toBe('a1')
     expect(transactionQueryMock).toHaveBeenCalledWith(
-      expect.stringContaining('AND w.author_user_id = $3'),
+      expect.stringContaining("AND ($2::uuid IS NULL OR a.kind IN ('branch', 'suggestion-branch'))"),
       ['a1', 'n2', 'u1'],
     )
   })
@@ -326,6 +387,48 @@ describe('message annotation queries', () => {
     expect(queryMock).toHaveBeenCalledWith(
       expect.stringContaining('SET deleted_at = NOW()'),
       ['a1', 'u1'],
+    )
+  })
+
+  test('transitionMessageAnnotationToSuggestionForAuthor downgrades suggestion-branch annotation', async () => {
+    queryMock.mockResolvedValueOnce({
+      rows: [{ ...annotationRow, kind: 'suggestion', leads_to_node_id: null }],
+    } as never)
+
+    const result = await transitionMessageAnnotationToSuggestionForAuthor('a1', 'u1')
+
+    expect(result?.kind).toBe('suggestion')
+    expect(result?.leadsToNodeId).toBeNull()
+    expect(queryMock).toHaveBeenCalledWith(
+      expect.stringContaining("SET\n    kind = 'suggestion'"),
+      ['a1', 'u1'],
+    )
+  })
+
+  test('transitionMessageAnnotationToSuggestionBranchForAuthorInTransaction upgrades suggestion annotation with node link', async () => {
+    const transactionQueryMock = jest.fn(async (_sql: string, _params: unknown[]) => ({
+      rows: [{ ...annotationRow, kind: 'suggestion-branch', idempotency_key: 'idem-branch-1' }],
+    }))
+
+    const result = await transitionMessageAnnotationToSuggestionBranchForAuthorInTransaction(
+      {
+        query: transactionQueryMock,
+      } as never,
+      {
+        id: 'a1',
+        leadsToNodeId: 'n2',
+        idempotencyKey: 'idem-branch-1',
+        messageId: 'm1',
+      },
+      'u1',
+    )
+
+    expect(result?.kind).toBe('suggestion-branch')
+    expect(result?.leadsToNodeId).toBe('n2')
+    expect(result?.idempotencyKey).toBe('idem-branch-1')
+    expect(transactionQueryMock).toHaveBeenCalledWith(
+      expect.stringContaining("SET\n    kind = 'suggestion-branch'"),
+      ['a1', 'n2', 'idem-branch-1', 'm1', 'u1'],
     )
   })
 })

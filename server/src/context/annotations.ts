@@ -1,12 +1,14 @@
 import { TRPCError } from '@trpc/server'
 import type { AppRouterContext } from '@branching/shared'
 import {
+  createMessageAnnotationForAuthor as createMessageAnnotationForAuthorRecord,
   deleteNodeForAuthor as deleteNodeForAuthorRecord,
   getNodeByIdForAuthor as getNodeByIdForAuthorRecord,
   getMessageAnnotationByIdForAuthor as getMessageAnnotationByIdForAuthorRecord,
   getMessageByIdForAuthor as getMessageByIdForAuthorRecord,
   listMessageAnnotationsByMessageForAuthor as listMessageAnnotationsByMessageForAuthorRecord,
   softDeleteMessageAnnotationForAuthor as softDeleteMessageAnnotationForAuthorRecord,
+  transitionMessageAnnotationToSuggestionForAuthor as transitionMessageAnnotationToSuggestionForAuthorRecord,
 } from '../db/index.js'
 import { messageExists as messageExistsRecord } from '../db/queries/internal.js'
 import { messageAnnotationExists as messageAnnotationExistsRecord } from '../db/queries/messageAnnotation.js'
@@ -19,7 +21,10 @@ import type { ContextOwnershipHelpers } from './types.js'
 
 type AnnotationHandlers = Pick<
   AppRouterContext,
-  'listMessageAnnotationsByMessage' | 'messageAnnotationDelete' | 'messageBranchFromSelection'
+  | 'listMessageAnnotationsByMessage'
+  | 'messageSuggestFromSelection'
+  | 'messageAnnotationDelete'
+  | 'messageBranchFromSelection'
 >
 
 const logger = createLogger('trpc-context')
@@ -82,6 +87,63 @@ export const createAnnotationHandlers = ({
       throw error
     }
   },
+  messageSuggestFromSelection: async (input) => {
+    let currentUserId: string | null = null
+
+    try {
+      const resolvedUserId = requireSessionUserId()
+      currentUserId = resolvedUserId
+      logger.info('[annotations] suggest request received.', {
+        message_id: input.messageId,
+        author_user_id: resolvedUserId,
+        idempotency_key: input.idempotencyKey,
+        selection_quote_length: input.selection.quote.length,
+        selector_count: input.selection.selectorJson.selector.length,
+      })
+
+      await resolveOwnedRecordOrNotFound(
+        await getMessageByIdForAuthorRecord(input.messageId, resolvedUserId),
+        input.messageId,
+        messageExistsRecord,
+        'Message not found.',
+      )
+
+      const annotation = await createMessageAnnotationForAuthorRecord({
+        messageId: input.messageId,
+        kind: 'suggestion',
+        quote: input.selection.quote,
+        startOffset: input.selection.startOffset ?? null,
+        endOffset: input.selection.endOffset ?? null,
+        selectorJson: input.selection.selectorJson,
+        authorUserId: resolvedUserId,
+        idempotencyKey: input.idempotencyKey,
+      })
+      if (!annotation) {
+        return throwNotFound('Message not found.')
+      }
+
+      logger.info('[annotations] suggest request completed.', {
+        message_id: input.messageId,
+        author_user_id: resolvedUserId,
+        annotation_id: annotation.id,
+      })
+      return annotation
+    } catch (error) {
+      logger.error('[annotations] suggest request failed.', {
+        message_id: input.messageId,
+        author_user_id: currentUserId,
+        idempotency_key: input.idempotencyKey,
+        error,
+      })
+      logger.debug('[annotations] suggest request debug error details.', {
+        message_id: input.messageId,
+        author_user_id: currentUserId,
+        idempotency_key: input.idempotencyKey,
+        error,
+      })
+      throw error
+    }
+  },
   messageAnnotationDelete: async (input) => {
     let currentUserId: string | null = null
 
@@ -103,6 +165,7 @@ export const createAnnotationHandlers = ({
       let deletedBranchNodeId: string | null = null
       let deletedNodeCount = 0
       let deletedMessageCount = 0
+
       if (annotation.leadsToNodeId) {
         const linkedNode = await getNodeByIdForAuthorRecord(annotation.leadsToNodeId, resolvedUserId)
         if (linkedNode && linkedNode.parentNodeId === linkedNode.id) {
@@ -120,10 +183,31 @@ export const createAnnotationHandlers = ({
         }
       }
 
-      const deleted = await softDeleteMessageAnnotationForAuthorRecord(
-        annotation.id,
-        resolvedUserId,
-      )
+      if (annotation.kind === 'suggestion-branch') {
+        const transitioned = await transitionMessageAnnotationToSuggestionForAuthorRecord(
+          annotation.id,
+          resolvedUserId,
+        )
+        if (!transitioned) {
+          return throwNotFound('Message annotation not found.')
+        }
+
+        logger.info('[annotations] delete request completed (downgraded suggestion-branch).', {
+          annotation_id: transitioned.id,
+          author_user_id: resolvedUserId,
+          deleted_branch_node_id: deletedBranchNodeId,
+          deleted_node_count: deletedNodeCount,
+          deleted_message_count: deletedMessageCount,
+        })
+        return {
+          annotationId: transitioned.id,
+          deletedBranchNodeId,
+          deletedNodeCount,
+          deletedMessageCount,
+        }
+      }
+
+      const deleted = await softDeleteMessageAnnotationForAuthorRecord(annotation.id, resolvedUserId)
       if (!deleted) {
         return throwNotFound('Message annotation not found.')
       }

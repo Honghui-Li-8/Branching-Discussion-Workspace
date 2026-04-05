@@ -62,6 +62,12 @@ const makeContext = (): AppRouterContext => {
     updateMessage: jest.fn(async () => null),
     deleteMessage: jest.fn(async () => null),
     listMessageAnnotationsByMessage: jest.fn(async () => [annotation]),
+    messageSuggestFromSelection: jest.fn(async () => ({
+      ...annotation,
+      id: 'a2',
+      kind: 'suggestion' as const,
+      leadsToNodeId: null,
+    })),
     messageAnnotationDelete: jest.fn(async () => ({
       annotationId: annotation.id,
       deletedBranchNodeId: annotation.leadsToNodeId,
@@ -106,6 +112,18 @@ describe('appRouter annotation routes', () => {
       }),
     ).rejects.toThrow('Authentication required.')
     await expect(
+      caller.messageSuggestFromSelection({
+        messageId: 'm1',
+        selection: {
+          quote: 'hello',
+          selectorJson: {
+            selector: [{ quote: 'hello', start: 0, end: 5 }],
+          },
+        },
+        idempotencyKey: 'suggest-idem-1',
+      }),
+    ).rejects.toThrow('Authentication required.')
+    await expect(
       caller.messageAnnotationDelete({
         annotationId: 'a1',
       }),
@@ -116,6 +134,22 @@ describe('appRouter annotation routes', () => {
     const ctx = makeContext()
     const caller = appRouter.createCaller(ctx)
     const listInput = { messageId: 'm1' }
+    const suggestInput = {
+      messageId: 'm1',
+      selection: {
+        quote: 'hello',
+        selectorJson: {
+          selector: [
+            {
+              quote: 'hello',
+              start: 0,
+              end: 5,
+            },
+          ],
+        },
+      },
+      idempotencyKey: 'suggest-idem-1',
+    }
     const deleteInput = { annotationId: 'a1' }
     const branchInput = {
       messageId: 'm1',
@@ -142,16 +176,19 @@ describe('appRouter annotation routes', () => {
     }
 
     const listResult = await caller.messageAnnotationsByMessage(listInput)
+    const suggestResult = await caller.messageSuggestFromSelection(suggestInput)
     const deleteResult = await caller.messageAnnotationDelete(deleteInput)
     const branchResult = await caller.messageBranchFromSelection(branchInput)
 
     expect(ctx.listMessageAnnotationsByMessage).toHaveBeenCalledWith('m1')
+    expect(ctx.messageSuggestFromSelection).toHaveBeenCalledWith(suggestInput)
     expect(ctx.messageAnnotationDelete).toHaveBeenCalledWith(deleteInput)
     expect(ctx.messageBranchFromSelection).toHaveBeenCalledTimes(1)
     const messageBranchFromSelectionCalls = (ctx.messageBranchFromSelection as jest.Mock).mock
       .calls
     expect(messageBranchFromSelectionCalls[0]?.[0]).toEqual(branchInput)
     expect(listResult[0]?.id).toBe('a1')
+    expect(suggestResult.kind).toBe('suggestion')
     expect(deleteResult.annotationId).toBe('a1')
     expect(branchResult.annotation.id).toBe('a1')
     expect(branchResult.branchNodeId).toBe('n-child-1')
@@ -159,6 +196,32 @@ describe('appRouter annotation routes', () => {
 
   test('messageBranchFromSelection validates input', async () => {
     const caller = appRouter.createCaller(makeContext())
+
+    await expect(
+      caller.messageSuggestFromSelection({
+        messageId: 'm1',
+        selection: {
+          quote: '   ',
+          selectorJson: {
+            selector: [{ quote: 'hello', start: 0, end: 5 }],
+          },
+        },
+        idempotencyKey: 'suggest-idem-1',
+      }),
+    ).rejects.toThrow()
+
+    await expect(
+      caller.messageSuggestFromSelection({
+        messageId: 'm1',
+        selection: {
+          quote: 'hello',
+          selectorJson: {
+            selector: [{ quote: 'hello', start: 0, end: 5 }],
+          },
+        },
+        idempotencyKey: '',
+      } as never),
+    ).rejects.toThrow()
 
     await expect(
       caller.messageAnnotationDelete({
@@ -260,6 +323,20 @@ describe('appRouter annotation routes', () => {
             selector: [],
           },
         },
+        idempotencyKey: 'branch-idem-1',
+      } as never),
+    ).rejects.toThrow()
+
+    await expect(
+      caller.messageBranchFromSelection({
+        messageId: 'm1',
+        selection: {
+          quote: 'hello',
+          selectorJson: {
+            selector: [{ quote: 'hello', start: 0, end: 5 }],
+          },
+        },
+        annotationKind: 'suggestion-branch',
         idempotencyKey: 'branch-idem-1',
       } as never),
     ).rejects.toThrow()

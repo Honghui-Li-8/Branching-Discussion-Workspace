@@ -44,4 +44,5 @@ export {
   linkMessageAnnotationToNodeForAuthor,
   listMessageAnnotationsByMessageForAuthor,
   softDeleteMessageAnnotationForAuthor,
+  transitionMessageAnnotationToSuggestionForAuthor,
 } from './messageAnnotation.js'

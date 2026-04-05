@@ -52,6 +52,20 @@ const makeContext = (): AppRouterContext => ({
   updateMessage: jest.fn(async () => null),
   deleteMessage: jest.fn(async () => null),
   listMessageAnnotationsByMessage: jest.fn(async () => []),
+  messageSuggestFromSelection: jest.fn(async () => ({
+    id: 'a2',
+    messageId: 'm1',
+    leadsToNodeId: null,
+    kind: 'suggestion' as const,
+    quote: 'hello',
+    selectorJson: {
+      selector: [{ quote: 'hello', start: 0, end: 5 }],
+    },
+    createdByUserId: 'u1',
+    createdAt: fixedNow,
+    updatedAt: fixedNow,
+    deletedAt: null,
+  })),
   messageAnnotationDelete: jest.fn(async () => ({
     annotationId: 'a1',
     deletedBranchNodeId: 'n2',
@@ -95,6 +109,7 @@ describe('shared public API router surface', () => {
     const caller = appRouter.createCaller(makeContext())
 
     expect(typeof caller.messageAnnotationsByMessage).toBe('function')
+    expect(typeof caller.messageSuggestFromSelection).toBe('function')
     expect(typeof caller.messageAnnotationDelete).toBe('function')
     expect(typeof caller.messageBranchFromSelection).toBe('function')
     expect(typeof caller.conversationSend).toBe('function')

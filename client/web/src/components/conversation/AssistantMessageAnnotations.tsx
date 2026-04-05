@@ -304,6 +304,7 @@ const AssistantAnnotationPopup = ({
   >()
   const utils = trpc.useUtils()
   const branchMutation = trpc.messageBranchFromSelection.useMutation()
+  const suggestMutation = trpc.messageSuggestFromSelection.useMutation()
   const deleteAnnotationMutation = trpc.messageAnnotationDelete.useMutation()
   const persistedAnnotationIdSet = useMemo(
     () => new Set(initiallyPersistedAnnotationIds),
@@ -400,14 +401,19 @@ const AssistantAnnotationPopup = ({
             annotator.cancelSelected()
             return
           }
-          const branchInput: MessageBranchFromSelectionInput = {
-            messageId,
-            idempotencyKey: createIdempotencyKey(),
-            selection,
-          }
-
           const currentKind = getAnnotationKind(annotation)
           const nextKind = getBranchActionKind(currentKind)
+          const sourceAnnotationId =
+            currentKind === 'suggestion' && persistedAnnotationIdSet.has(annotation.id)
+              ? annotation.id
+              : undefined
+          const branchInput: MessageBranchFromSelectionInput = {
+            messageId,
+            sourceAnnotationId,
+            idempotencyKey: createIdempotencyKey(),
+            selection,
+            annotationKind: nextKind === 'suggestion-branch' ? 'suggestion-branch' : 'branch',
+          }
           setAnnotationKind(annotator, annotation, nextKind)
 
           markAnnotationPersisted(annotation.id)
@@ -457,10 +463,22 @@ const AssistantAnnotationPopup = ({
         }
 
         const handleSuggestSelection = () => {
-          if (annotator) {
-            setAnnotationKind(annotator, annotation, 'suggestion')
+          if (!annotator || suggestMutation.isPending) {
+            return
           }
 
+          const selection = buildBranchSelectionPayload(annotation.target.selector)
+          if (!selection) {
+            console.error('[assistant-selection] unable to build valid suggest selection payload', {
+              messageId,
+              annotationId: annotation.id,
+            })
+            clearPendingDismissState()
+            annotator.cancelSelected()
+            return
+          }
+
+          setAnnotationKind(annotator, annotation, 'suggestion')
           markAnnotationPersisted(annotation.id)
           clearPendingDismissState()
           console.log('[assistant-selection] selected text', {
@@ -469,8 +487,42 @@ const AssistantAnnotationPopup = ({
             text: selectedText,
             annotationId: annotation.id,
           })
+          annotator.cancelSelected()
 
-          annotator?.cancelSelected()
+          suggestMutation.mutate(
+            {
+              messageId,
+              selection,
+              idempotencyKey: createIdempotencyKey(),
+            },
+            {
+              onSuccess: async (result) => {
+                utils.messageAnnotationsByMessage.setData(
+                  { messageId },
+                  (currentAnnotations) => {
+                    const current = currentAnnotations ?? []
+                    const alreadyPresent = current.some(
+                      (existingAnnotation) => existingAnnotation.id === result.id,
+                    )
+                    if (alreadyPresent) {
+                      return current
+                    }
+
+                    return [...current, result]
+                  },
+                )
+                await utils.messageAnnotationsByMessage.invalidate({ messageId })
+              },
+              onError: async (error) => {
+                console.error('[assistant-selection] failed to create suggestion from selection', {
+                  messageId,
+                  annotationId: annotation.id,
+                  error: error.message,
+                })
+                await utils.messageAnnotationsByMessage.invalidate({ messageId })
+              },
+            },
+          )
         }
 
         return (

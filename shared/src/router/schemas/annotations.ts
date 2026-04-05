@@ -61,6 +61,12 @@ export const messageAnnotationsByMessageInputSchema = z.object({
   messageId: z.string(),
 })
 
+export const messageSuggestFromSelectionInputSchema = z.object({
+  messageId: z.string(),
+  selection: annotationSelectionInputSchema,
+  idempotencyKey: z.string().min(1),
+})
+
 export const messageAnnotationDeleteInputSchema = z.object({
   annotationId: nonEmptyTrimmedStringSchema,
 })
@@ -75,10 +81,19 @@ export const messageAnnotationDeleteResultSchema = z.object({
 export const messageBranchFromSelectionInputSchema = z
   .object({
     messageId: z.string(),
+    sourceAnnotationId: z.string().optional(),
     selection: annotationSelectionInputSchema,
+    annotationKind: z.enum(['branch', 'suggestion-branch']).optional(),
     newNodeMeta: messageBranchNewNodeMetaSchema.optional(),
     idempotencyKey: z.string().min(1),
   })
+  .refine(
+    (value) => value.annotationKind !== 'suggestion-branch' || Boolean(value.sourceAnnotationId),
+    {
+      message: 'sourceAnnotationId is required when annotationKind is suggestion-branch.',
+      path: ['sourceAnnotationId'],
+    },
+  )
 
 export const messageBranchFromSelectionResultSchema = z.object({
   annotation: messageAnnotationSchema,
@@ -88,5 +103,6 @@ export const messageBranchFromSelectionResultSchema = z.object({
 export type MessageAnnotation = z.infer<typeof messageAnnotationSchema>
 export type MessageAnnotationDeleteInput = z.infer<typeof messageAnnotationDeleteInputSchema>
 export type MessageAnnotationDeleteResult = z.infer<typeof messageAnnotationDeleteResultSchema>
+export type MessageSuggestFromSelectionInput = z.infer<typeof messageSuggestFromSelectionInputSchema>
 export type MessageBranchFromSelectionInput = z.infer<typeof messageBranchFromSelectionInputSchema>
 export type MessageBranchFromSelectionResult = z.infer<typeof messageBranchFromSelectionResultSchema>
