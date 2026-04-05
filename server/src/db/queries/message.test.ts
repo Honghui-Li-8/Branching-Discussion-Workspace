@@ -5,6 +5,8 @@ import {
   createMessageForAuthor,
   deleteMessageForAuthor,
   deleteMessage,
+  getMessageBranchSourceContextForAuthor,
+  getMessageBranchSourceContextForAuthorInTransaction,
   getMessageByIdForAuthor,
   getMessageById,
   listMessagesByTurn,
@@ -164,6 +166,48 @@ describe('message queries', () => {
       2,
       expect.stringContaining('AND w.author_user_id = $2'),
       ['m1', 'u2'],
+    )
+  })
+
+  test('getMessageBranchSourceContextForAuthor returns source context for owner', async () => {
+    queryMock.mockResolvedValueOnce({
+      rows: [{ message_id: 'm1', parent_node_id: 'n1', workspace_id: 'w1' }],
+    } as never)
+
+    const result = await getMessageBranchSourceContextForAuthor('m1', 'u1')
+
+    expect(result).toEqual({
+      messageId: 'm1',
+      parentNodeId: 'n1',
+      workspaceId: 'w1',
+    })
+    expect(queryMock).toHaveBeenCalledWith(
+      expect.stringContaining('AND w.author_user_id = $2'),
+      ['m1', 'u1'],
+    )
+  })
+
+  test('getMessageBranchSourceContextForAuthorInTransaction uses provided client query executor', async () => {
+    const transactionQueryMock = jest.fn(async (_sql: string, _params: unknown[]) => ({
+      rows: [{ message_id: 'm1', parent_node_id: 'n1', workspace_id: 'w1' }],
+    }))
+
+    const result = await getMessageBranchSourceContextForAuthorInTransaction(
+      {
+        query: transactionQueryMock,
+      } as never,
+      'm1',
+      'u1',
+    )
+
+    expect(result).toEqual({
+      messageId: 'm1',
+      parentNodeId: 'n1',
+      workspaceId: 'w1',
+    })
+    expect(transactionQueryMock).toHaveBeenCalledWith(
+      expect.stringContaining('FROM messages m'),
+      ['m1', 'u1'],
     )
   })
 

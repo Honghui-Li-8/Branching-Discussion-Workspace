@@ -7,6 +7,7 @@ import type {
   MessageAnnotationSelectorJson,
   UpdateMessageAnnotationLinkInput,
 } from '../models/messageAnnotation.js'
+import type { PoolClient } from 'pg'
 import { query } from '../client.js'
 
 type MessageAnnotationRow = {
@@ -24,6 +25,11 @@ type MessageAnnotationRow = {
   updated_at: string
   deleted_at: string | null
 }
+
+type MessageAnnotationRowQueryExecutor = (
+  sql: string,
+  params: unknown[],
+) => Promise<{ rows: MessageAnnotationRow[] }>
 
 const MESSAGE_ANNOTATION_COLUMN_NAMES = [
   'id',
@@ -156,7 +162,21 @@ export const getMessageAnnotationByIdForAuthor = async (
 export const getMessageAnnotationByIdempotencyKeyForAuthor = async (
   input: MessageAnnotationIdempotencyLookupInput,
 ): Promise<MessageAnnotationRecord | null> => {
-  const result = await query<MessageAnnotationRow>(
+  return getMessageAnnotationByIdempotencyKeyForAuthorWithExecutor(
+    (sql, params) => query<MessageAnnotationRow>(sql, params),
+    input,
+    { lockForUpdate: false },
+  )
+}
+
+const getMessageAnnotationByIdempotencyKeyForAuthorWithExecutor = async (
+  runQuery: MessageAnnotationRowQueryExecutor,
+  input: MessageAnnotationIdempotencyLookupInput,
+  options: { lockForUpdate: boolean },
+): Promise<MessageAnnotationRecord | null> => {
+  const lockClause = options.lockForUpdate ? 'FOR UPDATE' : ''
+
+  const result = await runQuery(
     `
     SELECT
       ${scopedMessageAnnotationColumns}
@@ -170,6 +190,7 @@ export const getMessageAnnotationByIdempotencyKeyForAuthor = async (
       AND w.author_user_id = $2
       AND a.deleted_at IS NULL
     LIMIT 1
+    ${lockClause}
     `,
     [input.messageId, input.authorUserId, input.idempotencyKey],
   )
@@ -180,6 +201,16 @@ export const getMessageAnnotationByIdempotencyKeyForAuthor = async (
 
   return mapMessageAnnotationRow(result.rows[0])
 }
+
+export const getMessageAnnotationByIdempotencyKeyForAuthorInTransaction = async (
+  client: Pick<PoolClient, 'query'>,
+  input: MessageAnnotationIdempotencyLookupInput,
+): Promise<MessageAnnotationRecord | null> =>
+  getMessageAnnotationByIdempotencyKeyForAuthorWithExecutor(
+    (sql, params) => client.query<MessageAnnotationRow>(sql, params),
+    input,
+    { lockForUpdate: true },
+  )
 
 export const messageAnnotationExists = async (id: string): Promise<boolean> => {
   const result = await query<{ id: string }>(
@@ -226,10 +257,37 @@ const createMessageAnnotationParams = (
   input.idempotencyKey,
 ]
 
-const buildCreateMessageAnnotationSql = (options: { scopedToWorkspaceOwner: boolean }): string => {
+const buildCreateMessageAnnotationSql = (options: {
+  scopedToWorkspaceOwner: boolean
+  returnExistingOnConflict: boolean
+}): string => {
   const ownershipGuard = options.scopedToWorkspaceOwner
     ? 'w.author_user_id = c.actor_user_id AND'
     : ''
+  const resultSelectSql = options.returnExistingOnConflict
+    ? `
+  SELECT
+    ${fullMessageAnnotationColumns}
+  FROM inserted
+
+  UNION ALL
+
+  SELECT
+    ${buildSelectColumns('existing')}
+  FROM message_annotations existing
+  JOIN candidate c
+    ON existing.message_id = c.message_id
+   AND existing.created_by_user_id = c.actor_user_id
+   AND existing.idempotency_key = c.idempotency_key
+  WHERE existing.deleted_at IS NULL
+    AND NOT EXISTS (SELECT 1 FROM inserted)
+  LIMIT 1
+`
+    : `
+  SELECT
+    ${fullMessageAnnotationColumns}
+  FROM inserted
+`
 
   return `
   WITH candidate AS (
@@ -279,31 +337,23 @@ const buildCreateMessageAnnotationSql = (options: { scopedToWorkspaceOwner: bool
     RETURNING
       ${fullMessageAnnotationColumns}
   )
-  SELECT
-    ${fullMessageAnnotationColumns}
-  FROM inserted
-
-  UNION ALL
-
-  SELECT
-    ${buildSelectColumns('existing')}
-  FROM message_annotations existing
-  JOIN candidate c
-    ON existing.message_id = c.message_id
-   AND existing.created_by_user_id = c.actor_user_id
-   AND existing.idempotency_key = c.idempotency_key
-  WHERE existing.deleted_at IS NULL
-    AND NOT EXISTS (SELECT 1 FROM inserted)
-  LIMIT 1
+${resultSelectSql}
 `
 }
 
 const createMessageAnnotationSql = buildCreateMessageAnnotationSql({
   scopedToWorkspaceOwner: false,
+  returnExistingOnConflict: true,
 })
 
 const createMessageAnnotationForAuthorSql = buildCreateMessageAnnotationSql({
   scopedToWorkspaceOwner: true,
+  returnExistingOnConflict: true,
+})
+
+const createMessageAnnotationForAuthorInsertOnlySql = buildCreateMessageAnnotationSql({
+  scopedToWorkspaceOwner: true,
+  returnExistingOnConflict: false,
 })
 
 export const createMessageAnnotation = async (
@@ -324,10 +374,21 @@ export const createMessageAnnotation = async (
 export const createMessageAnnotationForAuthor = async (
   input: CreateMessageAnnotationForAuthorInput,
 ): Promise<MessageAnnotationRecord | null> => {
-  const result = await query<MessageAnnotationRow>(
-    createMessageAnnotationForAuthorSql,
-    createMessageAnnotationParams(input),
+  return createMessageAnnotationForAuthorWithExecutor(
+    (sql, params) => query<MessageAnnotationRow>(sql, params),
+    input,
   )
+}
+
+const createMessageAnnotationForAuthorWithExecutor = async (
+  runQuery: MessageAnnotationRowQueryExecutor,
+  input: CreateMessageAnnotationForAuthorInput,
+  options: { insertOnly?: boolean } = {},
+): Promise<MessageAnnotationRecord | null> => {
+  const sql = options.insertOnly
+    ? createMessageAnnotationForAuthorInsertOnlySql
+    : createMessageAnnotationForAuthorSql
+  const result = await runQuery(sql, createMessageAnnotationParams(input))
 
   if (result.rows.length === 0) {
     return null
@@ -335,6 +396,16 @@ export const createMessageAnnotationForAuthor = async (
 
   return mapMessageAnnotationRow(result.rows[0])
 }
+
+export const createMessageAnnotationForAuthorInTransaction = async (
+  client: Pick<PoolClient, 'query'>,
+  input: CreateMessageAnnotationForAuthorInput,
+): Promise<MessageAnnotationRecord | null> =>
+  createMessageAnnotationForAuthorWithExecutor(
+    (sql, params) => client.query<MessageAnnotationRow>(sql, params),
+    input,
+    { insertOnly: true },
+  )
 
 const buildLinkMessageAnnotationSql = (options: { scopedToWorkspaceOwner: boolean }): string => {
   const ownershipGuard = options.scopedToWorkspaceOwner ? 'AND w.author_user_id = $3' : ''
@@ -383,7 +454,19 @@ export const linkMessageAnnotationToNodeForAuthor = async (
   input: UpdateMessageAnnotationLinkInput,
   authorUserId: string,
 ): Promise<MessageAnnotationRecord | null> => {
-  const result = await query<MessageAnnotationRow>(linkMessageAnnotationForAuthorSql, [
+  return linkMessageAnnotationToNodeForAuthorWithExecutor(
+    (sql, params) => query<MessageAnnotationRow>(sql, params),
+    input,
+    authorUserId,
+  )
+}
+
+const linkMessageAnnotationToNodeForAuthorWithExecutor = async (
+  runQuery: MessageAnnotationRowQueryExecutor,
+  input: UpdateMessageAnnotationLinkInput,
+  authorUserId: string,
+): Promise<MessageAnnotationRecord | null> => {
+  const result = await runQuery(linkMessageAnnotationForAuthorSql, [
     input.id,
     input.leadsToNodeId,
     authorUserId,
@@ -395,6 +478,17 @@ export const linkMessageAnnotationToNodeForAuthor = async (
 
   return mapMessageAnnotationRow(result.rows[0])
 }
+
+export const linkMessageAnnotationToNodeForAuthorInTransaction = async (
+  client: Pick<PoolClient, 'query'>,
+  input: UpdateMessageAnnotationLinkInput,
+  authorUserId: string,
+): Promise<MessageAnnotationRecord | null> =>
+  linkMessageAnnotationToNodeForAuthorWithExecutor(
+    (sql, params) => client.query<MessageAnnotationRow>(sql, params),
+    input,
+    authorUserId,
+  )
 
 export const softDeleteMessageAnnotation = async (
   id: string,
