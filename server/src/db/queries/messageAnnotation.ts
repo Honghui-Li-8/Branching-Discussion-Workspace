@@ -21,9 +21,9 @@ type MessageAnnotationRow = {
   selector_json: MessageAnnotationSelectorJson
   created_by_user_id: string
   idempotency_key: string
-  created_at: string
-  updated_at: string
-  deleted_at: string | null
+  created_at: string | Date
+  updated_at: string | Date
+  deleted_at: string | Date | null
 }
 
 type MessageAnnotationRowQueryExecutor = (
@@ -55,6 +55,12 @@ const buildSelectColumns = (alias?: string): string =>
 const fullMessageAnnotationColumns = buildSelectColumns()
 const scopedMessageAnnotationColumns = buildSelectColumns('a')
 
+const normalizeTimestamp = (value: string | Date): string =>
+  value instanceof Date ? value.toISOString() : value
+
+const normalizeNullableTimestamp = (value: string | Date | null): string | null =>
+  value === null ? null : normalizeTimestamp(value)
+
 const mapMessageAnnotationRow = (row: MessageAnnotationRow): MessageAnnotationRecord => ({
   id: row.id,
   messageId: row.message_id,
@@ -66,9 +72,9 @@ const mapMessageAnnotationRow = (row: MessageAnnotationRow): MessageAnnotationRe
   selectorJson: row.selector_json,
   createdByUserId: row.created_by_user_id,
   idempotencyKey: row.idempotency_key,
-  createdAt: row.created_at,
-  updatedAt: row.updated_at,
-  deletedAt: row.deleted_at,
+  createdAt: normalizeTimestamp(row.created_at),
+  updatedAt: normalizeTimestamp(row.updated_at),
+  deletedAt: normalizeNullableTimestamp(row.deleted_at),
 })
 
 export const listMessageAnnotationsByMessage = async (

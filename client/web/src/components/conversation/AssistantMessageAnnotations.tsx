@@ -388,8 +388,26 @@ const AssistantAnnotationPopup = ({
 
           annotator.cancelSelected()
           branchMutation.mutate(branchInput, {
-            onSuccess: async () => {
-              await utils.messageAnnotationsByMessage.invalidate({ messageId })
+            onSuccess: async (result) => {
+              utils.messageAnnotationsByMessage.setData(
+                { messageId },
+                (currentAnnotations) => {
+                  const current = currentAnnotations ?? []
+                  const alreadyPresent = current.some(
+                    (existingAnnotation) => existingAnnotation.id === result.annotation.id,
+                  )
+                  if (alreadyPresent) {
+                    return current
+                  }
+
+                  return [...current, result.annotation]
+                },
+              )
+
+              await Promise.all([
+                utils.messageAnnotationsByMessage.invalidate({ messageId }),
+                utils.nodesByWorkspace.invalidate(),
+              ])
             },
             onError: (error) => {
               console.error('[assistant-selection] failed to create branch from selection', {
