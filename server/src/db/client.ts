@@ -5,6 +5,7 @@ import {
   type QueryResultRow,
 } from 'pg'
 import { resolve } from 'node:path'
+import { createLogger } from '../logging/logger.js'
 
 const loadEnvFiles = (): void => {
   const candidates = [
@@ -30,6 +31,7 @@ const pools: Record<DatabaseTarget, Pool | null> = {
   app: null,
   dev: null,
 }
+const logger = createLogger('db-client')
 
 const getDatabaseUrl = (target: DatabaseTarget): string => {
   const envVar = target === 'dev' ? 'DATABASE_URL_DEV' : 'DATABASE_URL'
@@ -59,18 +61,48 @@ export const query = async <T extends QueryResultRow = QueryResultRow>(
   params: unknown[] = [],
   databaseTarget: DatabaseTarget = 'app',
 ): Promise<QueryResult<T>> => {
-  const result = await getPool(databaseTarget).query<T>(text, params)
-  return result
+  try {
+    const result = await getPool(databaseTarget).query<T>(text, params)
+    return result
+  } catch (error) {
+    logger.error('[db] query execution failed.', {
+      database_target: databaseTarget,
+      query_preview: text.slice(0, 160),
+      parameter_count: params.length,
+      error,
+    })
+    logger.debug('[db] query execution debug error details.', {
+      database_target: databaseTarget,
+      query_text: text,
+      params,
+      error,
+    })
+    throw error
+  }
 }
 
-export const getClient = async (databaseTarget: DatabaseTarget = 'app'): Promise<PoolClient> =>
-  getPool(databaseTarget).connect()
+export const getClient = async (databaseTarget: DatabaseTarget = 'app'): Promise<PoolClient> => {
+  try {
+    return await getPool(databaseTarget).connect()
+  } catch (error) {
+    logger.error('[db] failed to acquire client connection.', {
+      database_target: databaseTarget,
+      error,
+    })
+    logger.debug('[db] client acquisition debug error details.', {
+      database_target: databaseTarget,
+      error,
+    })
+    throw error
+  }
+}
 
 export const testConnection = async (): Promise<boolean> => {
   try {
     await query('SELECT 1')
     return true
-  } catch (_error) {
+  } catch (error) {
+    logger.debug('[db] testConnection failed.', { error })
     return false
   }
 }

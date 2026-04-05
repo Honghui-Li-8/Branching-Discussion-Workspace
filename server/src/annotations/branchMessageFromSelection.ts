@@ -1,4 +1,5 @@
 import type { AppRouterContext } from '@branching/shared'
+import type { PoolClient } from 'pg'
 import { getClient } from '../db/client.js'
 import type { MessageAnnotationRecord } from '../db/models/messageAnnotation.js'
 import { getMessageBranchSourceContextForAuthorInTransaction } from '../db/queries/message.js'
@@ -103,9 +104,10 @@ export const branchMessageFromSelectionInTransaction = async ({
     selector_count: input.selection.selectorJson.selector.length,
   })
 
-  const client = await getClient()
+  let client: PoolClient | null = null
 
   try {
+    client = await getClient()
     await client.query('BEGIN')
 
     const source = await getMessageBranchSourceContextForAuthorInTransaction(
@@ -255,14 +257,34 @@ export const branchMessageFromSelectionInTransaction = async ({
       idempotency_key: input.idempotencyKey,
       error,
     })
-    try {
-      await client.query('ROLLBACK')
-    } catch {
-      // Ignore rollback failures and rethrow original error.
+    logger.debug('[annotations] branch-from-selection debug error details.', {
+      message_id: input.messageId,
+      author_user_id: currentUserId,
+      idempotency_key: input.idempotencyKey,
+      error,
+    })
+    if (client) {
+      try {
+        await client.query('ROLLBACK')
+      } catch (rollbackError) {
+        logger.error('[annotations] branch-from-selection rollback failed.', {
+          message_id: input.messageId,
+          author_user_id: currentUserId,
+          idempotency_key: input.idempotencyKey,
+          error: rollbackError,
+        })
+        logger.debug('[annotations] branch-from-selection rollback debug error details.', {
+          message_id: input.messageId,
+          author_user_id: currentUserId,
+          idempotency_key: input.idempotencyKey,
+          error: rollbackError,
+        })
+        // Ignore rollback failures and rethrow original error.
+      }
     }
 
     throw error
   } finally {
-    client.release()
+    client?.release()
   }
 }

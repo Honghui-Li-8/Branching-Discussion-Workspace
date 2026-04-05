@@ -29,15 +29,18 @@ export const createAnnotationHandlers = ({
   'requireSessionUserId' | 'resolveOwnedRecordOrNull' | 'resolveOwnedRecordOrNotFound' | 'throwNotFound'
 >): AnnotationHandlers => ({
   listMessageAnnotationsByMessage: async (messageId) => {
-    const currentUserId = requireSessionUserId()
-    logger.info('[annotations] list request received.', {
-      message_id: messageId,
-      author_user_id: currentUserId,
-    })
+    let currentUserId: string | null = null
 
     try {
+      const resolvedUserId = requireSessionUserId()
+      currentUserId = resolvedUserId
+      logger.info('[annotations] list request received.', {
+        message_id: messageId,
+        author_user_id: resolvedUserId,
+      })
+
       const message = await resolveOwnedRecordOrNull(
-        await getMessageByIdForAuthorRecord(messageId, currentUserId),
+        await getMessageByIdForAuthorRecord(messageId, resolvedUserId),
         messageId,
         messageExistsRecord,
       )
@@ -45,18 +48,18 @@ export const createAnnotationHandlers = ({
       if (!message) {
         logger.info('[annotations] list request resolved: message not accessible or missing.', {
           message_id: messageId,
-          author_user_id: currentUserId,
+          author_user_id: resolvedUserId,
         })
         return []
       }
 
       const annotations = await listMessageAnnotationsByMessageForAuthorRecord(
         messageId,
-        currentUserId,
+        resolvedUserId,
       )
       logger.info('[annotations] list request completed.', {
         message_id: messageId,
-        author_user_id: currentUserId,
+        author_user_id: resolvedUserId,
         annotation_count: annotations.length,
       })
       return annotations
@@ -66,22 +69,30 @@ export const createAnnotationHandlers = ({
         author_user_id: currentUserId,
         error,
       })
+      logger.debug('[annotations] list request debug error details.', {
+        message_id: messageId,
+        author_user_id: currentUserId,
+        error,
+      })
       throw error
     }
   },
   messageBranchFromSelection: async (input) => {
-    const currentUserId = requireSessionUserId()
-    logger.info('[annotations] branch request received.', {
-      message_id: input.messageId,
-      author_user_id: currentUserId,
-      idempotency_key: input.idempotencyKey,
-      selection_quote_length: input.selection.quote.length,
-      selector_count: input.selection.selectorJson.selector.length,
-    })
+    let currentUserId: string | null = null
 
     try {
+      const resolvedUserId = requireSessionUserId()
+      currentUserId = resolvedUserId
+      logger.info('[annotations] branch request received.', {
+        message_id: input.messageId,
+        author_user_id: resolvedUserId,
+        idempotency_key: input.idempotencyKey,
+        selection_quote_length: input.selection.quote.length,
+        selector_count: input.selection.selectorJson.selector.length,
+      })
+
       await resolveOwnedRecordOrNotFound(
-        await getMessageByIdForAuthorRecord(input.messageId, currentUserId),
+        await getMessageByIdForAuthorRecord(input.messageId, resolvedUserId),
         input.messageId,
         messageExistsRecord,
         'Message not found.',
@@ -89,7 +100,7 @@ export const createAnnotationHandlers = ({
 
       const result = await branchMessageFromSelectionInTransaction({
         input,
-        currentUserId,
+        currentUserId: resolvedUserId,
       })
 
       if (!result) {
@@ -98,7 +109,7 @@ export const createAnnotationHandlers = ({
 
       logger.info('[annotations] branch request completed.', {
         message_id: input.messageId,
-        author_user_id: currentUserId,
+        author_user_id: resolvedUserId,
         annotation_id: result.annotation.id,
         branch_node_id: result.branchNodeId,
       })
@@ -111,6 +122,12 @@ export const createAnnotationHandlers = ({
           idempotency_key: input.idempotencyKey,
           error_message: error.message,
         })
+        logger.debug('[annotations] branch request conflict debug error details.', {
+          message_id: input.messageId,
+          author_user_id: currentUserId,
+          idempotency_key: input.idempotencyKey,
+          error,
+        })
         throw new TRPCError({
           code: 'CONFLICT',
           message: error.message,
@@ -118,6 +135,12 @@ export const createAnnotationHandlers = ({
       }
 
       logger.error('[annotations] branch request failed.', {
+        message_id: input.messageId,
+        author_user_id: currentUserId,
+        idempotency_key: input.idempotencyKey,
+        error,
+      })
+      logger.debug('[annotations] branch request debug error details.', {
         message_id: input.messageId,
         author_user_id: currentUserId,
         idempotency_key: input.idempotencyKey,
