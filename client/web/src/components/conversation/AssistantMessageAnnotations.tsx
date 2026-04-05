@@ -13,10 +13,14 @@ import {
   type TextAnnotation,
   type W3CTextAnnotation,
 } from '@recogito/react-text-annotator'
+import type { inferRouterOutputs } from '@trpc/server'
+import type { AppRouter } from '@branching/shared'
 import type { ReactNode } from 'react'
 import { useEffect, useMemo, useRef } from 'react'
+import { trpc } from '../../trpc'
 import { AssistantSelectionMenu } from './AssistantSelectionMenu'
 import {
+  ASSISTANT_ANNOTATION_KIND_PREFIX,
   getBranchActionKind,
   parseAnnotationKindTag,
   resolveAnnotationKind,
@@ -30,33 +34,52 @@ type AssistantMessageAnnotationWrapperProps = {
   children: ReactNode
 }
 
-const ANNOTATION_STORAGE_PREFIX = 'assistant-message-annotations-v1'
 const LOCAL_ANNOTATION_USER = {
   id: 'local-assistant-annotation-user',
   name: 'Local Assistant Annotator',
 }
 
-const buildAnnotationStorageKey = (messageId: string) =>
-  `${ANNOTATION_STORAGE_PREFIX}:${messageId}`
-
 const buildAnnotationSource = (messageId: string) => `assistant-message:${messageId}`
 
-const readStoredAnnotations = (storageKey: string): W3CTextAnnotation[] => {
-  if (typeof window === 'undefined') {
-    return []
-  }
+type RouterOutputs = inferRouterOutputs<AppRouter>
+type BackendMessageAnnotation = RouterOutputs['messageAnnotationsByMessage'][number]
 
-  try {
-    const serialized = window.localStorage.getItem(storageKey)
-    if (!serialized) {
-      return []
-    }
+const mapBackendAnnotationToW3C = (
+  annotation: BackendMessageAnnotation,
+  source: string,
+): W3CTextAnnotation => {
+  const targets = annotation.selectorJson.selector.map((selector, index) => ({
+    id: `${annotation.id}-target-${index}`,
+    source,
+    selector: [
+      {
+        type: 'TextQuoteSelector' as const,
+        exact: selector.quote,
+      },
+      {
+        type: 'TextPositionSelector' as const,
+        start: selector.start,
+        end: selector.end,
+      },
+    ],
+  }))
 
-    const parsed = JSON.parse(serialized)
-    return Array.isArray(parsed) ? (parsed as W3CTextAnnotation[]) : []
-  } catch (error) {
-    console.error('[assistant-annotation] failed to parse stored annotations', error)
-    return []
+  return {
+    '@context': 'http://www.w3.org/ns/anno.jsonld',
+    type: 'Annotation',
+    id: annotation.id,
+    body: [
+      {
+        purpose: 'tagging',
+        value: `${ASSISTANT_ANNOTATION_KIND_PREFIX}${annotation.kind}`,
+      },
+    ],
+    target: targets.length === 1 ? targets[0]! : targets,
+    created: annotation.createdAt,
+    modified: annotation.updatedAt,
+    properties: {
+      kind: annotation.kind,
+    },
   }
 }
 
@@ -225,45 +248,24 @@ const getWholeWordTarget = (
   }
 }
 
-type AssistantAnnotationPersistenceProps = {
-  storageKey: string
+type AssistantAnnotationHydrationProps = {
   initialAnnotations: W3CTextAnnotation[]
 }
 
-const AssistantAnnotationPersistence = ({
-  storageKey,
+const AssistantAnnotationHydration = ({
   initialAnnotations,
-}: AssistantAnnotationPersistenceProps) => {
+}: AssistantAnnotationHydrationProps) => {
   const annotator = useAnnotator<
     RecogitoTextAnnotator<TextAnnotation, W3CTextAnnotation> | undefined
   >()
-  const annotations = useAnnotations<TextAnnotation>()
-  const restoredFromStorageRef = useRef(false)
 
   useEffect(() => {
-    if (!annotator || restoredFromStorageRef.current) {
+    if (!annotator) {
       return
     }
 
-    if (initialAnnotations.length > 0) {
-      annotator.setAnnotations(initialAnnotations, true)
-    }
-
-    restoredFromStorageRef.current = true
+    annotator.setAnnotations(initialAnnotations, true)
   }, [annotator, initialAnnotations])
-
-  useEffect(() => {
-    if (!annotator || !restoredFromStorageRef.current || typeof window === 'undefined') {
-      return
-    }
-
-    try {
-      const serialized = JSON.stringify(annotator.getAnnotations())
-      window.localStorage.setItem(storageKey, serialized)
-    } catch (error) {
-      console.error('[assistant-annotation] failed to store annotations', error)
-    }
-  }, [annotations, annotator, storageKey])
 
   return null
 }
@@ -542,11 +544,16 @@ export const AssistantMessageAnnotationWrapper = ({
   messageId,
   children,
 }: AssistantMessageAnnotationWrapperProps) => {
-  const storageKey = useMemo(() => buildAnnotationStorageKey(messageId), [messageId])
   const annotationSource = useMemo(() => buildAnnotationSource(messageId), [messageId])
+  const messageAnnotationsQuery = trpc.messageAnnotationsByMessage.useQuery({
+    messageId,
+  })
   const initialAnnotations = useMemo(
-    () => readStoredAnnotations(storageKey),
-    [storageKey],
+    () =>
+      (messageAnnotationsQuery.data ?? []).map((annotation) =>
+        mapBackendAnnotationToW3C(annotation, annotationSource),
+      ),
+    [annotationSource, messageAnnotationsQuery.data],
   )
   const initialPersistedAnnotationIds = useMemo(
     () => initialAnnotations.map((annotation) => annotation.id),
@@ -591,8 +598,7 @@ export const AssistantMessageAnnotationWrapper = ({
           initiallyPersistedAnnotationIds={initialPersistedAnnotationIds}
         />
       </TextAnnotator>
-      <AssistantAnnotationPersistence
-        storageKey={storageKey}
+      <AssistantAnnotationHydration
         initialAnnotations={initialAnnotations}
       />
     </Annotorious>

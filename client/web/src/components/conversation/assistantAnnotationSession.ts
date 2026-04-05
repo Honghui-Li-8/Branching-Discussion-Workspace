@@ -23,6 +23,10 @@ export const useAssistantAnnotationSession = ({
   const pendingDismissShouldDeleteRef = useRef(false)
 
   useEffect(() => {
+    persistedAnnotationIdsRef.current = new Set(initiallyPersistedAnnotationIds)
+  }, [initiallyPersistedAnnotationIds])
+
+  useEffect(() => {
     if (!annotator) {
       return
     }

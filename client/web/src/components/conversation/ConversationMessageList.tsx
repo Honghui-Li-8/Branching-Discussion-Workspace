@@ -71,7 +71,8 @@ export const ConversationMessageList = ({
           </p>
         )}
 
-        {true && (
+        {/* Test code */}
+        {false && (
           <AssistantConversationMessage
             key={TEST_MARKDOWN_ASSISTANT_MESSAGE.id}
             message={TEST_MARKDOWN_ASSISTANT_MESSAGE}
