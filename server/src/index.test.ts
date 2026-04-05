@@ -86,6 +86,13 @@ jest.mock('./annotations/branchMessageFromSelection.js', () => ({
       this.name = 'MessageBranchSelectionConflictError'
     }
   },
+  MessageBranchSelectionInvalidInputError: class MessageBranchSelectionInvalidInputError
+    extends Error {
+    constructor(message: string) {
+      super(message)
+      this.name = 'MessageBranchSelectionInvalidInputError'
+    }
+  },
 }))
 
 const getUserByIdMock = getUserById as jest.MockedFunction<typeof getUserById>
@@ -321,7 +328,13 @@ const makeCaller = (sessionUser: SessionUser | null) => {
 
 const expectTrpcError = async (
   promise: Promise<unknown>,
-  code: 'UNAUTHORIZED' | 'FORBIDDEN' | 'NOT_FOUND' | 'CONFLICT' | 'INTERNAL_SERVER_ERROR',
+  code:
+    | 'UNAUTHORIZED'
+    | 'FORBIDDEN'
+    | 'NOT_FOUND'
+    | 'CONFLICT'
+    | 'BAD_REQUEST'
+    | 'INTERNAL_SERVER_ERROR',
   message: string,
 ) => {
   await expect(promise).rejects.toMatchObject({
@@ -723,6 +736,25 @@ describe('tRPC ownership integration', () => {
     )
   })
 
+  test('messageSuggestFromSelection returns existing annotation when source annotation is provided', async () => {
+    const caller = makeCaller(selfSessionUser)
+    getMessageAnnotationByIdForAuthorMock.mockResolvedValueOnce(ownedSuggestionAnnotationRecord)
+
+    await expect(
+      caller.messageSuggestFromSelection({
+        messageId: ownedMessageRecord.id,
+        sourceAnnotationId: ownedSuggestionAnnotationRecord.id,
+        selection: {
+          quote: ownedSuggestionAnnotationRecord.quote,
+          selectorJson: ownedSuggestionAnnotationRecord.selectorJson,
+          startOffset: ownedSuggestionAnnotationRecord.startOffset,
+          endOffset: ownedSuggestionAnnotationRecord.endOffset,
+        },
+        idempotencyKey: 'annotation-suggest-idem-invalid-1',
+      }),
+    ).resolves.toEqual(ownedSuggestionAnnotationRecord)
+  })
+
   test('messageBranchFromSelection returns NOT_FOUND when message is missing', async () => {
     const caller = makeCaller(selfSessionUser)
     getMessageByIdForAuthorMock.mockResolvedValueOnce(null)
@@ -764,6 +796,26 @@ describe('tRPC ownership integration', () => {
       'CONFLICT',
       'Idempotency record exists without a branch node link.',
     )
+  })
+
+  test('messageBranchFromSelection returns existing branch-linked annotation when source is already branch-linked', async () => {
+    const caller = makeCaller(selfSessionUser)
+    branchMessageFromSelectionInTransactionMock.mockResolvedValueOnce(ownedMessageBranchResult)
+
+    await expect(
+      caller.messageBranchFromSelection({
+        messageId: ownedMessageRecord.id,
+        sourceAnnotationId: ownedMessageAnnotationRecord.id,
+        selection: {
+          quote: 'hello',
+          selectorJson: {
+            selector: [{ quote: 'hello', start: 0, end: 5 }],
+          },
+        },
+        annotationKind: 'branch',
+        idempotencyKey: 'annotation-branch-idem-invalid-1',
+      }),
+    ).resolves.toEqual(ownedMessageBranchResult)
   })
 
   test('messageBranchFromSelection returns NOT_FOUND when service returns null', async () => {

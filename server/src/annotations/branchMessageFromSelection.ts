@@ -36,6 +36,13 @@ export class MessageBranchSelectionConflictError extends Error {
   }
 }
 
+export class MessageBranchSelectionInvalidInputError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'MessageBranchSelectionInvalidInputError'
+  }
+}
+
 const compactWhitespace = (value: string): string => value.replace(/\s+/g, ' ').trim()
 
 const buildDefaultBranchTitle = (quote: string): string => {
@@ -175,19 +182,20 @@ export const branchMessageFromSelectionInTransaction = async ({
     }
 
     if (input.annotationKind === 'suggestion-branch' && !input.sourceAnnotationId) {
-      throw new MessageBranchSelectionConflictError(
+      throw new MessageBranchSelectionInvalidInputError(
         'sourceAnnotationId is required for suggestion-to-branch conversion.',
       )
     }
 
-    if (input.annotationKind === 'suggestion-branch' && input.sourceAnnotationId) {
-      const sourceAnnotation = await getMessageAnnotationByIdForAuthorInTransaction(
+    let sourceAnnotation: MessageAnnotationRecord | null = null
+    if (input.sourceAnnotationId) {
+      sourceAnnotation = await getMessageAnnotationByIdForAuthorInTransaction(
         client,
         input.sourceAnnotationId,
         currentUserId,
       )
       if (!sourceAnnotation) {
-        throw new MessageBranchSelectionConflictError(
+        throw new MessageBranchSelectionInvalidInputError(
           'Source suggestion annotation was not found for conversion.',
         )
       }
@@ -208,13 +216,22 @@ export const branchMessageFromSelectionInTransaction = async ({
           },
         )
       }
+    }
 
-      if (sourceAnnotation.kind === 'suggestion-branch') {
+    if (sourceAnnotation) {
+      if (sourceAnnotation.kind === 'branch' || sourceAnnotation.kind === 'suggestion-branch') {
         if (!sourceAnnotation.leadsToNodeId) {
           throw new MessageBranchSelectionConflictError(
-            'Source suggestion-branch annotation has no linked node.',
+            'Source branch-linked annotation has no linked node.',
           )
         }
+        logger.warn('[annotations] branch requested on already branch-linked annotation.', {
+          message_id: input.messageId,
+          author_user_id: currentUserId,
+          source_annotation_id: sourceAnnotation.id,
+          source_annotation_kind: sourceAnnotation.kind,
+          branch_node_id: sourceAnnotation.leadsToNodeId,
+        })
 
         await client.query('COMMIT')
         return {
@@ -222,10 +239,22 @@ export const branchMessageFromSelectionInTransaction = async ({
           branchNodeId: sourceAnnotation.leadsToNodeId,
         }
       }
+    }
 
-      if (sourceAnnotation.kind !== 'suggestion') {
-        throw new MessageBranchSelectionConflictError(
-          'Only suggestion annotations can be converted into suggestion-branch.',
+    const shouldConvertSuggestionSource =
+      sourceAnnotation !== null && sourceAnnotation.kind === 'suggestion'
+      && input.sourceAnnotationId
+      && (input.annotationKind === 'suggestion-branch' || input.annotationKind === 'branch')
+
+    if (shouldConvertSuggestionSource && sourceAnnotation) {
+      if (input.annotationKind === 'branch') {
+        logger.warn(
+          '[annotations] branch requested on suggestion; converting source annotation to suggestion-branch.',
+          {
+            message_id: input.messageId,
+            author_user_id: currentUserId,
+            source_annotation_id: sourceAnnotation.id,
+          },
         )
       }
 

@@ -15,6 +15,7 @@ import { messageAnnotationExists as messageAnnotationExistsRecord } from '../db/
 import {
   branchMessageFromSelectionInTransaction,
   MessageBranchSelectionConflictError,
+  MessageBranchSelectionInvalidInputError,
 } from '../annotations/branchMessageFromSelection.js'
 import { createLogger } from '../logging/logger.js'
 import type { ContextOwnershipHelpers } from './types.js'
@@ -108,7 +109,30 @@ export const createAnnotationHandlers = ({
         'Message not found.',
       )
 
-      const annotation = await createMessageAnnotationForAuthorRecord({
+      if (input.sourceAnnotationId) {
+        const sourceAnnotation = await resolveOwnedRecordOrNotFound(
+          await getMessageAnnotationByIdForAuthorRecord(input.sourceAnnotationId, resolvedUserId),
+          input.sourceAnnotationId,
+          messageAnnotationExistsRecord,
+          'Message annotation not found.',
+        )
+        if (sourceAnnotation.messageId !== input.messageId) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Source annotation does not belong to the requested message.',
+          })
+        }
+
+        logger.warn('[annotations] suggest requested on existing annotation; returning existing.', {
+          message_id: input.messageId,
+          author_user_id: resolvedUserId,
+          source_annotation_id: sourceAnnotation.id,
+          source_annotation_kind: sourceAnnotation.kind,
+        })
+        return sourceAnnotation
+      }
+
+      const existingSuggestion = await createMessageAnnotationForAuthorRecord({
         messageId: input.messageId,
         kind: 'suggestion',
         quote: input.selection.quote,
@@ -118,16 +142,25 @@ export const createAnnotationHandlers = ({
         authorUserId: resolvedUserId,
         idempotencyKey: input.idempotencyKey,
       })
-      if (!annotation) {
+      if (!existingSuggestion) {
         return throwNotFound('Message not found.')
+      }
+
+      if (existingSuggestion.kind !== 'suggestion') {
+        logger.warn('[annotations] suggest action reused existing non-suggestion annotation.', {
+          message_id: input.messageId,
+          author_user_id: resolvedUserId,
+          annotation_id: existingSuggestion.id,
+          annotation_kind: existingSuggestion.kind,
+        })
       }
 
       logger.info('[annotations] suggest request completed.', {
         message_id: input.messageId,
         author_user_id: resolvedUserId,
-        annotation_id: annotation.id,
+        annotation_id: existingSuggestion.id,
       })
-      return annotation
+      return existingSuggestion
     } catch (error) {
       logger.error('[annotations] suggest request failed.', {
         message_id: input.messageId,
@@ -277,6 +310,25 @@ export const createAnnotationHandlers = ({
       })
       return result
     } catch (error) {
+      if (error instanceof MessageBranchSelectionInvalidInputError) {
+        logger.warn('[annotations] branch request invalid input.', {
+          message_id: input.messageId,
+          author_user_id: currentUserId,
+          idempotency_key: input.idempotencyKey,
+          error_message: error.message,
+        })
+        logger.debug('[annotations] branch request invalid input debug error details.', {
+          message_id: input.messageId,
+          author_user_id: currentUserId,
+          idempotency_key: input.idempotencyKey,
+          error,
+        })
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: error.message,
+        })
+      }
+
       if (error instanceof MessageBranchSelectionConflictError) {
         logger.warn('[annotations] branch request conflict.', {
           message_id: input.messageId,

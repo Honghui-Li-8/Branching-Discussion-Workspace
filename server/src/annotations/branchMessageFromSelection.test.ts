@@ -48,6 +48,12 @@ const buildSuggestionConversionInput = () => ({
   sourceAnnotationId: 'a-suggest-1',
 })
 
+const buildBranchOnExistingBranchInput = () => ({
+  ...buildInput(),
+  annotationKind: 'branch' as const,
+  sourceAnnotationId: 'a-branch-1',
+})
+
 const sourceRow = {
   message_id: 'm1',
   parent_node_id: 'n-parent',
@@ -301,6 +307,47 @@ describe('branchMessageFromSelectionInTransaction', () => {
         deletedAt: null,
       },
       branchNodeId: 'n-child-3',
+    })
+
+    expect(queryMock).toHaveBeenLastCalledWith('COMMIT')
+    expect(releaseMock).toHaveBeenCalledTimes(1)
+  })
+
+  test('returns existing branch-linked annotation for repeated branch action', async () => {
+    const { queryMock, releaseMock } = createMockClient()
+
+    queryMock
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({ rows: [sourceRow] }) // source
+      .mockResolvedValueOnce({ rows: [] }) // existing idempotent row
+      .mockResolvedValueOnce({
+        rows: [{ ...baseAnnotationRow, id: 'a-branch-1', kind: 'branch', leads_to_node_id: 'n-child-1' }],
+      }) // source annotation lock
+      .mockResolvedValueOnce({ rows: [] }) // COMMIT
+
+    await expect(
+      branchMessageFromSelectionInTransaction({
+        input: buildBranchOnExistingBranchInput(),
+        currentUserId: 'u1',
+      }),
+    ).resolves.toEqual({
+      annotation: {
+        id: 'a-branch-1',
+        messageId: 'm1',
+        leadsToNodeId: 'n-child-1',
+        kind: 'branch',
+        quote: 'hello world',
+        startOffset: 0,
+        endOffset: 11,
+        selectorJson: {
+          selector: [{ quote: 'hello world', start: 0, end: 11 }],
+        },
+        createdByUserId: 'u1',
+        createdAt: '2026-04-04T00:00:00.000Z',
+        updatedAt: '2026-04-04T00:00:00.000Z',
+        deletedAt: null,
+      },
+      branchNodeId: 'n-child-1',
     })
 
     expect(queryMock).toHaveBeenLastCalledWith('COMMIT')

@@ -63,6 +63,7 @@ export const messageAnnotationsByMessageInputSchema = z.object({
 
 export const messageSuggestFromSelectionInputSchema = z.object({
   messageId: z.string(),
+  sourceAnnotationId: z.string().optional(),
   selection: annotationSelectionInputSchema,
   idempotencyKey: z.string().min(1),
 })

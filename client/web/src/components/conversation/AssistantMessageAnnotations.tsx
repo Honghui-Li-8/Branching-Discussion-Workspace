@@ -404,7 +404,7 @@ const AssistantAnnotationPopup = ({
           const currentKind = getAnnotationKind(annotation)
           const nextKind = getBranchActionKind(currentKind)
           const sourceAnnotationId =
-            currentKind === 'suggestion' && persistedAnnotationIdSet.has(annotation.id)
+            persistedAnnotationIdSet.has(annotation.id)
               ? annotation.id
               : undefined
           const branchInput: MessageBranchFromSelectionInput = {
@@ -492,6 +492,9 @@ const AssistantAnnotationPopup = ({
           suggestMutation.mutate(
             {
               messageId,
+              sourceAnnotationId: persistedAnnotationIdSet.has(annotation.id)
+                ? annotation.id
+                : undefined,
               selection,
               idempotencyKey: createIdempotencyKey(),
             },
