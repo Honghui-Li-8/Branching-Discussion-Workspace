@@ -13,12 +13,16 @@ import {
   type TextAnnotation,
   type W3CTextAnnotation,
 } from '@recogito/react-text-annotator'
-import type { inferRouterOutputs } from '@trpc/server'
+import type { inferRouterInputs, inferRouterOutputs } from '@trpc/server'
 import type { AppRouter } from '@branching/shared'
 import type { ReactNode } from 'react'
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { trpc } from '../../trpc'
 import { AssistantSelectionMenu } from './AssistantSelectionMenu'
+import {
+  buildBranchSelectionPayload,
+  canSubmitBranchRequest,
+} from './assistantBranchRequest'
 import {
   ASSISTANT_ANNOTATION_KIND_PREFIX,
   getBranchActionKind,
@@ -42,7 +46,9 @@ const LOCAL_ANNOTATION_USER = {
 const buildAnnotationSource = (messageId: string) => `assistant-message:${messageId}`
 
 type RouterOutputs = inferRouterOutputs<AppRouter>
+type RouterInputs = inferRouterInputs<AppRouter>
 type BackendMessageAnnotation = RouterOutputs['messageAnnotationsByMessage'][number]
+type MessageBranchFromSelectionInput = RouterInputs['messageBranchFromSelection']
 
 const mapBackendAnnotationToW3C = (
   annotation: BackendMessageAnnotation,
@@ -81,6 +87,14 @@ const mapBackendAnnotationToW3C = (
       kind: annotation.kind,
     },
   }
+}
+
+const createIdempotencyKey = (): string => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+
+  return `idem-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
 }
 
 const getSelectedTextFromAnnotation = (annotation: TextAnnotation): string =>
@@ -250,22 +264,24 @@ const getWholeWordTarget = (
 
 type AssistantAnnotationHydrationProps = {
   initialAnnotations: W3CTextAnnotation[]
+  suspendHydration: boolean
 }
 
 const AssistantAnnotationHydration = ({
   initialAnnotations,
+  suspendHydration,
 }: AssistantAnnotationHydrationProps) => {
   const annotator = useAnnotator<
     RecogitoTextAnnotator<TextAnnotation, W3CTextAnnotation> | undefined
   >()
 
   useEffect(() => {
-    if (!annotator) {
+    if (!annotator || suspendHydration) {
       return
     }
 
     annotator.setAnnotations(initialAnnotations, true)
-  }, [annotator, initialAnnotations])
+  }, [annotator, initialAnnotations, suspendHydration])
 
   return null
 }
@@ -273,15 +289,21 @@ const AssistantAnnotationHydration = ({
 type AssistantAnnotationPopupProps = {
   messageId: string
   initiallyPersistedAnnotationIds: string[]
+  onBranchPendingStateChange: (pending: boolean) => void
+  isBranchPending: boolean
 }
 
 const AssistantAnnotationPopup = ({
   messageId,
   initiallyPersistedAnnotationIds,
+  onBranchPendingStateChange,
+  isBranchPending,
 }: AssistantAnnotationPopupProps) => {
   const annotator = useAnnotator<
     RecogitoTextAnnotator<TextAnnotation, W3CTextAnnotation> | undefined
   >()
+  const utils = trpc.useUtils()
+  const branchMutation = trpc.messageBranchFromSelection.useMutation()
   const {
     clearPendingDismissState,
     consumePendingDismiss,
@@ -291,6 +313,10 @@ const AssistantAnnotationPopup = ({
   } = useAssistantAnnotationSession({
     annotator,
     initiallyPersistedAnnotationIds,
+  })
+  const isBranchActionPending = !canSubmitBranchRequest({
+    hasPendingBranchRequest: isBranchPending,
+    isBranchMutationPending: branchMutation.isPending,
   })
 
   return (
@@ -326,15 +352,33 @@ const AssistantAnnotationPopup = ({
         }
 
         const handleConfirmSelection = () => {
+          if (!annotator || isBranchActionPending) {
+            return
+          }
+
+          const selection = buildBranchSelectionPayload(annotation.target.selector)
+          if (!selection) {
+            console.error('[assistant-selection] unable to build valid branch selection payload', {
+              messageId,
+              annotationId: annotation.id,
+            })
+            clearPendingDismissState()
+            annotator.cancelSelected()
+            return
+          }
+          const branchInput: MessageBranchFromSelectionInput = {
+            messageId,
+            idempotencyKey: createIdempotencyKey(),
+            selection,
+          }
+
           const currentKind = getAnnotationKind(annotation)
           const nextKind = getBranchActionKind(currentKind)
-
-          if (annotator) {
-            setAnnotationKind(annotator, annotation, nextKind)
-          }
+          setAnnotationKind(annotator, annotation, nextKind)
 
           markAnnotationPersisted(annotation.id)
           clearPendingDismissState()
+          onBranchPendingStateChange(true)
           console.log('[assistant-selection] selected text', {
             messageId,
             kind: nextKind,
@@ -342,7 +386,22 @@ const AssistantAnnotationPopup = ({
             annotationId: annotation.id,
           })
 
-          annotator?.cancelSelected()
+          annotator.cancelSelected()
+          branchMutation.mutate(branchInput, {
+            onSuccess: async () => {
+              await utils.messageAnnotationsByMessage.invalidate({ messageId })
+            },
+            onError: (error) => {
+              console.error('[assistant-selection] failed to create branch from selection', {
+                messageId,
+                annotationId: annotation.id,
+                error: error.message,
+              })
+            },
+            onSettled: () => {
+              onBranchPendingStateChange(false)
+            },
+          })
         }
 
         const handleSuggestSelection = () => {
@@ -368,6 +427,7 @@ const AssistantAnnotationPopup = ({
             onDismissSelection={handleDismissSelection}
             onConfirmSelection={handleConfirmSelection}
             onSuggestSelection={handleSuggestSelection}
+            isBranchActionPending={isBranchActionPending}
           />
         )
       }}
@@ -544,6 +604,12 @@ export const AssistantMessageAnnotationWrapper = ({
   messageId,
   children,
 }: AssistantMessageAnnotationWrapperProps) => {
+  const [isBranchPending, setIsBranchPending] = useState(false)
+
+  useEffect(() => {
+    setIsBranchPending(false)
+  }, [messageId])
+
   const annotationSource = useMemo(() => buildAnnotationSource(messageId), [messageId])
   const messageAnnotationsQuery = trpc.messageAnnotationsByMessage.useQuery({
     messageId,
@@ -596,10 +662,13 @@ export const AssistantMessageAnnotationWrapper = ({
         <AssistantAnnotationPopup
           messageId={messageId}
           initiallyPersistedAnnotationIds={initialPersistedAnnotationIds}
+          onBranchPendingStateChange={setIsBranchPending}
+          isBranchPending={isBranchPending}
         />
       </TextAnnotator>
       <AssistantAnnotationHydration
         initialAnnotations={initialAnnotations}
+        suspendHydration={isBranchPending}
       />
     </Annotorious>
   )

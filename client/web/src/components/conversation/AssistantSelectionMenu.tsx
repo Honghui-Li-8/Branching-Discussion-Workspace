@@ -3,6 +3,7 @@ type AssistantSelectionMenuProps = {
   onConfirmSelection: () => void
   onSuggestSelection: () => void
   onDismissSelection: () => void
+  isBranchActionPending?: boolean
 }
 
 export const AssistantSelectionMenu = ({
@@ -10,6 +11,7 @@ export const AssistantSelectionMenu = ({
   onConfirmSelection,
   onSuggestSelection,
   onDismissSelection,
+  isBranchActionPending = false,
 }: AssistantSelectionMenuProps) => {
   const trimmedSelection = selectedText.trim()
 
@@ -42,9 +44,10 @@ export const AssistantSelectionMenu = ({
         <button
           type="button"
           onClick={onConfirmSelection}
+          disabled={isBranchActionPending}
           className="rounded-md border border-[#7fb2cf] bg-[#dff0fa] px-2 py-0.5 text-[11px] font-semibold text-[#22516c] whitespace-nowrap transition-colors hover:bg-[#d2e9f6]"
         >
-          Branch
+          {isBranchActionPending ? 'Branching...' : 'Branch'}
         </button>
       </div>
     </div>

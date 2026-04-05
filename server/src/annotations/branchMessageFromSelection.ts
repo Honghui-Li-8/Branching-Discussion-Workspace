@@ -8,6 +8,7 @@ import {
   linkMessageAnnotationToNodeForAuthorInTransaction,
 } from '../db/queries/messageAnnotation.js'
 import { createNodeForAuthorInTransaction } from '../db/queries/node.js'
+import { createLogger } from '../logging/logger.js'
 
 type MessageBranchFromSelectionInput = Parameters<AppRouterContext['messageBranchFromSelection']>[0]
 type MessageBranchFromSelectionResult = Awaited<
@@ -20,6 +21,7 @@ const DEFAULT_BRANCH_TYPE: NonNullable<
 
 const DEFAULT_BRANCH_SUMMARY = 'Branch generated from assistant message selection.'
 const MAX_BRANCH_TITLE_LENGTH = 96
+const logger = createLogger('annotations')
 
 export class MessageBranchSelectionConflictError extends Error {
   constructor(message: string) {
@@ -93,6 +95,14 @@ export const branchMessageFromSelectionInTransaction = async ({
   input,
   currentUserId,
 }: BranchMessageFromSelectionParams): Promise<MessageBranchFromSelectionResult | null> => {
+  logger.debug('[annotations] branch-from-selection started.', {
+    message_id: input.messageId,
+    author_user_id: currentUserId,
+    idempotency_key: input.idempotencyKey,
+    selection_quote_length: input.selection.quote.length,
+    selector_count: input.selection.selectorJson.selector.length,
+  })
+
   const client = await getClient()
 
   try {
@@ -114,6 +124,13 @@ export const branchMessageFromSelectionInTransaction = async ({
       idempotencyKey: input.idempotencyKey,
     })
     if (existing) {
+      logger.debug('[annotations] branch-from-selection idempotency hit.', {
+        message_id: input.messageId,
+        author_user_id: currentUserId,
+        idempotency_key: input.idempotencyKey,
+        annotation_id: existing.id,
+        leads_to_node_id: existing.leadsToNodeId,
+      })
       if (!existing.leadsToNodeId) {
         throw new MessageBranchSelectionConflictError(
           'Existing idempotency record is incomplete and has no branch node link.',
@@ -127,6 +144,14 @@ export const branchMessageFromSelectionInTransaction = async ({
       }
     }
 
+    logger.debug('[annotations] creating annotation record.', {
+      message_id: input.messageId,
+      author_user_id: currentUserId,
+      kind: 'branch',
+      idempotency_key: input.idempotencyKey,
+      quote_length: input.selection.quote.length,
+      selector_count: input.selection.selectorJson.selector.length,
+    })
     const insertedAnnotation = await createMessageAnnotationForAuthorInTransaction(client, {
       messageId: input.messageId,
       kind: 'branch',
@@ -138,6 +163,11 @@ export const branchMessageFromSelectionInTransaction = async ({
       idempotencyKey: input.idempotencyKey,
     })
     if (!insertedAnnotation) {
+      logger.debug('[annotations] annotation insert returned null, trying idempotency recovery.', {
+        message_id: input.messageId,
+        author_user_id: currentUserId,
+        idempotency_key: input.idempotencyKey,
+      })
       const recovered = await getMessageAnnotationByIdempotencyKeyForAuthorInTransaction(client, {
         messageId: input.messageId,
         authorUserId: currentUserId,
@@ -155,8 +185,21 @@ export const branchMessageFromSelectionInTransaction = async ({
         branchNodeId: recovered.leadsToNodeId,
       }
     }
+    logger.debug('[annotations] annotation record created.', {
+      message_id: input.messageId,
+      author_user_id: currentUserId,
+      annotation_id: insertedAnnotation.id,
+    })
 
     const branchMeta = resolveBranchNodeMeta(input)
+    logger.debug('[annotations] creating branch node.', {
+      message_id: input.messageId,
+      author_user_id: currentUserId,
+      workspace_id: source.workspaceId,
+      parent_node_id: source.parentNodeId,
+      node_type: branchMeta.type,
+      node_title: branchMeta.title,
+    })
     const branchNode = await createNodeForAuthorInTransaction(client, {
       workspaceId: source.workspaceId,
       authorUserId: currentUserId,
@@ -166,8 +209,20 @@ export const branchMessageFromSelectionInTransaction = async ({
       summary: branchMeta.summary,
     })
     if (!branchNode) {
+      logger.debug('[annotations] branch node creation returned null.', {
+        message_id: input.messageId,
+        author_user_id: currentUserId,
+        workspace_id: source.workspaceId,
+        parent_node_id: source.parentNodeId,
+      })
       throw new Error('Failed to create branch node.')
     }
+    logger.debug('[annotations] branch node created.', {
+      message_id: input.messageId,
+      author_user_id: currentUserId,
+      branch_node_id: branchNode.id,
+      parent_node_id: source.parentNodeId,
+    })
 
     const linkedAnnotation = await linkMessageAnnotationToNodeForAuthorInTransaction(
       client,
@@ -182,12 +237,24 @@ export const branchMessageFromSelectionInTransaction = async ({
     }
 
     await client.query('COMMIT')
+    logger.debug('[annotations] branch-from-selection committed.', {
+      message_id: input.messageId,
+      author_user_id: currentUserId,
+      annotation_id: linkedAnnotation.id,
+      branch_node_id: branchNode.id,
+    })
 
     return {
       annotation: mapAnnotationToResult(linkedAnnotation),
       branchNodeId: branchNode.id,
     }
   } catch (error) {
+    logger.error('[annotations] branch-from-selection failed, rolling back.', {
+      message_id: input.messageId,
+      author_user_id: currentUserId,
+      idempotency_key: input.idempotencyKey,
+      error,
+    })
     try {
       await client.query('ROLLBACK')
     } catch {
