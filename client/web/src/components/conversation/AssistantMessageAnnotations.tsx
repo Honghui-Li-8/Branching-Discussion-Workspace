@@ -304,6 +304,11 @@ const AssistantAnnotationPopup = ({
   >()
   const utils = trpc.useUtils()
   const branchMutation = trpc.messageBranchFromSelection.useMutation()
+  const deleteAnnotationMutation = trpc.messageAnnotationDelete.useMutation()
+  const persistedAnnotationIdSet = useMemo(
+    () => new Set(initiallyPersistedAnnotationIds),
+    [initiallyPersistedAnnotationIds],
+  )
   const {
     clearPendingDismissState,
     consumePendingDismiss,
@@ -344,11 +349,40 @@ const AssistantAnnotationPopup = ({
             return
           }
 
+          const isPersistedAnnotation = persistedAnnotationIdSet.has(annotation.id)
+
           clearPendingDismissState()
           annotator.removeAnnotation(annotation.id)
           removeAnnotationTracking(annotation.id)
 
           annotator.cancelSelected()
+
+          if (!isPersistedAnnotation) {
+            return
+          }
+
+          deleteAnnotationMutation.mutate(
+            { annotationId: annotation.id },
+            {
+              onSuccess: async () => {
+                await Promise.all([
+                  utils.messageAnnotationsByMessage.invalidate({ messageId }),
+                  utils.nodesByWorkspace.invalidate(),
+                ])
+              },
+              onError: async (error) => {
+                console.error('[assistant-selection] failed to delete annotation branch', {
+                  messageId,
+                  annotationId: annotation.id,
+                  error: error.message,
+                })
+                await Promise.all([
+                  utils.messageAnnotationsByMessage.invalidate({ messageId }),
+                  utils.nodesByWorkspace.invalidate(),
+                ])
+              },
+            },
+          )
         }
 
         const handleConfirmSelection = () => {

@@ -61,6 +61,17 @@ export const messageAnnotationsByMessageInputSchema = z.object({
   messageId: z.string(),
 })
 
+export const messageAnnotationDeleteInputSchema = z.object({
+  annotationId: nonEmptyTrimmedStringSchema,
+})
+
+export const messageAnnotationDeleteResultSchema = z.object({
+  annotationId: z.string(),
+  deletedBranchNodeId: z.string().nullable(),
+  deletedNodeCount: z.number().int().nonnegative(),
+  deletedMessageCount: z.number().int().nonnegative(),
+})
+
 export const messageBranchFromSelectionInputSchema = z
   .object({
     messageId: z.string(),
@@ -75,5 +86,7 @@ export const messageBranchFromSelectionResultSchema = z.object({
 })
 
 export type MessageAnnotation = z.infer<typeof messageAnnotationSchema>
+export type MessageAnnotationDeleteInput = z.infer<typeof messageAnnotationDeleteInputSchema>
+export type MessageAnnotationDeleteResult = z.infer<typeof messageAnnotationDeleteResultSchema>
 export type MessageBranchFromSelectionInput = z.infer<typeof messageBranchFromSelectionInputSchema>
 export type MessageBranchFromSelectionResult = z.infer<typeof messageBranchFromSelectionResultSchema>

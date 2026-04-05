@@ -62,6 +62,12 @@ const makeContext = (): AppRouterContext => {
     updateMessage: jest.fn(async () => null),
     deleteMessage: jest.fn(async () => null),
     listMessageAnnotationsByMessage: jest.fn(async () => [annotation]),
+    messageAnnotationDelete: jest.fn(async () => ({
+      annotationId: annotation.id,
+      deletedBranchNodeId: annotation.leadsToNodeId,
+      deletedNodeCount: 1,
+      deletedMessageCount: 0,
+    })),
     messageBranchFromSelection: jest.fn(async () => ({
       annotation,
       branchNodeId: 'n-child-1',
@@ -99,12 +105,18 @@ describe('appRouter annotation routes', () => {
         idempotencyKey: 'branch-idem-1',
       }),
     ).rejects.toThrow('Authentication required.')
+    await expect(
+      caller.messageAnnotationDelete({
+        annotationId: 'a1',
+      }),
+    ).rejects.toThrow('Authentication required.')
   })
 
   test('annotation procedures delegate to context', async () => {
     const ctx = makeContext()
     const caller = appRouter.createCaller(ctx)
     const listInput = { messageId: 'm1' }
+    const deleteInput = { annotationId: 'a1' }
     const branchInput = {
       messageId: 'm1',
       selection: {
@@ -130,20 +142,29 @@ describe('appRouter annotation routes', () => {
     }
 
     const listResult = await caller.messageAnnotationsByMessage(listInput)
+    const deleteResult = await caller.messageAnnotationDelete(deleteInput)
     const branchResult = await caller.messageBranchFromSelection(branchInput)
 
     expect(ctx.listMessageAnnotationsByMessage).toHaveBeenCalledWith('m1')
+    expect(ctx.messageAnnotationDelete).toHaveBeenCalledWith(deleteInput)
     expect(ctx.messageBranchFromSelection).toHaveBeenCalledTimes(1)
     const messageBranchFromSelectionCalls = (ctx.messageBranchFromSelection as jest.Mock).mock
       .calls
     expect(messageBranchFromSelectionCalls[0]?.[0]).toEqual(branchInput)
     expect(listResult[0]?.id).toBe('a1')
+    expect(deleteResult.annotationId).toBe('a1')
     expect(branchResult.annotation.id).toBe('a1')
     expect(branchResult.branchNodeId).toBe('n-child-1')
   })
 
   test('messageBranchFromSelection validates input', async () => {
     const caller = appRouter.createCaller(makeContext())
+
+    await expect(
+      caller.messageAnnotationDelete({
+        annotationId: '',
+      } as never),
+    ).rejects.toThrow()
 
     await expect(
       caller.messageBranchFromSelection({

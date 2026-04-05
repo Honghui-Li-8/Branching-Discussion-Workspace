@@ -1,10 +1,15 @@
 import { TRPCError } from '@trpc/server'
 import type { AppRouterContext } from '@branching/shared'
 import {
+  deleteNodeForAuthor as deleteNodeForAuthorRecord,
+  getNodeByIdForAuthor as getNodeByIdForAuthorRecord,
+  getMessageAnnotationByIdForAuthor as getMessageAnnotationByIdForAuthorRecord,
   getMessageByIdForAuthor as getMessageByIdForAuthorRecord,
   listMessageAnnotationsByMessageForAuthor as listMessageAnnotationsByMessageForAuthorRecord,
+  softDeleteMessageAnnotationForAuthor as softDeleteMessageAnnotationForAuthorRecord,
 } from '../db/index.js'
 import { messageExists as messageExistsRecord } from '../db/queries/internal.js'
+import { messageAnnotationExists as messageAnnotationExistsRecord } from '../db/queries/messageAnnotation.js'
 import {
   branchMessageFromSelectionInTransaction,
   MessageBranchSelectionConflictError,
@@ -14,7 +19,7 @@ import type { ContextOwnershipHelpers } from './types.js'
 
 type AnnotationHandlers = Pick<
   AppRouterContext,
-  'listMessageAnnotationsByMessage' | 'messageBranchFromSelection'
+  'listMessageAnnotationsByMessage' | 'messageAnnotationDelete' | 'messageBranchFromSelection'
 >
 
 const logger = createLogger('trpc-context')
@@ -71,6 +76,79 @@ export const createAnnotationHandlers = ({
       })
       logger.debug('[annotations] list request debug error details.', {
         message_id: messageId,
+        author_user_id: currentUserId,
+        error,
+      })
+      throw error
+    }
+  },
+  messageAnnotationDelete: async (input) => {
+    let currentUserId: string | null = null
+
+    try {
+      const resolvedUserId = requireSessionUserId()
+      currentUserId = resolvedUserId
+      logger.info('[annotations] delete request received.', {
+        annotation_id: input.annotationId,
+        author_user_id: resolvedUserId,
+      })
+
+      const annotation = await resolveOwnedRecordOrNotFound(
+        await getMessageAnnotationByIdForAuthorRecord(input.annotationId, resolvedUserId),
+        input.annotationId,
+        messageAnnotationExistsRecord,
+        'Message annotation not found.',
+      )
+
+      let deletedBranchNodeId: string | null = null
+      let deletedNodeCount = 0
+      let deletedMessageCount = 0
+      if (annotation.leadsToNodeId) {
+        const linkedNode = await getNodeByIdForAuthorRecord(annotation.leadsToNodeId, resolvedUserId)
+        if (linkedNode && linkedNode.parentNodeId === linkedNode.id) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: 'Cannot delete workspace root from annotation removal.',
+          })
+        }
+
+        const nodeDeleteResult = await deleteNodeForAuthorRecord(annotation.leadsToNodeId, resolvedUserId)
+        if (nodeDeleteResult) {
+          deletedBranchNodeId = nodeDeleteResult.id
+          deletedNodeCount = nodeDeleteResult.deletedNodeCount
+          deletedMessageCount = nodeDeleteResult.deletedMessageCount
+        }
+      }
+
+      const deleted = await softDeleteMessageAnnotationForAuthorRecord(
+        annotation.id,
+        resolvedUserId,
+      )
+      if (!deleted) {
+        return throwNotFound('Message annotation not found.')
+      }
+
+      logger.info('[annotations] delete request completed.', {
+        annotation_id: deleted.id,
+        author_user_id: resolvedUserId,
+        deleted_branch_node_id: deletedBranchNodeId,
+        deleted_node_count: deletedNodeCount,
+        deleted_message_count: deletedMessageCount,
+      })
+      return {
+        annotationId: deleted.id,
+        deletedBranchNodeId,
+        deletedNodeCount,
+        deletedMessageCount,
+      }
+    } catch (error) {
+      logger.error('[annotations] delete request failed.', {
+        annotation_id: input.annotationId,
+        author_user_id: currentUserId,
+        error,
+      })
+      logger.debug('[annotations] delete request debug error details.', {
+        annotation_id: input.annotationId,
         author_user_id: currentUserId,
         error,
       })

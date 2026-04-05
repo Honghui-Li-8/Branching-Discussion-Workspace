@@ -12,6 +12,8 @@ import type {
 } from './schemas/core.js'
 import type {
   MessageAnnotation,
+  MessageAnnotationDeleteInput,
+  MessageAnnotationDeleteResult,
   MessageBranchFromSelectionInput,
   MessageBranchFromSelectionResult,
 } from './schemas/annotations.js'
@@ -54,6 +56,9 @@ export type AppRouterContext = {
   updateMessage: (input: UpdateMessageInput) => Promise<Message | null>
   deleteMessage: (id: string) => Promise<{ id: string } | null>
   listMessageAnnotationsByMessage: (messageId: string) => Promise<MessageAnnotation[]>
+  messageAnnotationDelete: (
+    input: MessageAnnotationDeleteInput,
+  ) => Promise<MessageAnnotationDeleteResult>
   messageBranchFromSelection: (
     input: MessageBranchFromSelectionInput,
   ) => Promise<MessageBranchFromSelectionResult>

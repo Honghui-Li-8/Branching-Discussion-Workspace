@@ -11,6 +11,8 @@ import {
   updateWorkspaceInputSchema,
 } from './schemas/core.js'
 import {
+  messageAnnotationDeleteInputSchema,
+  messageAnnotationDeleteResultSchema,
   messageAnnotationsByMessageInputSchema,
   messageBranchFromSelectionInputSchema,
   messageBranchFromSelectionResultSchema,
@@ -79,6 +81,10 @@ export const appRouter = t.router({
   messageAnnotationsByMessage: protectedProcedure
     .input(messageAnnotationsByMessageInputSchema)
     .query(({ ctx, input }) => ctx.listMessageAnnotationsByMessage(input.messageId)),
+  messageAnnotationDelete: protectedProcedure
+    .input(messageAnnotationDeleteInputSchema)
+    .output(messageAnnotationDeleteResultSchema)
+    .mutation(({ ctx, input }) => ctx.messageAnnotationDelete(input)),
   messageBranchFromSelection: protectedProcedure
     .input(messageBranchFromSelectionInputSchema)
     .output(messageBranchFromSelectionResultSchema)
