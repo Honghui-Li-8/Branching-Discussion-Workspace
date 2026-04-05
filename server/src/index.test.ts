@@ -10,9 +10,11 @@ import {
   deleteMessageForAuthor,
   deleteNodeForAuthor,
   deleteWorkspaceForAuthor,
+  getMessageByIdForAuthor,
   getNodeByIdForAuthor,
   getUserById,
   getWorkspaceByIdForAuthor,
+  listMessageAnnotationsByMessageForAuthor,
   listMessagesForNodeForAuthor,
   listNodesByWorkspaceForAuthor,
   listWorkspacesByAuthor,
@@ -29,6 +31,10 @@ import {
 } from './db/queries/internal.js'
 import { createAppRouterContext } from './trpcContext.js'
 import * as selectProviderModule from './chat/providers/selectProvider.js'
+import {
+  branchMessageFromSelectionInTransaction,
+  MessageBranchSelectionConflictError,
+} from './annotations/branchMessageFromSelection.js'
 
 jest.mock('./db/index.js', () => ({
   createOrGetConversationPostprocessJobForAuthor: jest.fn(),
@@ -39,9 +45,11 @@ jest.mock('./db/index.js', () => ({
   deleteMessageForAuthor: jest.fn(),
   deleteNodeForAuthor: jest.fn(),
   deleteWorkspaceForAuthor: jest.fn(),
+  getMessageByIdForAuthor: jest.fn(),
   getNodeByIdForAuthor: jest.fn(),
   getUserById: jest.fn(),
   getWorkspaceByIdForAuthor: jest.fn(),
+  listMessageAnnotationsByMessageForAuthor: jest.fn(),
   listMessagesForNodeForAuthor: jest.fn(),
   listNodesByWorkspaceForAuthor: jest.fn(),
   listWorkspacesByAuthor: jest.fn(),
@@ -57,12 +65,25 @@ jest.mock('./db/queries/internal.js', () => ({
   workspaceExists: jest.fn(),
 }))
 
+jest.mock('./annotations/branchMessageFromSelection.js', () => ({
+  branchMessageFromSelectionInTransaction: jest.fn(),
+  MessageBranchSelectionConflictError: class MessageBranchSelectionConflictError extends Error {
+    constructor(message: string) {
+      super(message)
+      this.name = 'MessageBranchSelectionConflictError'
+    }
+  },
+}))
+
 const getUserByIdMock = getUserById as jest.MockedFunction<typeof getUserById>
 const listWorkspacesByAuthorMock = listWorkspacesByAuthor as jest.MockedFunction<
   typeof listWorkspacesByAuthor
 >
 const getWorkspaceByIdForAuthorMock = getWorkspaceByIdForAuthor as jest.MockedFunction<
   typeof getWorkspaceByIdForAuthor
+>
+const getMessageByIdForAuthorMock = getMessageByIdForAuthor as jest.MockedFunction<
+  typeof getMessageByIdForAuthor
 >
 const workspaceExistsMock = workspaceExists as jest.MockedFunction<typeof workspaceExists>
 const listNodesByWorkspaceForAuthorMock = listNodesByWorkspaceForAuthor as jest.MockedFunction<
@@ -75,7 +96,15 @@ const nodeExistsMock = nodeExists as jest.MockedFunction<typeof nodeExists>
 const listMessagesForNodeForAuthorMock = listMessagesForNodeForAuthor as jest.MockedFunction<
   typeof listMessagesForNodeForAuthor
 >
+const listMessageAnnotationsByMessageForAuthorMock =
+  listMessageAnnotationsByMessageForAuthor as jest.MockedFunction<
+    typeof listMessageAnnotationsByMessageForAuthor
+  >
 const messageExistsMock = messageExists as jest.MockedFunction<typeof messageExists>
+const branchMessageFromSelectionInTransactionMock =
+  branchMessageFromSelectionInTransaction as jest.MockedFunction<
+    typeof branchMessageFromSelectionInTransaction
+  >
 const createOrGetConversationTurnForAuthorMock = createOrGetConversationTurnForAuthor as jest.MockedFunction<
   typeof createOrGetConversationTurnForAuthor
 >
@@ -182,6 +211,42 @@ const ownedConversationTurnRecord = {
   updatedAt: '2026-03-20T00:00:00.000Z',
 }
 
+const ownedMessageAnnotationRecord = {
+  id: '66666666-6666-4666-8666-666666666666',
+  messageId: ownedMessageRecord.id,
+  leadsToNodeId: null,
+  kind: 'branch' as const,
+  quote: 'hello',
+  startOffset: 0,
+  endOffset: 5,
+  selectorJson: {
+    selector: [{ quote: 'hello', start: 0, end: 5 }],
+  },
+  createdByUserId: selfSessionUser.id,
+  idempotencyKey: 'annotation-idempotency-key-1',
+  createdAt: '2026-03-20T00:00:00.000Z',
+  updatedAt: '2026-03-20T00:00:00.000Z',
+  deletedAt: null,
+}
+
+const ownedMessageBranchResult = {
+  annotation: {
+    id: ownedMessageAnnotationRecord.id,
+    messageId: ownedMessageAnnotationRecord.messageId,
+    leadsToNodeId: '77777777-7777-4777-8777-777777777777',
+    kind: ownedMessageAnnotationRecord.kind,
+    quote: ownedMessageAnnotationRecord.quote,
+    startOffset: ownedMessageAnnotationRecord.startOffset,
+    endOffset: ownedMessageAnnotationRecord.endOffset,
+    selectorJson: ownedMessageAnnotationRecord.selectorJson,
+    createdByUserId: ownedMessageAnnotationRecord.createdByUserId,
+    createdAt: ownedMessageAnnotationRecord.createdAt,
+    updatedAt: ownedMessageAnnotationRecord.updatedAt,
+    deletedAt: ownedMessageAnnotationRecord.deletedAt,
+  },
+  branchNodeId: '77777777-7777-4777-8777-777777777777',
+}
+
 const makeCaller = (sessionUser: SessionUser | null) => {
   const cookie =
     sessionUser === null ? undefined : `bdw_session=${createSession(sessionUser)}`
@@ -285,6 +350,16 @@ describe('tRPC ownership integration', () => {
     listMessagesForNodeForAuthorMock.mockImplementation(async (nodeId: string, authorUserId: string) =>
       nodeId === ownedNodeRecord.id && authorUserId === selfSessionUser.id ? [ownedMessageRecord] : [],
     )
+    getMessageByIdForAuthorMock.mockImplementation(async (id: string, authorUserId: string) =>
+      id === ownedMessageRecord.id && authorUserId === selfSessionUser.id ? ownedMessageRecord : null,
+    )
+    listMessageAnnotationsByMessageForAuthorMock.mockImplementation(
+      async (messageId: string, authorUserId: string) =>
+        messageId === ownedMessageRecord.id && authorUserId === selfSessionUser.id
+          ? [ownedMessageAnnotationRecord]
+          : [],
+    )
+    branchMessageFromSelectionInTransactionMock.mockResolvedValue(ownedMessageBranchResult)
     messageExistsMock.mockResolvedValue(false)
 
     createWorkspaceForAuthorMock.mockResolvedValue(ownedWorkspaceRecord)
@@ -327,6 +402,141 @@ describe('tRPC ownership integration', () => {
       ownedNodeRecord,
     ])
     await expect(caller.messagesByNode({ nodeId: ownedNodeRecord.id })).resolves.toEqual([ownedMessageRecord])
+  })
+
+  test('owner can list message annotations and branch from selection', async () => {
+    const caller = makeCaller(selfSessionUser)
+    const branchInput = {
+      messageId: ownedMessageRecord.id,
+      selection: {
+        quote: 'hello',
+        selectorJson: {
+          selector: [{ quote: 'hello', start: 0, end: 5 }],
+        },
+        startOffset: 0,
+        endOffset: 5,
+      },
+      idempotencyKey: 'annotation-branch-idem-1',
+      newNodeMeta: {
+        title: 'Branch title',
+      },
+    }
+
+    await expect(
+      caller.messageAnnotationsByMessage({ messageId: ownedMessageRecord.id }),
+    ).resolves.toEqual([ownedMessageAnnotationRecord])
+    await expect(caller.messageBranchFromSelection(branchInput)).resolves.toEqual(
+      ownedMessageBranchResult,
+    )
+    expect(branchMessageFromSelectionInTransactionMock).toHaveBeenCalledWith({
+      input: branchInput,
+      currentUserId: selfSessionUser.id,
+    })
+  })
+
+  test('cross-user annotation reads and branch writes are denied with FORBIDDEN', async () => {
+    const caller = makeCaller(selfSessionUser)
+    getMessageByIdForAuthorMock.mockResolvedValue(null)
+    messageExistsMock.mockResolvedValue(true)
+
+    await expectTrpcError(
+      caller.messageAnnotationsByMessage({
+        messageId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      }),
+      'FORBIDDEN',
+      'Workspace access is forbidden.',
+    )
+
+    await expectTrpcError(
+      caller.messageBranchFromSelection({
+        messageId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        selection: {
+          quote: 'hello',
+          selectorJson: {
+            selector: [{ quote: 'hello', start: 0, end: 5 }],
+          },
+        },
+        idempotencyKey: 'annotation-branch-idem-2',
+      }),
+      'FORBIDDEN',
+      'Workspace access is forbidden.',
+    )
+  })
+
+  test('annotation list returns empty array for missing message', async () => {
+    const caller = makeCaller(selfSessionUser)
+    getMessageByIdForAuthorMock.mockResolvedValueOnce(null)
+    messageExistsMock.mockResolvedValueOnce(false)
+
+    await expect(
+      caller.messageAnnotationsByMessage({
+        messageId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      }),
+    ).resolves.toEqual([])
+    expect(listMessageAnnotationsByMessageForAuthorMock).not.toHaveBeenCalled()
+  })
+
+  test('messageBranchFromSelection returns NOT_FOUND when message is missing', async () => {
+    const caller = makeCaller(selfSessionUser)
+    getMessageByIdForAuthorMock.mockResolvedValueOnce(null)
+    messageExistsMock.mockResolvedValueOnce(false)
+
+    await expectTrpcError(
+      caller.messageBranchFromSelection({
+        messageId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+        selection: {
+          quote: 'hello',
+          selectorJson: {
+            selector: [{ quote: 'hello', start: 0, end: 5 }],
+          },
+        },
+        idempotencyKey: 'annotation-branch-idem-3',
+      }),
+      'NOT_FOUND',
+      'Message not found.',
+    )
+  })
+
+  test('messageBranchFromSelection maps service conflict to CONFLICT', async () => {
+    const caller = makeCaller(selfSessionUser)
+    branchMessageFromSelectionInTransactionMock.mockRejectedValueOnce(
+      new MessageBranchSelectionConflictError('Idempotency record exists without a branch node link.'),
+    )
+
+    await expectTrpcError(
+      caller.messageBranchFromSelection({
+        messageId: ownedMessageRecord.id,
+        selection: {
+          quote: 'hello',
+          selectorJson: {
+            selector: [{ quote: 'hello', start: 0, end: 5 }],
+          },
+        },
+        idempotencyKey: 'annotation-branch-idem-4',
+      }),
+      'CONFLICT',
+      'Idempotency record exists without a branch node link.',
+    )
+  })
+
+  test('messageBranchFromSelection returns NOT_FOUND when service returns null', async () => {
+    const caller = makeCaller(selfSessionUser)
+    branchMessageFromSelectionInTransactionMock.mockResolvedValueOnce(null)
+
+    await expectTrpcError(
+      caller.messageBranchFromSelection({
+        messageId: ownedMessageRecord.id,
+        selection: {
+          quote: 'hello',
+          selectorJson: {
+            selector: [{ quote: 'hello', start: 0, end: 5 }],
+          },
+        },
+        idempotencyKey: 'annotation-branch-idem-6',
+      }),
+      'NOT_FOUND',
+      'Message not found.',
+    )
   })
 
   test('cross-user workspace read is denied with FORBIDDEN', async () => {
@@ -376,6 +586,25 @@ describe('tRPC ownership integration', () => {
     )
     await expectTrpcError(
       caller.messagesByNode({ nodeId: ownedNodeRecord.id }),
+      'UNAUTHORIZED',
+      'Authentication required.',
+    )
+    await expectTrpcError(
+      caller.messageAnnotationsByMessage({ messageId: ownedMessageRecord.id }),
+      'UNAUTHORIZED',
+      'Authentication required.',
+    )
+    await expectTrpcError(
+      caller.messageBranchFromSelection({
+        messageId: ownedMessageRecord.id,
+        selection: {
+          quote: 'hello',
+          selectorJson: {
+            selector: [{ quote: 'hello', start: 0, end: 5 }],
+          },
+        },
+        idempotencyKey: 'annotation-branch-idem-5',
+      }),
       'UNAUTHORIZED',
       'Authentication required.',
     )

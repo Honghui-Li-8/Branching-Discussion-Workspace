@@ -10,9 +10,11 @@ import {
   deleteMessageForAuthor as deleteMessageForAuthorRecord,
   deleteNodeForAuthor as deleteNodeForAuthorRecord,
   deleteWorkspaceForAuthor as deleteWorkspaceForAuthorRecord,
+  getMessageByIdForAuthor as getMessageByIdForAuthorRecord,
   getUserById,
   getNodeByIdForAuthor as getNodeByIdForAuthorRecord,
   getWorkspaceByIdForAuthor as getWorkspaceByIdForAuthorRecord,
+  listMessageAnnotationsByMessageForAuthor as listMessageAnnotationsByMessageForAuthorRecord,
   listMessagesForNodeForAuthor as listMessagesForNodeForAuthorRecord,
   listNodesByWorkspaceForAuthor as listNodesByWorkspaceForAuthorRecord,
   listWorkspacesByAuthor as listWorkspacesByAuthorRecord,
@@ -28,6 +30,10 @@ import {
 import { buildPlaceholderAssistantReply } from './utils/placeholderModelReply.js'
 import { sendConversationTurn } from './chat/sendConversationTurn.js'
 import { createLogger } from './logging/logger.js'
+import {
+  branchMessageFromSelectionInTransaction,
+  MessageBranchSelectionConflictError,
+} from './annotations/branchMessageFromSelection.js'
 
 type ContextRequest = Pick<Request, 'headers'>
 type ExistsById = (id: string) => Promise<boolean>
@@ -58,13 +64,6 @@ export const createAppRouterContext = (req: ContextRequest): AppRouterContext =>
     throw new TRPCError({
       code: 'NOT_FOUND',
       message,
-    })
-  }
-
-  const throwAnnotationFeatureNotImplemented = (): never => {
-    throw new TRPCError({
-      code: 'INTERNAL_SERVER_ERROR',
-      message: 'Message annotation backend feature is not implemented yet.',
     })
   }
 
@@ -271,13 +270,50 @@ export const createAppRouterContext = (req: ContextRequest): AppRouterContext =>
         messageExistsRecord,
       )
     },
-    listMessageAnnotationsByMessage: async (_messageId) => {
-      requireSessionUserId()
-      return throwAnnotationFeatureNotImplemented()
+    listMessageAnnotationsByMessage: async (messageId) => {
+      const currentUserId = requireSessionUserId()
+      const message = await resolveOwnedRecordOrNull(
+        await getMessageByIdForAuthorRecord(messageId, currentUserId),
+        messageId,
+        messageExistsRecord,
+      )
+
+      if (!message) {
+        return []
+      }
+
+      return listMessageAnnotationsByMessageForAuthorRecord(messageId, currentUserId)
     },
-    messageBranchFromSelection: async (_input) => {
-      requireSessionUserId()
-      return throwAnnotationFeatureNotImplemented()
+    messageBranchFromSelection: async (input) => {
+      const currentUserId = requireSessionUserId()
+      await resolveOwnedRecordOrNotFound(
+        await getMessageByIdForAuthorRecord(input.messageId, currentUserId),
+        input.messageId,
+        messageExistsRecord,
+        'Message not found.',
+      )
+
+      try {
+        const result = await branchMessageFromSelectionInTransaction({
+          input,
+          currentUserId,
+        })
+
+        if (!result) {
+          return throwNotFound('Message not found.')
+        }
+
+        return result
+      } catch (error) {
+        if (error instanceof MessageBranchSelectionConflictError) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: error.message,
+          })
+        }
+
+        throw error
+      }
     },
     conversationSend: async (input) => {
       const currentUserId = requireSessionUserId()
