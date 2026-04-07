@@ -10,7 +10,7 @@ import {
   softDeleteMessageAnnotationForAuthor as softDeleteMessageAnnotationForAuthorRecord,
   transitionMessageAnnotationToSuggestionForAuthor as transitionMessageAnnotationToSuggestionForAuthorRecord,
 } from '../db/index.js'
-import { messageExists as messageExistsRecord } from '../db/queries/internal.js'
+import { messageExists as messageExistsRecord } from '../db/queries/message.js'
 import { messageAnnotationExists as messageAnnotationExistsRecord } from '../db/queries/messageAnnotation.js'
 import {
   branchMessageFromSelectionInTransaction,

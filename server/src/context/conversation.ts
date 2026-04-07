@@ -1,6 +1,6 @@
 import type { AppRouterContext } from '@branching/shared'
 import { getNodeByIdForAuthor as getNodeByIdForAuthorRecord } from '../db/index.js'
-import { nodeExists as nodeExistsRecord } from '../db/queries/internal.js'
+import { nodeExists as nodeExistsRecord } from '../db/queries/node.js'
 import { sendConversationTurn } from '../chat/sendConversationTurn.js'
 import { createLogger } from '../logging/logger.js'
 import type { ContextOwnershipHelpers } from './types.js'

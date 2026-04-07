@@ -7,10 +7,8 @@ import {
   listMessagesForNodeForAuthor as listMessagesForNodeForAuthorRecord,
   updateMessageForAuthor as updateMessageForAuthorRecord,
 } from '../db/index.js'
-import {
-  messageExists as messageExistsRecord,
-  nodeExists as nodeExistsRecord,
-} from '../db/queries/internal.js'
+import { messageExists as messageExistsRecord } from '../db/queries/message.js'
+import { nodeExists as nodeExistsRecord } from '../db/queries/node.js'
 import { createLogger } from '../logging/logger.js'
 import { buildPlaceholderAssistantReply } from '../utils/placeholderModelReply.js'
 import type { ContextOwnershipHelpers } from './types.js'

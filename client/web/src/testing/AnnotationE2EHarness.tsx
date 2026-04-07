@@ -5,6 +5,7 @@ import {
   type W3CTextAnnotation,
 } from '@recogito/react-text-annotator'
 import { AssistantMessageAnnotationWrapper } from '../components/conversation/AssistantMessageAnnotations'
+import { trpc } from '../trpc'
 
 const E2E_MESSAGE_ID = 'e2e-assistant-message'
 const E2E_TEXT = `This is a stable test paragraph so we can validate annotation dismiss behavior with advanced PG features and branch controls.`
@@ -107,6 +108,22 @@ const AnnotationE2EStatus = () => {
   )
 }
 
+const BackendAnnotationStatus = () => {
+  const messageAnnotationsQuery = trpc.messageAnnotationsByMessage.useQuery({
+    messageId: E2E_MESSAGE_ID,
+  })
+  const count = messageAnnotationsQuery.data?.length ?? 0
+
+  return (
+    <p
+      data-testid="e2e-backend-annotation-count"
+      className="mb-2 text-xs font-medium text-[#456a82]"
+    >
+      Backend annotation count: {count}
+    </p>
+  )
+}
+
 export const AnnotationE2EHarness = () => {
   return (
     <div className="min-h-screen bg-[#f4fbff] p-6 text-[#1f4f68]">
@@ -126,6 +143,7 @@ export const AnnotationE2EHarness = () => {
 
       <div className="max-w-2xl rounded-xl border border-[#a6cde2] bg-white/80 p-4">
         <AssistantMessageAnnotationWrapper messageId={E2E_MESSAGE_ID}>
+          <BackendAnnotationStatus />
           <AnnotationE2EStatus />
           <AnnotationE2EControls />
           <p data-testid="e2e-annotation-text" className="m-0 text-sm leading-relaxed">

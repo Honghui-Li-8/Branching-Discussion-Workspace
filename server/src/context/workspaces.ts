@@ -5,7 +5,7 @@ import {
   listWorkspacesByAuthor as listWorkspacesByAuthorRecord,
   updateWorkspaceForAuthor as updateWorkspaceForAuthorRecord,
 } from '../db/index.js'
-import { workspaceExists as workspaceExistsRecord } from '../db/queries/internal.js'
+import { workspaceExists as workspaceExistsRecord } from '../db/queries/workspace.js'
 import { createLogger } from '../logging/logger.js'
 import type { ContextOwnershipHelpers } from './types.js'
 

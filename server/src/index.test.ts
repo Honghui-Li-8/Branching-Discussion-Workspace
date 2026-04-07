@@ -74,6 +74,33 @@ jest.mock('./db/queries/internal.js', () => ({
   workspaceExists: jest.fn(),
 }))
 
+jest.mock('./db/queries/message.js', () => ({
+  messageExists: (id: string) =>
+    (
+      jest.requireMock('./db/queries/internal.js') as {
+        messageExists: (messageId: string) => Promise<boolean>
+      }
+    ).messageExists(id),
+}))
+
+jest.mock('./db/queries/node.js', () => ({
+  nodeExists: (id: string) =>
+    (
+      jest.requireMock('./db/queries/internal.js') as {
+        nodeExists: (nodeId: string) => Promise<boolean>
+      }
+    ).nodeExists(id),
+}))
+
+jest.mock('./db/queries/workspace.js', () => ({
+  workspaceExists: (id: string) =>
+    (
+      jest.requireMock('./db/queries/internal.js') as {
+        workspaceExists: (workspaceId: string) => Promise<boolean>
+      }
+    ).workspaceExists(id),
+}))
+
 jest.mock('./db/queries/messageAnnotation.js', () => ({
   messageAnnotationExists: jest.fn(),
 }))
