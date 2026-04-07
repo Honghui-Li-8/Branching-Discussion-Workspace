@@ -1,4 +1,5 @@
-import { appRouter, type AppRouterContext } from './index'
+import { describe, expect, jest, test } from '@jest/globals'
+import { appRouter, type AppRouterContext } from '../index'
 
 const fixedNow = '2026-03-17T00:00:00.000Z'
 
@@ -76,6 +77,43 @@ const makeContext = (): AppRouterContext => {
     createMessage: jest.fn(async () => message),
     updateMessage: jest.fn(async () => message),
     deleteMessage: jest.fn(async () => ({ id: message.id })),
+    listMessageAnnotationsByMessage: jest.fn(async () => []),
+    messageSuggestFromSelection: jest.fn(async () => ({
+      id: 'a2',
+      messageId: message.id,
+      leadsToNodeId: null,
+      kind: 'suggestion' as const,
+      quote: 'hello',
+      selectorJson: {
+        selector: [{ quote: 'hello', start: 0, end: 5 }],
+      },
+      createdByUserId: user.id,
+      createdAt: fixedNow,
+      updatedAt: fixedNow,
+      deletedAt: null,
+    })),
+    messageAnnotationDelete: jest.fn(async () => ({
+      annotationId: 'a1',
+      deletedBranchNodeId: 'n-child-1',
+      deletedNodeCount: 1,
+      deletedMessageCount: 0,
+    })),
+    messageBranchFromSelection: jest.fn(async () => ({
+      annotation: {
+        id: 'a1',
+        messageId: message.id,
+        leadsToNodeId: 'n-child-1',
+        kind: 'branch' as const,
+        quote: 'hello',
+        selectorJson: {
+          selector: [{ quote: 'hello', start: 0, end: 5 }],
+        },
+        createdByUserId: user.id,
+        createdAt: fixedNow,
+        updatedAt: fixedNow,
+      },
+      branchNodeId: 'n-child-1',
+    })),
     conversationSend: jest.fn(async () => ({
       turnId: 't1',
       status: 'completed' as const,
@@ -91,7 +129,7 @@ const makeContext = (): AppRouterContext => {
   }
 }
 
-describe('appRouter', () => {
+describe('appRouter core routes', () => {
   test('health returns service status', async () => {
     const caller = appRouter.createCaller(makeContext())
     const result = await caller.health()
@@ -112,7 +150,7 @@ describe('appRouter', () => {
     expect(result.id).toBe('w1')
   })
 
-  test('protected procedures require authenticated context', async () => {
+  test('protected core procedures require authenticated context', async () => {
     const caller = appRouter.createCaller({
       ...makeContext(),
       sessionUserId: null,

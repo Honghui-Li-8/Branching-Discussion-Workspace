@@ -8,6 +8,7 @@ import type {
   MessageRole,
   UpdateMessageInput,
 } from '../models/message.js'
+import type { PoolClient } from 'pg'
 import { query } from '../client.js'
 
 type MessageRow = {
@@ -21,6 +22,23 @@ type MessageRow = {
   created_at: string
 }
 
+type MessageBranchSourceContextRow = {
+  message_id: string
+  parent_node_id: string
+  workspace_id: string
+}
+
+export type MessageBranchSourceContextRecord = {
+  messageId: string
+  parentNodeId: string
+  workspaceId: string
+}
+
+type MessageBranchSourceContextQueryExecutor = (
+  sql: string,
+  params: unknown[],
+) => Promise<{ rows: MessageBranchSourceContextRow[] }>
+
 const mapMessageRow = (row: MessageRow): MessageRecord => ({
   id: row.id,
   authorUserId: row.author_user_id,
@@ -31,6 +49,63 @@ const mapMessageRow = (row: MessageRow): MessageRecord => ({
   metadata: parseMessageMetadata(row.metadata),
   createdAt: row.created_at,
 })
+
+const mapMessageBranchSourceContextRow = (
+  row: MessageBranchSourceContextRow,
+): MessageBranchSourceContextRecord => ({
+  messageId: row.message_id,
+  parentNodeId: row.parent_node_id,
+  workspaceId: row.workspace_id,
+})
+
+const getMessageBranchSourceContextForAuthorWithExecutor = async (
+  runQuery: MessageBranchSourceContextQueryExecutor,
+  messageId: string,
+  authorUserId: string,
+): Promise<MessageBranchSourceContextRecord | null> => {
+  const result = await runQuery(
+    `
+    SELECT
+      m.id AS message_id,
+      m.node_id AS parent_node_id,
+      n.workspace_id AS workspace_id
+    FROM messages m
+    JOIN nodes n ON n.id = m.node_id
+    JOIN workspaces w ON w.id = n.workspace_id
+    WHERE m.id = $1
+      AND w.author_user_id = $2
+    LIMIT 1
+    `,
+    [messageId, authorUserId],
+  )
+
+  if (result.rows.length === 0) {
+    return null
+  }
+
+  return mapMessageBranchSourceContextRow(result.rows[0])
+}
+
+export const getMessageBranchSourceContextForAuthor = async (
+  messageId: string,
+  authorUserId: string,
+): Promise<MessageBranchSourceContextRecord | null> =>
+  getMessageBranchSourceContextForAuthorWithExecutor(
+    (sql, params) => query<MessageBranchSourceContextRow>(sql, params),
+    messageId,
+    authorUserId,
+  )
+
+export const getMessageBranchSourceContextForAuthorInTransaction = async (
+  client: Pick<PoolClient, 'query'>,
+  messageId: string,
+  authorUserId: string,
+): Promise<MessageBranchSourceContextRecord | null> =>
+  getMessageBranchSourceContextForAuthorWithExecutor(
+    (sql, params) => client.query<MessageBranchSourceContextRow>(sql, params),
+    messageId,
+    authorUserId,
+  )
 
 export const listMessagesForNode = async (nodeId: string): Promise<MessageRecord[]> => {
   const result = await query<MessageRow>(

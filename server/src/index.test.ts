@@ -4,18 +4,24 @@ import { clearAllSessions, createSession } from './auth/sessionStore.js'
 import type { SessionUser } from './auth/types.js'
 import {
   createOrGetConversationTurnForAuthor,
+  createMessageAnnotationForAuthor,
   createMessageForAuthor,
   createNodeForAuthor,
   createWorkspaceForAuthor,
   deleteMessageForAuthor,
   deleteNodeForAuthor,
   deleteWorkspaceForAuthor,
+  getMessageAnnotationByIdForAuthor,
+  getMessageByIdForAuthor,
   getNodeByIdForAuthor,
   getUserById,
   getWorkspaceByIdForAuthor,
+  listMessageAnnotationsByMessageForAuthor,
   listMessagesForNodeForAuthor,
   listNodesByWorkspaceForAuthor,
   listWorkspacesByAuthor,
+  softDeleteMessageAnnotationForAuthor,
+  transitionMessageAnnotationToSuggestionForAuthor,
   type ConversationTurnRecord,
   updateConversationTurnForAuthor,
   updateMessageForAuthor,
@@ -27,24 +33,35 @@ import {
   nodeExists,
   workspaceExists,
 } from './db/queries/internal.js'
+import { messageAnnotationExists } from './db/queries/messageAnnotation.js'
 import { createAppRouterContext } from './trpcContext.js'
 import * as selectProviderModule from './chat/providers/selectProvider.js'
+import {
+  branchMessageFromSelectionInTransaction,
+  MessageBranchSelectionConflictError,
+} from './annotations/branchMessageFromSelection.js'
 
 jest.mock('./db/index.js', () => ({
   createOrGetConversationPostprocessJobForAuthor: jest.fn(),
   createOrGetConversationTurnForAuthor: jest.fn(),
   createMessageForAuthor: jest.fn(),
+  createMessageAnnotationForAuthor: jest.fn(),
   createNodeForAuthor: jest.fn(),
   createWorkspaceForAuthor: jest.fn(),
   deleteMessageForAuthor: jest.fn(),
   deleteNodeForAuthor: jest.fn(),
   deleteWorkspaceForAuthor: jest.fn(),
+  getMessageAnnotationByIdForAuthor: jest.fn(),
+  getMessageByIdForAuthor: jest.fn(),
   getNodeByIdForAuthor: jest.fn(),
   getUserById: jest.fn(),
   getWorkspaceByIdForAuthor: jest.fn(),
+  listMessageAnnotationsByMessageForAuthor: jest.fn(),
   listMessagesForNodeForAuthor: jest.fn(),
   listNodesByWorkspaceForAuthor: jest.fn(),
   listWorkspacesByAuthor: jest.fn(),
+  softDeleteMessageAnnotationForAuthor: jest.fn(),
+  transitionMessageAnnotationToSuggestionForAuthor: jest.fn(),
   updateConversationTurnForAuthor: jest.fn(),
   updateMessageForAuthor: jest.fn(),
   updateNodeForAuthor: jest.fn(),
@@ -57,12 +74,63 @@ jest.mock('./db/queries/internal.js', () => ({
   workspaceExists: jest.fn(),
 }))
 
+jest.mock('./db/queries/message.js', () => ({
+  messageExists: (id: string) =>
+    (
+      jest.requireMock('./db/queries/internal.js') as {
+        messageExists: (messageId: string) => Promise<boolean>
+      }
+    ).messageExists(id),
+}))
+
+jest.mock('./db/queries/node.js', () => ({
+  nodeExists: (id: string) =>
+    (
+      jest.requireMock('./db/queries/internal.js') as {
+        nodeExists: (nodeId: string) => Promise<boolean>
+      }
+    ).nodeExists(id),
+}))
+
+jest.mock('./db/queries/workspace.js', () => ({
+  workspaceExists: (id: string) =>
+    (
+      jest.requireMock('./db/queries/internal.js') as {
+        workspaceExists: (workspaceId: string) => Promise<boolean>
+      }
+    ).workspaceExists(id),
+}))
+
+jest.mock('./db/queries/messageAnnotation.js', () => ({
+  messageAnnotationExists: jest.fn(),
+}))
+
+jest.mock('./annotations/branchMessageFromSelection.js', () => ({
+  branchMessageFromSelectionInTransaction: jest.fn(),
+  MessageBranchSelectionConflictError: class MessageBranchSelectionConflictError extends Error {
+    constructor(message: string) {
+      super(message)
+      this.name = 'MessageBranchSelectionConflictError'
+    }
+  },
+  MessageBranchSelectionInvalidInputError: class MessageBranchSelectionInvalidInputError
+    extends Error {
+    constructor(message: string) {
+      super(message)
+      this.name = 'MessageBranchSelectionInvalidInputError'
+    }
+  },
+}))
+
 const getUserByIdMock = getUserById as jest.MockedFunction<typeof getUserById>
 const listWorkspacesByAuthorMock = listWorkspacesByAuthor as jest.MockedFunction<
   typeof listWorkspacesByAuthor
 >
 const getWorkspaceByIdForAuthorMock = getWorkspaceByIdForAuthor as jest.MockedFunction<
   typeof getWorkspaceByIdForAuthor
+>
+const getMessageByIdForAuthorMock = getMessageByIdForAuthor as jest.MockedFunction<
+  typeof getMessageByIdForAuthor
 >
 const workspaceExistsMock = workspaceExists as jest.MockedFunction<typeof workspaceExists>
 const listNodesByWorkspaceForAuthorMock = listNodesByWorkspaceForAuthor as jest.MockedFunction<
@@ -75,7 +143,29 @@ const nodeExistsMock = nodeExists as jest.MockedFunction<typeof nodeExists>
 const listMessagesForNodeForAuthorMock = listMessagesForNodeForAuthor as jest.MockedFunction<
   typeof listMessagesForNodeForAuthor
 >
+const listMessageAnnotationsByMessageForAuthorMock =
+  listMessageAnnotationsByMessageForAuthor as jest.MockedFunction<
+    typeof listMessageAnnotationsByMessageForAuthor
+  >
+const getMessageAnnotationByIdForAuthorMock =
+  getMessageAnnotationByIdForAuthor as jest.MockedFunction<
+    typeof getMessageAnnotationByIdForAuthor
+  >
+const softDeleteMessageAnnotationForAuthorMock =
+  softDeleteMessageAnnotationForAuthor as jest.MockedFunction<
+    typeof softDeleteMessageAnnotationForAuthor
+  >
+const transitionMessageAnnotationToSuggestionForAuthorMock =
+  transitionMessageAnnotationToSuggestionForAuthor as jest.MockedFunction<
+    typeof transitionMessageAnnotationToSuggestionForAuthor
+  >
+const messageAnnotationExistsMock =
+  messageAnnotationExists as jest.MockedFunction<typeof messageAnnotationExists>
 const messageExistsMock = messageExists as jest.MockedFunction<typeof messageExists>
+const branchMessageFromSelectionInTransactionMock =
+  branchMessageFromSelectionInTransaction as jest.MockedFunction<
+    typeof branchMessageFromSelectionInTransaction
+  >
 const createOrGetConversationTurnForAuthorMock = createOrGetConversationTurnForAuthor as jest.MockedFunction<
   typeof createOrGetConversationTurnForAuthor
 >
@@ -84,6 +174,8 @@ const createWorkspaceForAuthorMock = createWorkspaceForAuthor as jest.MockedFunc
 >
 const createNodeForAuthorMock = createNodeForAuthor as jest.MockedFunction<typeof createNodeForAuthor>
 const createMessageForAuthorMock = createMessageForAuthor as jest.MockedFunction<typeof createMessageForAuthor>
+const createMessageAnnotationForAuthorMock =
+  createMessageAnnotationForAuthor as jest.MockedFunction<typeof createMessageAnnotationForAuthor>
 const updateWorkspaceForAuthorMock = updateWorkspaceForAuthor as jest.MockedFunction<
   typeof updateWorkspaceForAuthor
 >
@@ -146,6 +238,23 @@ const ownedNodeRecord = {
   updatedAt: '2026-03-20T00:00:00.000Z',
 }
 
+const ownedBranchNodeRecord = {
+  id: '77777777-7777-4777-8777-777777777777',
+  workspaceId: ownedWorkspaceRecord.id,
+  authorUserId: selfSessionUser.id,
+  parentNodeId: ownedNodeRecord.id,
+  depth: 1,
+  type: 'option' as const,
+  title: 'Branch Node',
+  status: 'open' as const,
+  confidence: 'medium' as const,
+  summary: 'branch summary',
+  conclusion: null,
+  rationale: null,
+  createdAt: '2026-03-20T00:00:00.000Z',
+  updatedAt: '2026-03-20T00:00:00.000Z',
+}
+
 const ownedMessageRecord = {
   id: '33333333-3333-4333-8333-333333333333',
   authorUserId: selfSessionUser.id,
@@ -182,6 +291,57 @@ const ownedConversationTurnRecord = {
   updatedAt: '2026-03-20T00:00:00.000Z',
 }
 
+const ownedMessageAnnotationRecord = {
+  id: '66666666-6666-4666-8666-666666666666',
+  messageId: ownedMessageRecord.id,
+  leadsToNodeId: ownedBranchNodeRecord.id,
+  kind: 'branch' as const,
+  quote: 'hello',
+  startOffset: 0,
+  endOffset: 5,
+  selectorJson: {
+    selector: [{ quote: 'hello', start: 0, end: 5 }],
+  },
+  createdByUserId: selfSessionUser.id,
+  idempotencyKey: 'annotation-idempotency-key-1',
+  createdAt: '2026-03-20T00:00:00.000Z',
+  updatedAt: '2026-03-20T00:00:00.000Z',
+  deletedAt: null,
+}
+
+const ownedSuggestionAnnotationRecord = {
+  ...ownedMessageAnnotationRecord,
+  id: '99999999-9999-4999-8999-999999999999',
+  leadsToNodeId: null,
+  kind: 'suggestion' as const,
+  idempotencyKey: 'annotation-idempotency-key-suggest-1',
+}
+
+const ownedMessageBranchResult = {
+  annotation: {
+    id: ownedMessageAnnotationRecord.id,
+    messageId: ownedMessageAnnotationRecord.messageId,
+    leadsToNodeId: ownedBranchNodeRecord.id,
+    kind: ownedMessageAnnotationRecord.kind,
+    quote: ownedMessageAnnotationRecord.quote,
+    startOffset: ownedMessageAnnotationRecord.startOffset,
+    endOffset: ownedMessageAnnotationRecord.endOffset,
+    selectorJson: ownedMessageAnnotationRecord.selectorJson,
+    createdByUserId: ownedMessageAnnotationRecord.createdByUserId,
+    createdAt: ownedMessageAnnotationRecord.createdAt,
+    updatedAt: ownedMessageAnnotationRecord.updatedAt,
+    deletedAt: ownedMessageAnnotationRecord.deletedAt,
+  },
+  branchNodeId: ownedBranchNodeRecord.id,
+}
+
+const ownedMessageAnnotationDeleteResult = {
+  annotationId: ownedMessageAnnotationRecord.id,
+  deletedBranchNodeId: ownedBranchNodeRecord.id,
+  deletedNodeCount: 1,
+  deletedMessageCount: 0,
+}
+
 const makeCaller = (sessionUser: SessionUser | null) => {
   const cookie =
     sessionUser === null ? undefined : `bdw_session=${createSession(sessionUser)}`
@@ -195,7 +355,13 @@ const makeCaller = (sessionUser: SessionUser | null) => {
 
 const expectTrpcError = async (
   promise: Promise<unknown>,
-  code: 'UNAUTHORIZED' | 'FORBIDDEN' | 'NOT_FOUND' | 'CONFLICT' | 'INTERNAL_SERVER_ERROR',
+  code:
+    | 'UNAUTHORIZED'
+    | 'FORBIDDEN'
+    | 'NOT_FOUND'
+    | 'CONFLICT'
+    | 'BAD_REQUEST'
+    | 'INTERNAL_SERVER_ERROR',
   message: string,
 ) => {
   await expect(promise).rejects.toMatchObject({
@@ -278,13 +444,41 @@ describe('tRPC ownership integration', () => {
       workspaceId === ownedWorkspaceRecord.id && authorUserId === selfSessionUser.id ? [ownedNodeRecord] : [],
     )
     getNodeByIdForAuthorMock.mockImplementation(async (id: string, authorUserId: string) =>
-      id === ownedNodeRecord.id && authorUserId === selfSessionUser.id ? ownedNodeRecord : null,
+      authorUserId === selfSessionUser.id
+        ? (id === ownedNodeRecord.id
+          ? ownedNodeRecord
+          : id === ownedBranchNodeRecord.id
+            ? ownedBranchNodeRecord
+            : null)
+        : null,
     )
     nodeExistsMock.mockResolvedValue(false)
 
     listMessagesForNodeForAuthorMock.mockImplementation(async (nodeId: string, authorUserId: string) =>
       nodeId === ownedNodeRecord.id && authorUserId === selfSessionUser.id ? [ownedMessageRecord] : [],
     )
+    getMessageByIdForAuthorMock.mockImplementation(async (id: string, authorUserId: string) =>
+      id === ownedMessageRecord.id && authorUserId === selfSessionUser.id ? ownedMessageRecord : null,
+    )
+    listMessageAnnotationsByMessageForAuthorMock.mockImplementation(
+      async (messageId: string, authorUserId: string) =>
+        messageId === ownedMessageRecord.id && authorUserId === selfSessionUser.id
+          ? [ownedMessageAnnotationRecord]
+          : [],
+    )
+    getMessageAnnotationByIdForAuthorMock.mockImplementation(async (annotationId: string, authorUserId: string) =>
+      annotationId === ownedMessageAnnotationRecord.id && authorUserId === selfSessionUser.id
+        ? ownedMessageAnnotationRecord
+        : null,
+    )
+    softDeleteMessageAnnotationForAuthorMock.mockImplementation(async (annotationId: string) =>
+      annotationId === ownedMessageAnnotationRecord.id
+        ? { id: annotationId }
+        : null,
+    )
+    transitionMessageAnnotationToSuggestionForAuthorMock.mockResolvedValue(null)
+    branchMessageFromSelectionInTransactionMock.mockResolvedValue(ownedMessageBranchResult)
+    messageAnnotationExistsMock.mockResolvedValue(false)
     messageExistsMock.mockResolvedValue(false)
 
     createWorkspaceForAuthorMock.mockResolvedValue(ownedWorkspaceRecord)
@@ -292,6 +486,7 @@ describe('tRPC ownership integration', () => {
     createMessageForAuthorMock.mockImplementation(async (input) =>
       input.role === 'assistant' ? ownedAssistantMessageRecord : ownedMessageRecord,
     )
+    createMessageAnnotationForAuthorMock.mockResolvedValue(ownedMessageAnnotationRecord)
     createOrGetConversationTurnForAuthorMock.mockResolvedValue({
       turn: ownedConversationTurnRecord,
       wasCreated: true,
@@ -327,6 +522,347 @@ describe('tRPC ownership integration', () => {
       ownedNodeRecord,
     ])
     await expect(caller.messagesByNode({ nodeId: ownedNodeRecord.id })).resolves.toEqual([ownedMessageRecord])
+  })
+
+  test('owner can list, suggest, delete annotation branch, and branch from selection', async () => {
+    const caller = makeCaller(selfSessionUser)
+    deleteNodeForAuthorMock.mockResolvedValueOnce({
+      id: '77777777-7777-4777-8777-777777777777',
+      deletedWorkspace: false,
+      deletedNodeCount: 1,
+      deletedMessageCount: 0,
+    })
+    createMessageAnnotationForAuthorMock.mockResolvedValueOnce(ownedSuggestionAnnotationRecord)
+    const branchInput = {
+      messageId: ownedMessageRecord.id,
+      selection: {
+        quote: 'hello',
+        selectorJson: {
+          selector: [{ quote: 'hello', start: 0, end: 5 }],
+        },
+        startOffset: 0,
+        endOffset: 5,
+      },
+      idempotencyKey: 'annotation-branch-idem-1',
+      newNodeMeta: {
+        title: 'Branch title',
+      },
+    }
+    const suggestInput = {
+      messageId: ownedMessageRecord.id,
+      selection: {
+        quote: 'hello',
+        selectorJson: {
+          selector: [{ quote: 'hello', start: 0, end: 5 }],
+        },
+        startOffset: 0,
+        endOffset: 5,
+      },
+      idempotencyKey: 'annotation-suggest-idem-1',
+    }
+
+    await expect(
+      caller.messageAnnotationsByMessage({ messageId: ownedMessageRecord.id }),
+    ).resolves.toEqual([ownedMessageAnnotationRecord])
+    await expect(caller.messageSuggestFromSelection(suggestInput)).resolves.toEqual(
+      ownedSuggestionAnnotationRecord,
+    )
+    await expect(
+      caller.messageAnnotationDelete({ annotationId: ownedMessageAnnotationRecord.id }),
+    ).resolves.toEqual(ownedMessageAnnotationDeleteResult)
+    await expect(caller.messageBranchFromSelection(branchInput)).resolves.toEqual(
+      ownedMessageBranchResult,
+    )
+    expect(softDeleteMessageAnnotationForAuthorMock).toHaveBeenCalledWith(
+      ownedMessageAnnotationRecord.id,
+      selfSessionUser.id,
+    )
+    expect(createMessageAnnotationForAuthorMock).toHaveBeenCalledWith({
+      messageId: suggestInput.messageId,
+      kind: 'suggestion',
+      quote: suggestInput.selection.quote,
+      selectorJson: suggestInput.selection.selectorJson,
+      startOffset: suggestInput.selection.startOffset,
+      endOffset: suggestInput.selection.endOffset,
+      authorUserId: selfSessionUser.id,
+      idempotencyKey: suggestInput.idempotencyKey,
+    })
+    expect(branchMessageFromSelectionInTransactionMock).toHaveBeenCalledWith({
+      input: branchInput,
+      currentUserId: selfSessionUser.id,
+    })
+  })
+
+  test('cross-user annotation reads/writes are denied with FORBIDDEN', async () => {
+    const caller = makeCaller(selfSessionUser)
+    getMessageByIdForAuthorMock.mockResolvedValue(null)
+    getMessageAnnotationByIdForAuthorMock.mockResolvedValue(null)
+    messageAnnotationExistsMock.mockResolvedValue(true)
+    messageExistsMock.mockResolvedValue(true)
+
+    await expectTrpcError(
+      caller.messageAnnotationsByMessage({
+        messageId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      }),
+      'FORBIDDEN',
+      'Workspace access is forbidden.',
+    )
+
+    await expectTrpcError(
+      caller.messageSuggestFromSelection({
+        messageId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        selection: {
+          quote: 'hello',
+          selectorJson: {
+            selector: [{ quote: 'hello', start: 0, end: 5 }],
+          },
+        },
+        idempotencyKey: 'annotation-suggest-idem-2',
+      }),
+      'FORBIDDEN',
+      'Workspace access is forbidden.',
+    )
+
+    await expectTrpcError(
+      caller.messageBranchFromSelection({
+        messageId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        selection: {
+          quote: 'hello',
+          selectorJson: {
+            selector: [{ quote: 'hello', start: 0, end: 5 }],
+          },
+        },
+        idempotencyKey: 'annotation-branch-idem-2',
+      }),
+      'FORBIDDEN',
+      'Workspace access is forbidden.',
+    )
+
+    await expectTrpcError(
+      caller.messageAnnotationDelete({
+        annotationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      }),
+      'FORBIDDEN',
+      'Workspace access is forbidden.',
+    )
+  })
+
+  test('annotation list returns empty array for missing message', async () => {
+    const caller = makeCaller(selfSessionUser)
+    getMessageByIdForAuthorMock.mockResolvedValueOnce(null)
+    messageExistsMock.mockResolvedValueOnce(false)
+
+    await expect(
+      caller.messageAnnotationsByMessage({
+        messageId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      }),
+    ).resolves.toEqual([])
+    expect(listMessageAnnotationsByMessageForAuthorMock).not.toHaveBeenCalled()
+  })
+
+  test('messageAnnotationDelete returns NOT_FOUND when annotation is missing', async () => {
+    const caller = makeCaller(selfSessionUser)
+    getMessageAnnotationByIdForAuthorMock.mockResolvedValueOnce(null)
+    messageAnnotationExistsMock.mockResolvedValueOnce(false)
+
+    await expectTrpcError(
+      caller.messageAnnotationDelete({
+        annotationId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      }),
+      'NOT_FOUND',
+      'Message annotation not found.',
+    )
+  })
+
+  test('messageAnnotationDelete skips node deletion for suggestion annotation', async () => {
+    const caller = makeCaller(selfSessionUser)
+    getMessageAnnotationByIdForAuthorMock.mockResolvedValueOnce(ownedSuggestionAnnotationRecord)
+    softDeleteMessageAnnotationForAuthorMock.mockResolvedValueOnce({
+      id: ownedSuggestionAnnotationRecord.id,
+    })
+
+    await expect(
+      caller.messageAnnotationDelete({
+        annotationId: ownedSuggestionAnnotationRecord.id,
+      }),
+    ).resolves.toEqual({
+      annotationId: ownedSuggestionAnnotationRecord.id,
+      deletedBranchNodeId: null,
+      deletedNodeCount: 0,
+      deletedMessageCount: 0,
+    })
+
+    expect(deleteNodeForAuthorMock).not.toHaveBeenCalled()
+    expect(softDeleteMessageAnnotationForAuthorMock).toHaveBeenCalledWith(
+      ownedSuggestionAnnotationRecord.id,
+      selfSessionUser.id,
+    )
+  })
+
+  test('messageAnnotationDelete downgrades suggestion-branch after deleting linked node', async () => {
+    const caller = makeCaller(selfSessionUser)
+    const ownedSuggestionBranchAnnotation = {
+      ...ownedMessageAnnotationRecord,
+      id: 'abababab-abab-4bab-8bab-abababababab',
+      kind: 'suggestion-branch' as const,
+      leadsToNodeId: ownedBranchNodeRecord.id,
+    }
+    getMessageAnnotationByIdForAuthorMock.mockResolvedValueOnce(ownedSuggestionBranchAnnotation)
+    deleteNodeForAuthorMock.mockResolvedValueOnce({
+      id: ownedBranchNodeRecord.id,
+      deletedWorkspace: false,
+      deletedNodeCount: 1,
+      deletedMessageCount: 0,
+    })
+    transitionMessageAnnotationToSuggestionForAuthorMock.mockResolvedValueOnce({
+      ...ownedSuggestionBranchAnnotation,
+      kind: 'suggestion',
+      leadsToNodeId: null,
+    })
+
+    await expect(
+      caller.messageAnnotationDelete({
+        annotationId: ownedSuggestionBranchAnnotation.id,
+      }),
+    ).resolves.toEqual({
+      annotationId: ownedSuggestionBranchAnnotation.id,
+      deletedBranchNodeId: ownedBranchNodeRecord.id,
+      deletedNodeCount: 1,
+      deletedMessageCount: 0,
+    })
+
+    expect(deleteNodeForAuthorMock).toHaveBeenCalledWith(
+      ownedBranchNodeRecord.id,
+      selfSessionUser.id,
+    )
+    expect(transitionMessageAnnotationToSuggestionForAuthorMock).toHaveBeenCalledWith(
+      ownedSuggestionBranchAnnotation.id,
+      selfSessionUser.id,
+    )
+    expect(softDeleteMessageAnnotationForAuthorMock).not.toHaveBeenCalled()
+  })
+
+  test('messageSuggestFromSelection returns NOT_FOUND when message is missing', async () => {
+    const caller = makeCaller(selfSessionUser)
+    getMessageByIdForAuthorMock.mockResolvedValueOnce(null)
+    messageExistsMock.mockResolvedValueOnce(false)
+
+    await expectTrpcError(
+      caller.messageSuggestFromSelection({
+        messageId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        selection: {
+          quote: 'hello',
+          selectorJson: {
+            selector: [{ quote: 'hello', start: 0, end: 5 }],
+          },
+        },
+        idempotencyKey: 'annotation-suggest-idem-3',
+      }),
+      'NOT_FOUND',
+      'Message not found.',
+    )
+  })
+
+  test('messageSuggestFromSelection returns existing annotation when source annotation is provided', async () => {
+    const caller = makeCaller(selfSessionUser)
+    getMessageAnnotationByIdForAuthorMock.mockResolvedValueOnce(ownedSuggestionAnnotationRecord)
+
+    await expect(
+      caller.messageSuggestFromSelection({
+        messageId: ownedMessageRecord.id,
+        sourceAnnotationId: ownedSuggestionAnnotationRecord.id,
+        selection: {
+          quote: ownedSuggestionAnnotationRecord.quote,
+          selectorJson: ownedSuggestionAnnotationRecord.selectorJson,
+          startOffset: ownedSuggestionAnnotationRecord.startOffset,
+          endOffset: ownedSuggestionAnnotationRecord.endOffset,
+        },
+        idempotencyKey: 'annotation-suggest-idem-invalid-1',
+      }),
+    ).resolves.toEqual(ownedSuggestionAnnotationRecord)
+  })
+
+  test('messageBranchFromSelection returns NOT_FOUND when message is missing', async () => {
+    const caller = makeCaller(selfSessionUser)
+    getMessageByIdForAuthorMock.mockResolvedValueOnce(null)
+    messageExistsMock.mockResolvedValueOnce(false)
+
+    await expectTrpcError(
+      caller.messageBranchFromSelection({
+        messageId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+        selection: {
+          quote: 'hello',
+          selectorJson: {
+            selector: [{ quote: 'hello', start: 0, end: 5 }],
+          },
+        },
+        idempotencyKey: 'annotation-branch-idem-3',
+      }),
+      'NOT_FOUND',
+      'Message not found.',
+    )
+  })
+
+  test('messageBranchFromSelection maps service conflict to CONFLICT', async () => {
+    const caller = makeCaller(selfSessionUser)
+    branchMessageFromSelectionInTransactionMock.mockRejectedValueOnce(
+      new MessageBranchSelectionConflictError('Idempotency record exists without a branch node link.'),
+    )
+
+    await expectTrpcError(
+      caller.messageBranchFromSelection({
+        messageId: ownedMessageRecord.id,
+        selection: {
+          quote: 'hello',
+          selectorJson: {
+            selector: [{ quote: 'hello', start: 0, end: 5 }],
+          },
+        },
+        idempotencyKey: 'annotation-branch-idem-4',
+      }),
+      'CONFLICT',
+      'Idempotency record exists without a branch node link.',
+    )
+  })
+
+  test('messageBranchFromSelection returns existing branch-linked annotation when source is already branch-linked', async () => {
+    const caller = makeCaller(selfSessionUser)
+    branchMessageFromSelectionInTransactionMock.mockResolvedValueOnce(ownedMessageBranchResult)
+
+    await expect(
+      caller.messageBranchFromSelection({
+        messageId: ownedMessageRecord.id,
+        sourceAnnotationId: ownedMessageAnnotationRecord.id,
+        selection: {
+          quote: 'hello',
+          selectorJson: {
+            selector: [{ quote: 'hello', start: 0, end: 5 }],
+          },
+        },
+        annotationKind: 'branch',
+        idempotencyKey: 'annotation-branch-idem-invalid-1',
+      }),
+    ).resolves.toEqual(ownedMessageBranchResult)
+  })
+
+  test('messageBranchFromSelection returns NOT_FOUND when service returns null', async () => {
+    const caller = makeCaller(selfSessionUser)
+    branchMessageFromSelectionInTransactionMock.mockResolvedValueOnce(null)
+
+    await expectTrpcError(
+      caller.messageBranchFromSelection({
+        messageId: ownedMessageRecord.id,
+        selection: {
+          quote: 'hello',
+          selectorJson: {
+            selector: [{ quote: 'hello', start: 0, end: 5 }],
+          },
+        },
+        idempotencyKey: 'annotation-branch-idem-6',
+      }),
+      'NOT_FOUND',
+      'Message not found.',
+    )
   })
 
   test('cross-user workspace read is denied with FORBIDDEN', async () => {
@@ -376,6 +912,46 @@ describe('tRPC ownership integration', () => {
     )
     await expectTrpcError(
       caller.messagesByNode({ nodeId: ownedNodeRecord.id }),
+      'UNAUTHORIZED',
+      'Authentication required.',
+    )
+    await expectTrpcError(
+      caller.messageAnnotationsByMessage({ messageId: ownedMessageRecord.id }),
+      'UNAUTHORIZED',
+      'Authentication required.',
+    )
+    await expectTrpcError(
+      caller.messageSuggestFromSelection({
+        messageId: ownedMessageRecord.id,
+        selection: {
+          quote: 'hello',
+          selectorJson: {
+            selector: [{ quote: 'hello', start: 0, end: 5 }],
+          },
+        },
+        idempotencyKey: 'annotation-suggest-idem-5',
+      }),
+      'UNAUTHORIZED',
+      'Authentication required.',
+    )
+    await expectTrpcError(
+      caller.messageBranchFromSelection({
+        messageId: ownedMessageRecord.id,
+        selection: {
+          quote: 'hello',
+          selectorJson: {
+            selector: [{ quote: 'hello', start: 0, end: 5 }],
+          },
+        },
+        idempotencyKey: 'annotation-branch-idem-5',
+      }),
+      'UNAUTHORIZED',
+      'Authentication required.',
+    )
+    await expectTrpcError(
+      caller.messageAnnotationDelete({
+        annotationId: ownedMessageAnnotationRecord.id,
+      }),
       'UNAUTHORIZED',
       'Authentication required.',
     )

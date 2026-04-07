@@ -7,6 +7,7 @@ import type {
   NodeType,
   UpdateNodeInput,
 } from '../models/node.js'
+import type { PoolClient } from 'pg'
 import { query } from '../client.js'
 
 type NodeRow = {
@@ -42,6 +43,84 @@ const mapNodeRow = (row: NodeRow): NodeRecord => ({
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 })
+
+const createNodeParams = (input: CreateNodeInput): unknown[] => [
+  input.workspaceId,
+  input.authorUserId,
+  input.parentNodeId,
+  input.type,
+  input.title,
+  input.status ?? null,
+  input.confidence ?? null,
+  input.summary,
+  input.conclusion ?? null,
+  input.rationale ?? null,
+]
+
+type NodeRowQueryExecutor = (
+  sql: string,
+  params: unknown[],
+) => Promise<{ rows: NodeRow[] }>
+
+const createNodeForAuthorWithExecutor = async (
+  runQuery: NodeRowQueryExecutor,
+  input: CreateNodeInput,
+): Promise<NodeRecord | null> => {
+  const result = await runQuery(
+    `
+    INSERT INTO nodes (
+      workspace_id,
+      author_user_id,
+      parent_node_id,
+      type,
+      title,
+      status,
+      confidence,
+      summary,
+      conclusion,
+      rationale
+    )
+    SELECT
+      $1,
+      $2,
+      $3,
+      $4,
+      $5,
+      COALESCE($6, 'open'),
+      COALESCE($7, 'medium'),
+      $8,
+      $9,
+      $10
+    FROM nodes AS parent
+    JOIN workspaces w ON w.id = parent.workspace_id
+    WHERE parent.id = $3
+      AND parent.workspace_id = $1
+      AND w.author_user_id = $2
+    RETURNING
+      id,
+      workspace_id,
+      author_user_id,
+      parent_node_id,
+      depth,
+      type,
+      title,
+      status,
+      confidence,
+      summary,
+      conclusion,
+      rationale,
+      created_at,
+      updated_at
+    `,
+    createNodeParams(input),
+  )
+
+  if (result.rows.length === 0) {
+    return null
+  }
+
+  return mapNodeRow(result.rows[0])
+}
 
 export const listNodesByWorkspace = async (workspaceId: string): Promise<NodeRecord[]> => {
   const result = await query<NodeRow>(
@@ -229,18 +308,7 @@ export const createNode = async (input: CreateNodeInput): Promise<NodeRecord> =>
       created_at,
       updated_at
     `,
-    [
-      input.workspaceId,
-      input.authorUserId,
-      input.parentNodeId,
-      input.type,
-      input.title,
-      input.status ?? null,
-      input.confidence ?? null,
-      input.summary,
-      input.conclusion ?? null,
-      input.rationale ?? null,
-    ],
+    createNodeParams(input),
   )
 
   if (result.rows.length === 0) {
@@ -251,72 +319,20 @@ export const createNode = async (input: CreateNodeInput): Promise<NodeRecord> =>
 }
 
 export const createNodeForAuthor = async (input: CreateNodeInput): Promise<NodeRecord | null> => {
-  const result = await query<NodeRow>(
-    `
-    INSERT INTO nodes (
-      workspace_id,
-      author_user_id,
-      parent_node_id,
-      type,
-      title,
-      status,
-      confidence,
-      summary,
-      conclusion,
-      rationale
-    )
-    SELECT
-      $1,
-      $2,
-      $3,
-      $4,
-      $5,
-      COALESCE($6, 'open'),
-      COALESCE($7, 'medium'),
-      $8,
-      $9,
-      $10
-    FROM nodes AS parent
-    JOIN workspaces w ON w.id = parent.workspace_id
-    WHERE parent.id = $3
-      AND parent.workspace_id = $1
-      AND w.author_user_id = $2
-    RETURNING
-      id,
-      workspace_id,
-      author_user_id,
-      parent_node_id,
-      depth,
-      type,
-      title,
-      status,
-      confidence,
-      summary,
-      conclusion,
-      rationale,
-      created_at,
-      updated_at
-    `,
-    [
-      input.workspaceId,
-      input.authorUserId,
-      input.parentNodeId,
-      input.type,
-      input.title,
-      input.status ?? null,
-      input.confidence ?? null,
-      input.summary,
-      input.conclusion ?? null,
-      input.rationale ?? null,
-    ],
+  return createNodeForAuthorWithExecutor(
+    (sql, params) => query<NodeRow>(sql, params),
+    input,
   )
-
-  if (result.rows.length === 0) {
-    return null
-  }
-
-  return mapNodeRow(result.rows[0])
 }
+
+export const createNodeForAuthorInTransaction = async (
+  client: Pick<PoolClient, 'query'>,
+  input: CreateNodeInput,
+): Promise<NodeRecord | null> =>
+  createNodeForAuthorWithExecutor(
+    (sql, params) => client.query<NodeRow>(sql, params),
+    input,
+  )
 
 export const updateNode = async (input: UpdateNodeInput): Promise<NodeRecord | null> => {
   const result = await query<NodeRow>(

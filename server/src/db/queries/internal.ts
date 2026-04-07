@@ -55,3 +55,12 @@ export {
   getMaxConversationTurnEventSeq,
   listConversationTurnEventsAfterId,
 } from './conversationTurnEvent.js'
+
+export {
+  createMessageAnnotation,
+  getMessageAnnotationById,
+  linkMessageAnnotationToNode,
+  listMessageAnnotationsByMessage,
+  messageAnnotationExists,
+  softDeleteMessageAnnotation,
+} from './messageAnnotation.js'

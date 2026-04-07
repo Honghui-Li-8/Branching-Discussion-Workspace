@@ -3,6 +3,7 @@ import { query } from '../client.js'
 import {
   createNode,
   createNodeForAuthor,
+  createNodeForAuthorInTransaction,
   deleteNode,
   deleteNodeForAuthor,
   getNodeById,
@@ -156,6 +157,30 @@ describe('node queries', () => {
       expect.stringContaining('AND w.author_user_id = $2'),
       expect.any(Array),
     )
+  })
+
+  test('createNodeForAuthorInTransaction uses provided client query executor', async () => {
+    const transactionQueryMock = jest.fn(async () => ({
+      rows: [nodeRow],
+    }))
+
+    const result = await createNodeForAuthorInTransaction(
+      {
+        query: transactionQueryMock,
+      } as never,
+      {
+        workspaceId: 'w1',
+        authorUserId: 'u1',
+        parentNodeId: 'n1',
+        type: 'decision',
+        title: 'Child',
+        summary: 'child summary',
+      },
+    )
+
+    expect(result?.id).toBe('n1')
+    expect(transactionQueryMock).toHaveBeenCalledTimes(1)
+    expect(queryMock).not.toHaveBeenCalled()
   })
 
   test('createNode throws when parent is missing', async () => {

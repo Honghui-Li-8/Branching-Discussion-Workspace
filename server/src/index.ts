@@ -59,6 +59,24 @@ app.use(
   createExpressMiddleware({
     router: appRouter,
     createContext: ({ req }) => createAppRouterContext(req),
+    onError: ({ error, path, type, input, req }) => {
+      logger.error('[trpc] request failed.', {
+        path: path ?? null,
+        procedure_type: type,
+        method: req.method,
+        url: req.url,
+        input,
+        error,
+      })
+      logger.debug('[trpc] request debug error details.', {
+        path: path ?? null,
+        procedure_type: type,
+        method: req.method,
+        url: req.url,
+        input,
+        error,
+      })
+    },
   }),
 )
 
