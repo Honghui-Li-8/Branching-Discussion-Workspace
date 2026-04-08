@@ -3,6 +3,7 @@ import {
   type SubmitEvent,
   type PointerEvent as ReactPointerEvent,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
 } from 'react'
@@ -56,6 +57,12 @@ const getNodeConclusion = (messages: TreeMessage[] | undefined) => {
     : normalizedConclusion
 }
 
+const AUTO_SCROLL_BOTTOM_THRESHOLD_PX = 48
+
+const isNearBottom = (element: HTMLDivElement): boolean =>
+  element.scrollHeight - (element.scrollTop + element.clientHeight) <=
+  AUTO_SCROLL_BOTTOM_THRESHOLD_PX
+
 /**
  * Conversation side panel for a selected tree node.
  * Renders node messages, input composer, and resize/fullscreen controls.
@@ -82,15 +89,32 @@ export const NodeConversationPanel = ({
   const startXRef = useRef(0)
   const startWidthRef = useRef(0)
   const conversationScrollRef = useRef<HTMLDivElement | null>(null)
+  const conversationBottomAnchorRef = useRef<HTMLDivElement | null>(null)
   const conversationInputRef = useRef<HTMLTextAreaElement | null>(null)
+  const isPinnedToBottomRef = useRef(true)
   const [statusTimerStartedAtMs, setStatusTimerStartedAtMs] = useState<number | null>(null)
   const [statusTimerNowMs, setStatusTimerNowMs] = useState(0)
 
   const messages = conversation.messages
+  const lastMessageContent = messages[messages.length - 1]?.content ?? ''
   const hasFailedMessages = conversation.failedMessageIds.size > 0
   const streamStatusLabel = conversation.streamStatusLabel
   const hasActiveStreamStatus =
     Boolean(streamStatusLabel) && !(streamStatusLabel?.startsWith('Error:') ?? false)
+
+  const scrollConversationToBottom = () => {
+    const bottomAnchor = conversationBottomAnchorRef.current
+    if (bottomAnchor) {
+      bottomAnchor.scrollIntoView({ block: 'end' })
+    }
+
+    const scrollContainer = conversationScrollRef.current
+    if (!scrollContainer) {
+      return
+    }
+
+    scrollContainer.scrollTop = scrollContainer.scrollHeight
+  }
 
   const adjustConversationInputHeight = () => {
     const input = conversationInputRef.current
@@ -113,16 +137,75 @@ export const NodeConversationPanel = ({
     }
   }, [node.id])
 
-  useEffect(() => {
-    if (!conversationScrollRef.current) {
+  useLayoutEffect(() => {
+    const scrollContainer = conversationScrollRef.current
+    if (!scrollContainer) {
       return
     }
 
-    conversationScrollRef.current.scrollTo({
-      top: conversationScrollRef.current.scrollHeight,
-      behavior: 'auto',
+    if (!isPinnedToBottomRef.current) {
+      return
+    }
+
+    scrollConversationToBottom()
+    const rafId = window.requestAnimationFrame(() => {
+      if (!isPinnedToBottomRef.current) {
+        return
+      }
+      scrollConversationToBottom()
     })
-  }, [node.id, messages.length])
+
+    return () => {
+      window.cancelAnimationFrame(rafId)
+    }
+  }, [lastMessageContent, messages.length, node.id])
+
+  useEffect(() => {
+    const scrollContainer = conversationScrollRef.current
+    if (!scrollContainer) {
+      return
+    }
+
+    isPinnedToBottomRef.current = true
+    scrollConversationToBottom()
+
+    const handleScroll = () => {
+      isPinnedToBottomRef.current = isNearBottom(scrollContainer)
+    }
+
+    scrollContainer.addEventListener('scroll', handleScroll, { passive: true })
+    return () => {
+      scrollContainer.removeEventListener('scroll', handleScroll)
+    }
+  }, [node.id])
+
+  useEffect(() => {
+    if (typeof ResizeObserver === 'undefined') {
+      return
+    }
+
+    const scrollContainer = conversationScrollRef.current
+    if (!scrollContainer) {
+      return
+    }
+
+    const resizeObserver = new ResizeObserver(() => {
+      if (!isPinnedToBottomRef.current) {
+        return
+      }
+
+      scrollConversationToBottom()
+    })
+    const messageStack = scrollContainer.firstElementChild
+    resizeObserver.observe(scrollContainer)
+    if (messageStack instanceof HTMLElement) {
+      resizeObserver.observe(messageStack)
+    }
+
+    return () => {
+      resizeObserver.disconnect()
+    }
+  }, [node.id])
 
   useEffect(() => {
     adjustConversationInputHeight()
@@ -258,6 +341,7 @@ export const NodeConversationPanel = ({
         onRetryFailedMessage={conversation.retryFailedMessage}
         onDismissFailedMessage={conversation.dismissFailedMessage}
         conversationScrollRef={conversationScrollRef}
+        bottomAnchorRef={conversationBottomAnchorRef}
       />
       {streamStatusWithElapsed ? (
         <p className="m-0 shrink-0 border-t border-[#d8ebf6] bg-[#f4fbff] px-4 py-2 text-xs text-[#2f6688]">

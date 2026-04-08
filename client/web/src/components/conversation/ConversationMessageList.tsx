@@ -12,6 +12,7 @@ type ConversationMessageListProps = {
   onRetryFailedMessage: (messageId: string) => void;
   onDismissFailedMessage: (messageId: string) => void;
   conversationScrollRef: RefObject<HTMLDivElement | null>;
+  bottomAnchorRef: RefObject<HTMLDivElement | null>;
 };
 
 export const ConversationMessageList = ({
@@ -23,6 +24,7 @@ export const ConversationMessageList = ({
   onRetryFailedMessage,
   onDismissFailedMessage,
   conversationScrollRef,
+  bottomAnchorRef,
 }: ConversationMessageListProps) => {
   return (
     <div
@@ -78,6 +80,7 @@ export const ConversationMessageList = ({
             message={TEST_MARKDOWN_ASSISTANT_MESSAGE}
           />
         )}
+        <div ref={bottomAnchorRef} className="h-px w-full shrink-0" aria-hidden="true" />
       </div>
     </div>
   );
