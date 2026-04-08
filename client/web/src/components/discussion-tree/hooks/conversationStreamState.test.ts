@@ -269,6 +269,18 @@ describe('conversationStreamState', () => {
     })
     expect(getConversationStreamStatusLabel(generating)).toBe('Loading context...')
 
+    const awaitingModel = conversationStreamReducer(generating, {
+      type: 'eventReceived',
+      event: {
+        type: 'turn.status',
+        turnId: 'turn-1',
+        seq: 1,
+        ts: '2026-04-08T00:00:01.000Z',
+        payload: { status: 'awaiting_model' },
+      },
+    })
+    expect(getConversationStreamStatusLabel(awaitingModel)).toBe('Waiting for model service...')
+
     const failed = conversationStreamReducer(generating, {
       type: 'sendFailed',
       errorMessage: 'boom',

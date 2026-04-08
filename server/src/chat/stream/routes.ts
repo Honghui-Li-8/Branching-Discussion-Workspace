@@ -46,6 +46,24 @@ const writeSseEvent = (res: StreamResponse, event: ChatTurnStreamEvent): void =>
   res.write(`data: ${JSON.stringify(event)}\n\n`)
 }
 
+const logSseStageEvent = (
+  source: 'initial_replay' | 'broker' | 'post_subscribe_catchup' | 'poll_replay',
+  event: ChatTurnStreamEvent,
+): void => {
+  if (event.type !== 'turn.status') {
+    return
+  }
+
+  logger.info('[chat-stream] turn.status event sent to SSE client.', {
+    source,
+    turn_id: event.turnId,
+    seq: event.seq,
+    event_id: event.eventId ?? null,
+    status: event.payload.status,
+    detail: event.payload.detail ?? null,
+  })
+}
+
 const parseLastEventIdHeader = (
   rawHeaderValue: string | string[] | undefined,
 ): number => {
@@ -81,7 +99,15 @@ const toReplayStreamEvent = (row: {
       type: row.eventType,
       payload: row.payload,
     })
-  } catch (_error) {
+  } catch (error) {
+    logger.warn('[chat-stream] Dropping invalid replay event row.', {
+      turn_id: row.turnId,
+      event_id: row.id,
+      seq: row.seq,
+      event_type: row.eventType,
+      created_at: row.createdAt,
+      error,
+    })
     return null
   }
 }
@@ -130,6 +156,7 @@ export const handleConversationTurnStream = async (
       continue
     }
     writeSseEvent(res, replayEvent)
+    logSseStageEvent('initial_replay', replayEvent)
     lastEventId = Math.max(lastEventId, row.id)
   }
 
@@ -141,8 +168,33 @@ export const handleConversationTurnStream = async (
         lastEventId = Math.max(lastEventId, event.eventId)
       }
       writeSseEvent(res, event)
+      logSseStageEvent('broker', event)
     },
   })
+
+  try {
+    const catchupRows = await listConversationTurnEventsAfterIdForAuthor(
+      turnId,
+      sessionUser.id,
+      lastEventId,
+      REPLAY_BATCH_LIMIT,
+    )
+    for (const row of catchupRows) {
+      const catchupEvent = toReplayStreamEvent(row)
+      if (!catchupEvent) {
+        continue
+      }
+      writeSseEvent(res, catchupEvent)
+      logSseStageEvent('post_subscribe_catchup', catchupEvent)
+      lastEventId = Math.max(lastEventId, row.id)
+    }
+  } catch (error) {
+    logger.warn('[chat-stream] Failed to catch up replay events after subscribe.', {
+      turn_id: turnId,
+      author_user_id: sessionUser.id,
+      error,
+    })
+  }
 
   let closed = false
   writeSseHeartbeat(res)
@@ -173,6 +225,7 @@ export const handleConversationTurnStream = async (
             continue
           }
           writeSseEvent(res, replayEvent)
+          logSseStageEvent('poll_replay', replayEvent)
           lastEventId = Math.max(lastEventId, row.id)
         }
       })

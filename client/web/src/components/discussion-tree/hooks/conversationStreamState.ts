@@ -1,6 +1,7 @@
 export type TurnStage =
   | 'loading_context'
   | 'retrieving'
+  | 'awaiting_model'
   | 'generating'
   | 'summarizing'
   | 'persisting'
@@ -320,6 +321,8 @@ export const getConversationStreamStatusLabel = (
       return 'Loading context...'
     case 'retrieving':
       return 'Retrieving context...'
+    case 'awaiting_model':
+      return 'Waiting for model service...'
     case 'generating':
       return 'Generating response...'
     case 'summarizing':
@@ -394,6 +397,7 @@ export const parseConversationStreamEvent = (
       if (
         stage !== 'loading_context' &&
         stage !== 'retrieving' &&
+        stage !== 'awaiting_model' &&
         stage !== 'generating' &&
         stage !== 'summarizing' &&
         stage !== 'persisting'

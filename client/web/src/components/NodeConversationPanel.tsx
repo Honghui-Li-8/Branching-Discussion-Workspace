@@ -67,9 +67,11 @@ const isNearBottom = (element: HTMLDivElement): boolean =>
 const getStageLabel = (stage: TurnStage): string => {
   switch (stage) {
     case 'loading_context':
-      return 'Loading'
+      return 'Context'
     case 'retrieving':
-      return 'Retrieving'
+      return 'Retrieval'
+    case 'awaiting_model':
+      return 'Model wait'
     case 'generating':
       return 'Generating'
     case 'summarizing':

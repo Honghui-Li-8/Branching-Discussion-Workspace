@@ -7,10 +7,10 @@ import type {
 type ConversationTurnEventRow = {
   id: string | number
   turn_id: string
-  seq: number
+  seq: string | number
   event_type: string
   payload: unknown
-  created_at: string
+  created_at: string | Date
 }
 
 const mapConversationTurnEventRow = (
@@ -18,10 +18,10 @@ const mapConversationTurnEventRow = (
 ): ConversationTurnEventRecord => ({
   id: Number(row.id),
   turnId: row.turn_id,
-  seq: row.seq,
+  seq: Number(row.seq),
   eventType: row.event_type,
   payload: row.payload,
-  createdAt: row.created_at,
+  createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
 })
 
 export const appendConversationTurnEvent = async (

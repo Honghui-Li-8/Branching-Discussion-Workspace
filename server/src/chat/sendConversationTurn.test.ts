@@ -322,12 +322,22 @@ describe('sendConversationTurn', () => {
       'turn.started',
       'turn.status',
       'turn.status',
+      'turn.status',
       'token.delta',
       'token.delta',
       'turn.status',
       'message.completed',
     ])
-    expect(emittedEvents.map((event) => event.seq)).toEqual([1, 2, 3, 4, 5, 6, 7])
+    expect(emittedEvents.map((event) => event.seq)).toEqual([1, 2, 3, 4, 5, 6, 7, 8])
+    const emittedTurnStatuses = emittedEvents
+      .filter((event) => event.type === 'turn.status')
+      .map((event) => event.payload.status)
+    expect(emittedTurnStatuses).toEqual([
+      'loading_context',
+      'awaiting_model',
+      'generating',
+      'persisting',
+    ])
     expect(
       emittedEvents
         .filter((event) => event.type === 'token.delta')

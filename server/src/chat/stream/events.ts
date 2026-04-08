@@ -3,6 +3,7 @@ import { z } from 'zod'
 const turnStageSchema = z.enum([
   'loading_context',
   'retrieving',
+  'awaiting_model',
   'generating',
   'summarizing',
   'persisting',

@@ -148,6 +148,16 @@ const createTurnEventPublisher = (
     const transientEvent = createTurnStreamEvent(eventSequencer, event)
     let streamEvent = transientEvent
 
+    if (transientEvent.type === 'turn.status') {
+      logger.info('[chat-stream] turn.status event queued.', {
+        turn_id: turnId,
+        author_user_id: currentUserId,
+        seq: transientEvent.seq,
+        status: transientEvent.payload.status,
+        detail: transientEvent.payload.detail ?? null,
+      })
+    }
+
     try {
       const persistedEvent = await appendConversationTurnEventRecord({
         turnId,
@@ -161,6 +171,16 @@ const createTurnEventPublisher = (
           ...transientEvent,
           eventId: persistedEvent.id,
           ts: persistedEvent.createdAt,
+        }
+        if (streamEvent.type === 'turn.status') {
+          logger.info('[chat-stream] turn.status event persisted.', {
+            turn_id: turnId,
+            author_user_id: currentUserId,
+            seq: streamEvent.seq,
+            event_id: streamEvent.eventId ?? null,
+            status: streamEvent.payload.status,
+            detail: streamEvent.payload.detail ?? null,
+          })
         }
       }
     } catch (error) {
@@ -179,6 +199,16 @@ const createTurnEventPublisher = (
         authorUserId: currentUserId,
         event: streamEvent,
       })
+      if (streamEvent.type === 'turn.status') {
+        logger.info('[chat-stream] turn.status event published to broker.', {
+          turn_id: turnId,
+          author_user_id: currentUserId,
+          seq: streamEvent.seq,
+          event_id: streamEvent.eventId ?? null,
+          status: streamEvent.payload.status,
+          detail: streamEvent.payload.detail ?? null,
+        })
+      }
     } catch (error) {
       logger.warn('[chat-stream] Failed to publish turn event.', {
         turn_id: turnId,
@@ -376,6 +406,19 @@ export const sendConversationTurn = async ({
     let pipelineStage = 'building_context'
 
     try {
+      const contextPreparationStartedAtMs = Date.now()
+      logger.info('[chat] context preparation started.', {
+        turn_id: turnResult.turn.id,
+        node_id: input.nodeId,
+        author_user_id: currentUserId,
+        current_turn_id: turnResult.turn.id,
+      })
+
+      logger.info('[chat] context preparation step: loading node and recent message history.', {
+        turn_id: turnResult.turn.id,
+        node_id: input.nodeId,
+        author_user_id: currentUserId,
+      })
       const context = await buildConversationContext({
         nodeId: input.nodeId,
         currentUserId,
@@ -399,11 +442,24 @@ export const sendConversationTurn = async ({
         workspace_id: context.node.workspaceId,
         recent_messages: context.recentMessages.length,
       })
+      logger.info('[chat] context preparation step complete: conversation context assembled.', {
+        turn_id: turnResult.turn.id,
+        node_id: input.nodeId,
+        author_user_id: currentUserId,
+        workspace_id: context.node.workspaceId,
+        recent_messages: context.recentMessages.length,
+        has_memory_placeholder: Boolean(context.memoryPlaceholder),
+      })
 
       let retrievalState: RetrievalStageState = {
         prompt: buildAssistantPrompt(context),
       }
       pipelineStage = 'evaluating_rag'
+      logger.info('[chat] context preparation step: evaluating retrieval eligibility.', {
+        turn_id: turnResult.turn.id,
+        node_id: input.nodeId,
+        author_user_id: currentUserId,
+      })
       const ragConfig = getRagConfig()
       const ragAllowed = isRagAllowedForTarget({
         config: ragConfig,
@@ -418,6 +474,14 @@ export const sendConversationTurn = async ({
         rag_allowed: ragAllowed,
         retriever: ragConfig.retriever,
         workspace_id: context.node.workspaceId,
+      })
+      logger.info('[chat] context preparation step complete: retrieval eligibility resolved.', {
+        turn_id: turnResult.turn.id,
+        node_id: input.nodeId,
+        author_user_id: currentUserId,
+        rag_enabled: ragConfig.enabled,
+        rag_allowed: ragAllowed,
+        retriever: ragConfig.retriever,
       })
 
       if (ragAllowed) {
@@ -556,6 +620,11 @@ export const sendConversationTurn = async ({
         }
       }
 
+      logger.info('[chat] context preparation step: applying prompt budget.', {
+        turn_id: turnResult.turn.id,
+        node_id: input.nodeId,
+        author_user_id: currentUserId,
+      })
       const promptSectionsBeforeBudget = summarizePromptSections(retrievalState.prompt)
       const budgetedPromptResult = applyPromptBudget(retrievalState.prompt)
       const promptSectionsAfterBudget = summarizePromptSections(budgetedPromptResult.prompt)
@@ -580,13 +649,23 @@ export const sendConversationTurn = async ({
         estimated_tokens_before: budgetedPromptResult.summary.estimatedTokensBefore,
         estimated_tokens_after: budgetedPromptResult.summary.estimatedTokensAfter,
       })
+      logger.info('[chat] context preparation completed.', {
+        turn_id: turnResult.turn.id,
+        node_id: input.nodeId,
+        author_user_id: currentUserId,
+        rag_allowed: ragAllowed,
+        prompt_instruction_count: retrievalState.prompt.instructions.length,
+        prompt_conversation_turn_count: retrievalState.prompt.conversation.length,
+        prompt_retrieval_chunk_count: retrievalState.prompt.retrievalContext.length,
+        context_preparation_duration_ms: Date.now() - contextPreparationStartedAtMs,
+      })
 
       pipelineStage = 'generating_assistant_reply'
       await publishTurnEvent({
         type: 'turn.status',
         payload: {
-          status: 'generating',
-          detail: 'Generating assistant response.',
+          status: 'awaiting_model',
+          detail: 'Waiting for model service.',
         },
       })
       const provider = selectProvider({ model: input.model })
@@ -616,12 +695,23 @@ export const sendConversationTurn = async ({
           retrievalState.prompt.currentUserMessage,
         ),
       })
+      let hasPublishedGeneratingStatus = false
       const assistantOutput = await provider.generate({
         model: input.model,
         prompt: retrievalState.prompt,
         onTokenDelta: async (delta) => {
           if (delta.length === 0) {
             return
+          }
+          if (!hasPublishedGeneratingStatus) {
+            hasPublishedGeneratingStatus = true
+            await publishTurnEvent({
+              type: 'turn.status',
+              payload: {
+                status: 'generating',
+                detail: 'Generating assistant response.',
+              },
+            })
           }
           await publishTurnEvent({
             type: 'token.delta',
