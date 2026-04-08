@@ -123,6 +123,7 @@ export const useNodeConversation = ({
   const streamStateRef = useRef(streamState)
   const streamSourceRef = useRef<EventSource | null>(null)
   const streamTurnIdRef = useRef<string | null>(null)
+  const streamAuthorUserIdRef = useRef<string | null>(null)
   const fallbackTimerRef = useRef<number | null>(null)
   const postprocessWindowTimerRef = useRef<number | null>(null)
 
@@ -131,9 +132,9 @@ export const useNodeConversation = ({
     { enabled: Boolean(nodeId) },
   )
 
-  const invalidateNodeMessages = async (targetNodeId: string) => {
+  const invalidateNodeMessages = useCallback(async (targetNodeId: string) => {
     await invalidateMessagesByNode(utils.messagesByNode.invalidate, targetNodeId)
-  }
+  }, [utils.messagesByNode.invalidate])
 
   const clearStreamTimers = () => {
     if (fallbackTimerRef.current === null) {
@@ -194,6 +195,30 @@ export const useNodeConversation = ({
           return
         }
 
+        if (parsedEvent.type === 'message.completed' && nodeId) {
+          utils.messagesByNode.setData({ nodeId }, (current) => {
+            const fallbackAuthorUserId = current?.find((message) =>
+              message.role === 'user' || message.role === 'assistant'
+            )?.authorUserId ?? null
+            const authorUserId = streamAuthorUserIdRef.current ?? fallbackAuthorUserId
+            if (!authorUserId) {
+              return current
+            }
+
+            return upsertNodeMessage(current, {
+              id: parsedEvent.payload.messageId,
+              authorUserId,
+              nodeId,
+              turnId: parsedEvent.turnId,
+              role: 'assistant',
+              content: parsedEvent.payload.content,
+              createdAt: parsedEvent.ts,
+            })
+          })
+
+          void invalidateNodeMessages(nodeId)
+        }
+
         dispatchStreamAction({
           type: 'eventReceived',
           event: parsedEvent,
@@ -216,7 +241,7 @@ export const useNodeConversation = ({
     bindEvent('turn.error')
     bindEvent('summary.completed')
     bindEvent('summary.failed')
-  }, [closeTurnStream])
+  }, [closeTurnStream, invalidateNodeMessages, nodeId, utils.messagesByNode])
 
   useEffect(() => {
     streamStateRef.current = streamState
@@ -225,6 +250,7 @@ export const useNodeConversation = ({
   useEffect(() => {
     dispatchStreamAction({ type: 'reset' })
     setPendingMessages([])
+    streamAuthorUserIdRef.current = null
     closeTurnStream()
   }, [closeTurnStream, nodeId])
 
@@ -343,6 +369,7 @@ export const useNodeConversation = ({
           utils.messagesByNode.setData({ nodeId: input.nodeId }, (current) =>
             upsertNodeMessage(current, result.userMessage),
           )
+          streamAuthorUserIdRef.current = result.userMessage.authorUserId
           const assistantMessage = result.assistantMessage
           if (assistantMessage) {
             utils.messagesByNode.setData({ nodeId: input.nodeId }, (current) =>

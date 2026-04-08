@@ -35,6 +35,7 @@ export const createConversationHandlers = ({
       const result = await sendConversationTurn({
         input,
         currentUserId,
+        awaitCompletion: false,
       })
       logger.info('[chat] conversationSend request completed.', {
         node_id: input.nodeId,

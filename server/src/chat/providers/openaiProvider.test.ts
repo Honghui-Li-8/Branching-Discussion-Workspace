@@ -36,6 +36,18 @@ const makeLogger = () => ({
   error: jest.fn(),
 })
 
+const toSseStream = (frames: string[]): ReadableStream<Uint8Array> => {
+  const encoder = new TextEncoder()
+  return new ReadableStream<Uint8Array>({
+    start(controller) {
+      for (const frame of frames) {
+        controller.enqueue(encoder.encode(frame))
+      }
+      controller.close()
+    },
+  })
+}
+
 const getRequestBody = (fetchMock: jest.Mock) => {
   const requestInit = fetchMock.mock.calls[0]?.[1] as { body?: string } | undefined
 
@@ -246,5 +258,43 @@ describe('createOpenAIProvider', () => {
     await expect(provider.generate(makeInput())).rejects.toThrow(
       'OpenAI request failed (503).',
     )
+  })
+
+  test('streams output deltas when onTokenDelta callback is provided', async () => {
+    const fetchMock = jest.fn(async () => ({
+      ok: true,
+      status: 200,
+      body: toSseStream([
+        'data: {"type":"response.output_text.delta","delta":"hello "}\n\n',
+        'data: {"type":"response.output_text.delta","delta":"world"}\n\n',
+        'data: {"type":"response.completed","response":{"id":"resp_stream","finish_reason":"stop","output_text":"hello world"}}\n\n',
+        'data: [DONE]\n\n',
+      ]),
+    })) as unknown as typeof fetch
+    const logger = makeLogger()
+    const onTokenDelta = jest.fn(async (_delta: string) => {})
+
+    const provider = createOpenAIProvider({
+      apiKey: 'test-key',
+      fetchImpl: fetchMock,
+      logger,
+    })
+    const result = await provider.generate({
+      ...makeInput(),
+      onTokenDelta,
+    })
+
+    expect(getRequestBody(fetchMock as unknown as jest.Mock)).toEqual(
+      expect.objectContaining({
+        stream: true,
+      }),
+    )
+    expect(onTokenDelta).toHaveBeenNthCalledWith(1, 'hello ')
+    expect(onTokenDelta).toHaveBeenNthCalledWith(2, 'world')
+    expect(result).toEqual({
+      content: 'hello world',
+      finishReason: 'stop',
+      providerResponseId: 'resp_stream',
+    })
   })
 })

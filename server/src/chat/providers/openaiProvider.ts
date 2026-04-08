@@ -71,6 +71,7 @@ type OpenAIRequestBody = {
   model: string
   instructions: string
   input: OpenAIInputMessage[]
+  stream?: boolean
 }
 
 const OPENAI_BASE_URL = 'https://api.openai.com'
@@ -148,10 +149,12 @@ const buildOpenAIRequestBody = (
   model: string,
   prompt: GenerateAssistantInput['prompt'],
   logger: AppLogger,
+  stream: boolean,
 ): OpenAIRequestBody => ({
   model,
   instructions: prompt.instructions.join('\n'),
   input: buildOpenAIInputMessages(prompt, logger),
+  ...(stream ? { stream: true } : {}),
 })
 
 const estimateRequestBodySize = (body: OpenAIRequestBody): number =>
@@ -197,6 +200,130 @@ const extractOutputText = (payload: OpenAIResponse): string => {
   return ''
 }
 
+const isObjectRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null
+
+const tryParseJsonObject = (value: string): Record<string, unknown> | null => {
+  try {
+    const parsed = JSON.parse(value) as unknown
+    return isObjectRecord(parsed) ? parsed : null
+  } catch {
+    return null
+  }
+}
+
+const extractDeltaFromStreamEvent = (event: Record<string, unknown>): string | null => {
+  if (event.type !== 'response.output_text.delta') {
+    return null
+  }
+
+  return typeof event.delta === 'string' ? event.delta : null
+}
+
+const extractCompletedResponseFromStreamEvent = (
+  event: Record<string, unknown>,
+): OpenAIResponse | null => {
+  if (event.type !== 'response.completed') {
+    return null
+  }
+
+  const response = event.response
+  return isObjectRecord(response) ? response as OpenAIResponse : null
+}
+
+const parseOpenAIResponseStream = async (
+  body: ReadableStream<Uint8Array>,
+  onTokenDelta: GenerateAssistantInput['onTokenDelta'],
+): Promise<{ streamedContent: string; completedPayload: OpenAIResponse | null }> => {
+  const reader = body.getReader()
+  const decoder = new TextDecoder()
+  let bufferedText = ''
+  let streamedContent = ''
+  let completedPayload: OpenAIResponse | null = null
+  let shouldStop = false
+
+  const processSseFrame = async (frame: string): Promise<void> => {
+    const lines = frame.split('\n')
+    const dataLines: string[] = []
+    for (const rawLine of lines) {
+      const line = rawLine.trimEnd()
+      if (!line || line.startsWith(':')) {
+        continue
+      }
+      if (line.startsWith('data:')) {
+        dataLines.push(line.slice('data:'.length).trimStart())
+      }
+    }
+
+    if (dataLines.length === 0) {
+      return
+    }
+
+    const data = dataLines.join('\n').trim()
+    if (!data) {
+      return
+    }
+    if (data === '[DONE]') {
+      shouldStop = true
+      return
+    }
+
+    const parsedEvent = tryParseJsonObject(data)
+    if (!parsedEvent) {
+      return
+    }
+
+    const delta = extractDeltaFromStreamEvent(parsedEvent)
+    if (delta && delta.length > 0) {
+      streamedContent += delta
+      await onTokenDelta?.(delta)
+      return
+    }
+
+    const completedResponse = extractCompletedResponseFromStreamEvent(parsedEvent)
+    if (completedResponse) {
+      completedPayload = completedResponse
+    }
+  }
+
+  try {
+    while (!shouldStop) {
+      const { value, done } = await reader.read()
+      if (done) {
+        break
+      }
+
+      bufferedText += decoder.decode(value, { stream: true })
+      bufferedText = bufferedText.replace(/\r\n/g, '\n')
+      while (true) {
+        const separatorIndex = bufferedText.indexOf('\n\n')
+        if (separatorIndex === -1) {
+          break
+        }
+
+        const frame = bufferedText.slice(0, separatorIndex)
+        bufferedText = bufferedText.slice(separatorIndex + 2)
+        await processSseFrame(frame)
+        if (shouldStop) {
+          break
+        }
+      }
+    }
+
+    const flushed = decoder.decode()
+    if (flushed) {
+      bufferedText += flushed
+    }
+    if (!shouldStop && bufferedText.trim().length > 0) {
+      await processSseFrame(bufferedText)
+    }
+
+    return { streamedContent, completedPayload }
+  } finally {
+    reader.releaseLock()
+  }
+}
+
 export const createOpenAIProvider = (
   options: OpenAIProviderOptions = {},
 ): AssistantProvider => {
@@ -213,7 +340,13 @@ export const createOpenAIProvider = (
     id: 'openai',
     generate: async (input: GenerateAssistantInput) => {
       const startedAtMs = Date.now()
-      const requestBody = buildOpenAIRequestBody(input.model, input.prompt, logger)
+      const shouldStream = typeof input.onTokenDelta === 'function'
+      const requestBody = buildOpenAIRequestBody(
+        input.model,
+        input.prompt,
+        logger,
+        shouldStream,
+      )
       const promptSections = summarizePromptSections(input.prompt)
       logger.debug('[llm] OpenAI Responses request started.', {
         model: input.model,
@@ -248,12 +381,33 @@ export const createOpenAIProvider = (
         throw new Error(`OpenAI request failed (${response.status}).`)
       }
 
-      const payload = (await response.json()) as OpenAIResponse
-      const content = extractOutputText(payload)
+      let payload: OpenAIResponse | null = null
+      let content = ''
+
+      if (shouldStream && response.body) {
+        const streamResult = await parseOpenAIResponseStream(response.body, input.onTokenDelta)
+        payload = streamResult.completedPayload
+        if (payload) {
+          content = extractOutputText(payload)
+        }
+        if (content.length === 0) {
+          content = streamResult.streamedContent
+        }
+      } else {
+        payload = (await response.json()) as OpenAIResponse
+        content = extractOutputText(payload)
+        await emitTokenDeltas(content, input.onTokenDelta)
+      }
+
       if (content.length === 0) {
         throw new Error('OpenAI response did not include output text.')
       }
-      await emitTokenDeltas(content, input.onTokenDelta)
+      if (!payload) {
+        payload = {
+          output_text: content,
+          finish_reason: 'stop',
+        }
+      }
 
       logger.info('[llm] OpenAI Responses request completed.', {
         model: input.model,

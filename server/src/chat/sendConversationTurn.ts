@@ -6,6 +6,7 @@ import {
   listMessagesForNodeForAuthor as listMessagesForNodeForAuthorRecord,
   updateConversationTurnForAuthor as updateConversationTurnForAuthorRecord,
 } from '../db/index.js'
+import { appendConversationTurnEvent as appendConversationTurnEventRecord } from '../db/queries/conversationTurnEvent.js'
 import {
   getRagConfig,
   isRagAllowedForTarget,
@@ -39,6 +40,7 @@ import { createLogger } from '../logging/logger.js'
 type SendConversationTurnParams = {
   input: SendConversationTurnInput
   currentUserId: string
+  awaitCompletion?: boolean
 }
 
 const POSTPROCESS_JOB_TYPES = ['summary', 'index'] as const
@@ -134,9 +136,64 @@ type RetrievalStageState = {
   >
 }
 
+type TurnEventPublisher = (event: ChatTurnStreamEventInput) => Promise<void>
+
+const createTurnEventPublisher = (
+  turnId: string,
+  currentUserId: string,
+): TurnEventPublisher => {
+  const eventSequencer = new TurnEventSequencer(turnId)
+
+  return async (event) => {
+    const transientEvent = createTurnStreamEvent(eventSequencer, event)
+    let streamEvent = transientEvent
+
+    try {
+      const persistedEvent = await appendConversationTurnEventRecord({
+        turnId,
+        seq: transientEvent.seq,
+        eventType: transientEvent.type,
+        payload: transientEvent.payload,
+      })
+
+      if (persistedEvent) {
+        streamEvent = {
+          ...transientEvent,
+          eventId: persistedEvent.id,
+          ts: persistedEvent.createdAt,
+        }
+      }
+    } catch (error) {
+      logger.warn('[chat-stream] Failed to persist turn stream event.', {
+        turn_id: turnId,
+        author_user_id: currentUserId,
+        seq: transientEvent.seq,
+        event_type: transientEvent.type,
+        error,
+      })
+    }
+
+    try {
+      turnEventBroker.publish({
+        turnId,
+        authorUserId: currentUserId,
+        event: streamEvent,
+      })
+    } catch (error) {
+      logger.warn('[chat-stream] Failed to publish turn event.', {
+        turn_id: turnId,
+        author_user_id: currentUserId,
+        event_type: streamEvent.type,
+        error,
+      })
+    }
+  }
+}
+
 export const sendConversationTurn = async ({
   input,
   currentUserId,
+  awaitCompletion = true,
 }: SendConversationTurnParams): Promise<SendConversationTurnResult> => {
   const requestStartedAtMs = Date.now()
   let stage = 'validating'
@@ -238,31 +295,15 @@ export const sendConversationTurn = async ({
     }
   }
 
-  const eventSequencer = new TurnEventSequencer(turnResult.turn.id)
-  const publishTurnEvent = (event: ChatTurnStreamEventInput): void => {
-    try {
-      turnEventBroker.publish({
-        turnId: turnResult.turn.id,
-        authorUserId: currentUserId,
-        event: createTurnStreamEvent(eventSequencer, event),
-      })
-    } catch (error) {
-      logger.warn('[chat-stream] Failed to publish turn event.', {
-        turn_id: turnResult.turn.id,
-        author_user_id: currentUserId,
-        event_type: event.type,
-        error,
-      })
-    }
-  }
+  const publishTurnEvent = createTurnEventPublisher(turnResult.turn.id, currentUserId)
 
-  publishTurnEvent({
+  await publishTurnEvent({
     type: 'turn.started',
     payload: {
       status: 'loading_context',
     },
   })
-  publishTurnEvent({
+  await publishTurnEvent({
     type: 'turn.status',
     payload: {
       status: 'loading_context',
@@ -279,393 +320,22 @@ export const sendConversationTurn = async ({
     await markTurnFailed(turnResult.turn.id, currentUserId, errorMessage)
   }
 
-  try {
-    stage = 'persisting_user_message'
-    const userMessage = await createMessageForAuthorRecord({
-      nodeId: input.nodeId,
-      authorUserId: currentUserId,
-      turnId: turnResult.turn.id,
-      role: 'user',
-      content: input.text,
-    })
-
-    if (userMessage === null) {
-      await markTurnFailedOnce('Node not found.')
-      logger.warn('[chat] failed to persist user message because node was not found.', {
-        turn_id: turnResult.turn.id,
-        node_id: input.nodeId,
-        author_user_id: currentUserId,
-      })
-      throw new TRPCError({
-        code: 'NOT_FOUND',
-        message: 'Node not found.',
-      })
-    }
-
-    stage = 'building_context'
-    const context = await buildConversationContext({
-      nodeId: input.nodeId,
-      currentUserId,
-      userInput: input.text,
-      currentTurnId: turnResult.turn.id,
-    })
-    if (context.memoryPlaceholder) {
-      logger.warn('[chat] older conversation context would use a placeholder summary path.', {
-        turn_id: turnResult.turn.id,
-        node_id: input.nodeId,
-        author_user_id: currentUserId,
-        placeholder_status: context.memoryPlaceholder.status,
-        older_message_count: context.memoryPlaceholder.olderMessageCount,
-        retained_message_count: context.memoryPlaceholder.retainedMessageCount,
-      })
-    }
-    logger.debug('[chat] conversation context built.', {
-      turn_id: turnResult.turn.id,
-      node_id: input.nodeId,
-      author_user_id: currentUserId,
-      workspace_id: context.node.workspaceId,
-      recent_messages: context.recentMessages.length,
-    })
-
-    let retrievalState: RetrievalStageState = {
-      prompt: buildAssistantPrompt(context),
-    }
-    stage = 'evaluating_rag'
-    const ragConfig = getRagConfig()
-    const ragAllowed = isRagAllowedForTarget({
-      config: ragConfig,
-      userId: currentUserId,
-      workspaceId: context.node.workspaceId,
-    })
-    logger.debug('[rag] retrieval gate evaluated.', {
-      turn_id: turnResult.turn.id,
-      node_id: input.nodeId,
-      author_user_id: currentUserId,
-      rag_enabled: ragConfig.enabled,
-      rag_allowed: ragAllowed,
-      retriever: ragConfig.retriever,
-      workspace_id: context.node.workspaceId,
-    })
-
-    if (ragAllowed) {
-      const retrievalStartedAtMs = Date.now()
-      stage = 'retrieving_context'
-      publishTurnEvent({
-        type: 'turn.status',
-        payload: {
-          status: 'retrieving',
-          detail: 'Retrieving relevant context.',
-        },
-      })
-
-      try {
-        const retriever = resolveRetriever({ config: ragConfig })
-        logger.debug('[rag] retrieval started.', {
-          turn_id: turnResult.turn.id,
-          node_id: input.nodeId,
-          author_user_id: currentUserId,
-          retriever: retriever.id,
-          max_chunks: ragConfig.maxChunks,
-        })
-        const retrievalResult = await retriever.retrieve({
-          query: input.text,
-          nodeId: input.nodeId,
-          authorUserId: currentUserId,
-          workspaceId: context.node.workspaceId,
-          maxChunks: ragConfig.maxChunks,
-        })
-        const policyDecision = applyContextPolicy(retrievalResult, {
-          config: ragConfig,
-        })
-
-        retrievalState = {
-          prompt: buildAssistantPrompt(context, {
-            retrievedChunks: policyDecision.selectedChunks,
-          }),
-          assistantMetadata: buildAssistantMessageMetadata({
-            citations: policyDecision.citations,
-          }),
-          turnMetadata: buildConversationTurnMetadata({
-            existing: turnResult.turn.metadata,
-            snapshot: policyDecision.snapshot,
-            diagnostics: policyDecision.diagnostics,
-          }),
-        }
-        logger.debug('[rag] retrieval policy applied.', {
-          turn_id: turnResult.turn.id,
-          node_id: input.nodeId,
-          author_user_id: currentUserId,
-          retriever: retriever.id,
-          chunks_returned: retrievalResult.chunks.length,
-          chunks_selected: policyDecision.selectedChunks.length,
-          citations: policyDecision.citations.length,
-          snapshot_id: policyDecision.snapshot.id,
-        })
-        logger.debug('[rag] retrieval details.', {
-          turn_id: turnResult.turn.id,
-          node_id: input.nodeId,
-          author_user_id: currentUserId,
-          retriever: retriever.id,
-          diagnostics: retrievalResult.diagnostics,
-          returned_chunks: retrievalResult.chunks.map((chunk) => ({
-            message_id: chunk.messageId,
-            node_id: chunk.nodeId,
-            chunk_index: chunk.chunkIndex,
-            token_count: chunk.tokenCount,
-            score: chunk.score,
-            content_preview: toDebugPreview(chunk.content),
-          })),
-          selected_chunks: policyDecision.selectedChunks.map((chunk) => ({
-            message_id: chunk.messageId,
-            node_id: chunk.nodeId,
-            chunk_index: chunk.chunkIndex,
-            token_count: chunk.tokenCount,
-            score: chunk.score,
-            content_preview: toDebugPreview(chunk.content),
-          })),
-          citations: policyDecision.citations,
-          snapshot: policyDecision.snapshot,
-        })
-        recordRetrievalTelemetry({
-          turnId: turnResult.turn.id,
-          nodeId: input.nodeId,
-          authorUserId: currentUserId,
-          retriever: retriever.id,
-          ragEnabled: true,
-          startedAtMs: retrievalStartedAtMs,
-          chunksReturned: retrievalResult.chunks.length,
-          chunksSelected: policyDecision.selectedChunks.length,
-          citationCount: policyDecision.citations.length,
-          snapshotId: policyDecision.snapshot.id,
-        })
-      } catch (error) {
-        logger.warn('[rag] Retrieval failed; continuing with base prompt.', {
-          turnId: turnResult.turn.id,
-          nodeId: input.nodeId,
-          currentUserId,
-          turn_id: turnResult.turn.id,
-          node_id: input.nodeId,
-          author_user_id: currentUserId,
-          retriever: ragConfig.retriever,
-          error,
-        })
-
-        retrievalState = {
-          prompt: buildAssistantPrompt(context),
-          turnMetadata: buildConversationTurnMetadata({
-            existing: turnResult.turn.metadata,
-            diagnostics: {
-              retriever: ragConfig.retriever,
-              query: input.text,
-              fallbackReason: 'retrieval_failed',
-            },
-          }),
-        }
-        logger.debug('[rag] fallback retrieval diagnostics.', {
-          turn_id: turnResult.turn.id,
-          node_id: input.nodeId,
-          author_user_id: currentUserId,
-          retriever: ragConfig.retriever,
-          fallback_reason: 'retrieval_failed',
-        })
-        recordRetrievalTelemetry({
-          turnId: turnResult.turn.id,
-          nodeId: input.nodeId,
-          authorUserId: currentUserId,
-          retriever: ragConfig.retriever,
-          ragEnabled: true,
-          startedAtMs: retrievalStartedAtMs,
-          chunksReturned: 0,
-          chunksSelected: 0,
-          citationCount: 0,
-          fallbackReason: 'retrieval_failed',
-        })
-      }
-    }
-
-    const promptSectionsBeforeBudget = summarizePromptSections(retrievalState.prompt)
-    const budgetedPromptResult = applyPromptBudget(retrievalState.prompt)
-    const promptSectionsAfterBudget = summarizePromptSections(budgetedPromptResult.prompt)
-    retrievalState = {
-      ...retrievalState,
-      prompt: budgetedPromptResult.prompt,
-      promptBudgetSummary: budgetedPromptResult.summary,
-    }
-    logger.debug('[chat] prompt budget applied.', {
-      turn_id: turnResult.turn.id,
-      node_id: input.nodeId,
-      author_user_id: currentUserId,
-      prompt_sections_before_budget: promptSectionsBeforeBudget,
-      prompt_sections_after_budget: promptSectionsAfterBudget,
-      instruction_count: budgetedPromptResult.summary.instructionCount,
-      conversation_count_before: budgetedPromptResult.summary.conversationCountBefore,
-      conversation_count_after: budgetedPromptResult.summary.conversationCountAfter,
-      retrieval_count_before: budgetedPromptResult.summary.retrievalCountBefore,
-      retrieval_count_after: budgetedPromptResult.summary.retrievalCountAfter,
-      trimmed_conversation_count: budgetedPromptResult.summary.trimmedConversationCount,
-      trimmed_retrieval_count: budgetedPromptResult.summary.trimmedRetrievalCount,
-      estimated_tokens_before: budgetedPromptResult.summary.estimatedTokensBefore,
-      estimated_tokens_after: budgetedPromptResult.summary.estimatedTokensAfter,
-    })
-
-    stage = 'generating_assistant_reply'
-    publishTurnEvent({
-      type: 'turn.status',
-      payload: {
-        status: 'generating',
-        detail: 'Generating assistant response.',
-      },
-    })
-    const provider = selectProvider({ model: input.model })
-    logger.debug('[llm] provider selected.', {
-      turn_id: turnResult.turn.id,
-      node_id: input.nodeId,
-      author_user_id: currentUserId,
-      model: input.model,
-      provider: provider.id,
-    })
-    logger.debug('[llm] provider input prepared.', {
-      turn_id: turnResult.turn.id,
-      node_id: input.nodeId,
-      author_user_id: currentUserId,
-      model: input.model,
-      provider: provider.id,
-      instruction_count: retrievalState.promptBudgetSummary?.instructionCount ?? null,
-      conversation_count: retrievalState.prompt.conversation.length,
-      retrieval_count: retrievalState.prompt.retrievalContext.length,
-      prompt_sections: summarizePromptSections(retrievalState.prompt),
-      estimated_tokens_after_budget: retrievalState.promptBudgetSummary?.estimatedTokensAfter ?? null,
-      prompt_instruction_count: retrievalState.prompt.instructions.length,
-      prompt_conversation_turn_count: retrievalState.prompt.conversation.length,
-      prompt_retrieval_chunk_count: retrievalState.prompt.retrievalContext.length,
-      prompt_current_user_message_length: retrievalState.prompt.currentUserMessage.length,
-      prompt_current_user_message_preview: toDebugPreview(
-        retrievalState.prompt.currentUserMessage,
-      ),
-    })
-    const assistantOutput = await provider.generate({
-      model: input.model,
-      prompt: retrievalState.prompt,
-      onTokenDelta: (delta) => {
-        if (delta.length === 0) {
-          return
-        }
-        publishTurnEvent({
-          type: 'token.delta',
-          payload: {
-            delta,
-          },
-        })
-      },
-    })
-    logger.info('[llm] assistant generation completed.', {
-      turn_id: turnResult.turn.id,
-      node_id: input.nodeId,
-      author_user_id: currentUserId,
-      provider: provider.id,
-      finish_reason: assistantOutput.finishReason,
-      provider_response_id: assistantOutput.providerResponseId,
-      output_length: assistantOutput.content.length,
-    })
-
-    stage = 'persisting_assistant_message'
-    publishTurnEvent({
-      type: 'turn.status',
-      payload: {
-        status: 'persisting',
-        detail: 'Persisting assistant response.',
-      },
-    })
-    const assistantMessage = await createMessageForAuthorRecord({
-      nodeId: input.nodeId,
-      authorUserId: currentUserId,
-      turnId: turnResult.turn.id,
-      role: 'assistant',
-      content: assistantOutput.content,
-      ...(retrievalState.assistantMetadata !== undefined
-        ? { metadata: retrievalState.assistantMetadata }
-        : {}),
-    })
-
-    if (assistantMessage === null) {
-      await markTurnFailedOnce('Node not found.')
-      logger.warn('[chat] failed to persist assistant message because node was not found.', {
-        turn_id: turnResult.turn.id,
-        node_id: input.nodeId,
-        author_user_id: currentUserId,
-      })
-      throw new TRPCError({
-        code: 'NOT_FOUND',
-        message: 'Node not found.',
-      })
-    }
-
-    stage = 'finalizing_turn'
-    const completedAt = new Date().toISOString()
-    const finalizedTurn = await updateConversationTurnForAuthorRecord(
-      {
-        id: turnResult.turn.id,
-        status: 'completed',
-        error: null,
-        completedAt,
-        ...(retrievalState.turnMetadata !== undefined
-          ? { metadata: retrievalState.turnMetadata }
-          : {}),
-      },
-      currentUserId,
-    )
-
-    if (!finalizedTurn) {
-      logger.warn('[chat] failed to finalize conversation turn because it was not found.', {
-        turn_id: turnResult.turn.id,
-        node_id: input.nodeId,
-        author_user_id: currentUserId,
-      })
-      throw new TRPCError({
-        code: 'NOT_FOUND',
-        message: 'Conversation turn not found.',
-      })
-    }
-    await enqueuePostprocessJobsForTurn(finalizedTurn.id, currentUserId)
-
-    publishTurnEvent({
-      type: 'message.completed',
-      payload: {
-        messageId: assistantMessage.id,
-        content: assistantMessage.content,
-      },
-    })
-
-    logger.info('[chat] sendConversationTurn completed.', {
-      turn_id: finalizedTurn.id,
-      node_id: input.nodeId,
-      author_user_id: currentUserId,
-      status: finalizedTurn.status,
-      user_message_id: userMessage.id,
-      assistant_message_id: assistantMessage.id,
-      duration_ms: Date.now() - requestStartedAtMs,
-    })
-
-    return {
-      turnId: finalizedTurn.id,
-      status: finalizedTurn.status,
-      userMessage,
-      assistantMessage,
-      error: finalizedTurn.error,
-    }
-  } catch (error) {
+  const handleTurnFailure = async (
+    failedStage: string,
+    error: unknown,
+  ): Promise<never> => {
     if (error instanceof TRPCError) {
       await markTurnFailedOnce(error.message)
       logger.warn('[chat] sendConversationTurn failed with TRPCError.', {
         turn_id: turnResult.turn.id,
         node_id: input.nodeId,
         author_user_id: currentUserId,
-        stage,
+        stage: failedStage,
         code: error.code,
         message: error.message,
         duration_ms: Date.now() - requestStartedAtMs,
       })
-      publishTurnEvent({
+      await publishTurnEvent({
         type: 'turn.error',
         payload: {
           code: error.code,
@@ -683,11 +353,11 @@ export const sendConversationTurn = async ({
       turn_id: turnResult.turn.id,
       node_id: input.nodeId,
       author_user_id: currentUserId,
-      stage,
+      stage: failedStage,
       error,
       duration_ms: Date.now() - requestStartedAtMs,
     })
-    publishTurnEvent({
+    await publishTurnEvent({
       type: 'turn.error',
       payload: {
         code: 'INTERNAL_SERVER_ERROR',
@@ -699,4 +369,429 @@ export const sendConversationTurn = async ({
       message: 'Assistant generation failed.',
     })
   }
+
+  const runTurnPipeline = async (
+    userMessage: SendConversationTurnResult['userMessage'],
+  ): Promise<SendConversationTurnResult> => {
+    let pipelineStage = 'building_context'
+
+    try {
+      const context = await buildConversationContext({
+        nodeId: input.nodeId,
+        currentUserId,
+        userInput: input.text,
+        currentTurnId: turnResult.turn.id,
+      })
+      if (context.memoryPlaceholder) {
+        logger.warn('[chat] older conversation context would use a placeholder summary path.', {
+          turn_id: turnResult.turn.id,
+          node_id: input.nodeId,
+          author_user_id: currentUserId,
+          placeholder_status: context.memoryPlaceholder.status,
+          older_message_count: context.memoryPlaceholder.olderMessageCount,
+          retained_message_count: context.memoryPlaceholder.retainedMessageCount,
+        })
+      }
+      logger.debug('[chat] conversation context built.', {
+        turn_id: turnResult.turn.id,
+        node_id: input.nodeId,
+        author_user_id: currentUserId,
+        workspace_id: context.node.workspaceId,
+        recent_messages: context.recentMessages.length,
+      })
+
+      let retrievalState: RetrievalStageState = {
+        prompt: buildAssistantPrompt(context),
+      }
+      pipelineStage = 'evaluating_rag'
+      const ragConfig = getRagConfig()
+      const ragAllowed = isRagAllowedForTarget({
+        config: ragConfig,
+        userId: currentUserId,
+        workspaceId: context.node.workspaceId,
+      })
+      logger.debug('[rag] retrieval gate evaluated.', {
+        turn_id: turnResult.turn.id,
+        node_id: input.nodeId,
+        author_user_id: currentUserId,
+        rag_enabled: ragConfig.enabled,
+        rag_allowed: ragAllowed,
+        retriever: ragConfig.retriever,
+        workspace_id: context.node.workspaceId,
+      })
+
+      if (ragAllowed) {
+        const retrievalStartedAtMs = Date.now()
+        pipelineStage = 'retrieving_context'
+        await publishTurnEvent({
+          type: 'turn.status',
+          payload: {
+            status: 'retrieving',
+            detail: 'Retrieving relevant context.',
+          },
+        })
+
+        try {
+          const retriever = resolveRetriever({ config: ragConfig })
+          logger.debug('[rag] retrieval started.', {
+            turn_id: turnResult.turn.id,
+            node_id: input.nodeId,
+            author_user_id: currentUserId,
+            retriever: retriever.id,
+            max_chunks: ragConfig.maxChunks,
+          })
+          const retrievalResult = await retriever.retrieve({
+            query: input.text,
+            nodeId: input.nodeId,
+            authorUserId: currentUserId,
+            workspaceId: context.node.workspaceId,
+            maxChunks: ragConfig.maxChunks,
+          })
+          const policyDecision = applyContextPolicy(retrievalResult, {
+            config: ragConfig,
+          })
+
+          retrievalState = {
+            prompt: buildAssistantPrompt(context, {
+              retrievedChunks: policyDecision.selectedChunks,
+            }),
+            assistantMetadata: buildAssistantMessageMetadata({
+              citations: policyDecision.citations,
+            }),
+            turnMetadata: buildConversationTurnMetadata({
+              existing: turnResult.turn.metadata,
+              snapshot: policyDecision.snapshot,
+              diagnostics: policyDecision.diagnostics,
+            }),
+          }
+          logger.debug('[rag] retrieval policy applied.', {
+            turn_id: turnResult.turn.id,
+            node_id: input.nodeId,
+            author_user_id: currentUserId,
+            retriever: retriever.id,
+            chunks_returned: retrievalResult.chunks.length,
+            chunks_selected: policyDecision.selectedChunks.length,
+            citations: policyDecision.citations.length,
+            snapshot_id: policyDecision.snapshot.id,
+          })
+          logger.debug('[rag] retrieval details.', {
+            turn_id: turnResult.turn.id,
+            node_id: input.nodeId,
+            author_user_id: currentUserId,
+            retriever: retriever.id,
+            diagnostics: retrievalResult.diagnostics,
+            returned_chunks: retrievalResult.chunks.map((chunk) => ({
+              message_id: chunk.messageId,
+              node_id: chunk.nodeId,
+              chunk_index: chunk.chunkIndex,
+              token_count: chunk.tokenCount,
+              score: chunk.score,
+              content_preview: toDebugPreview(chunk.content),
+            })),
+            selected_chunks: policyDecision.selectedChunks.map((chunk) => ({
+              message_id: chunk.messageId,
+              node_id: chunk.nodeId,
+              chunk_index: chunk.chunkIndex,
+              token_count: chunk.tokenCount,
+              score: chunk.score,
+              content_preview: toDebugPreview(chunk.content),
+            })),
+            citations: policyDecision.citations,
+            snapshot: policyDecision.snapshot,
+          })
+          recordRetrievalTelemetry({
+            turnId: turnResult.turn.id,
+            nodeId: input.nodeId,
+            authorUserId: currentUserId,
+            retriever: retriever.id,
+            ragEnabled: true,
+            startedAtMs: retrievalStartedAtMs,
+            chunksReturned: retrievalResult.chunks.length,
+            chunksSelected: policyDecision.selectedChunks.length,
+            citationCount: policyDecision.citations.length,
+            snapshotId: policyDecision.snapshot.id,
+          })
+        } catch (error) {
+          logger.warn('[rag] Retrieval failed; continuing with base prompt.', {
+            turnId: turnResult.turn.id,
+            nodeId: input.nodeId,
+            currentUserId,
+            turn_id: turnResult.turn.id,
+            node_id: input.nodeId,
+            author_user_id: currentUserId,
+            retriever: ragConfig.retriever,
+            error,
+          })
+
+          retrievalState = {
+            prompt: buildAssistantPrompt(context),
+            turnMetadata: buildConversationTurnMetadata({
+              existing: turnResult.turn.metadata,
+              diagnostics: {
+                retriever: ragConfig.retriever,
+                query: input.text,
+                fallbackReason: 'retrieval_failed',
+              },
+            }),
+          }
+          logger.debug('[rag] fallback retrieval diagnostics.', {
+            turn_id: turnResult.turn.id,
+            node_id: input.nodeId,
+            author_user_id: currentUserId,
+            retriever: ragConfig.retriever,
+            fallback_reason: 'retrieval_failed',
+          })
+          recordRetrievalTelemetry({
+            turnId: turnResult.turn.id,
+            nodeId: input.nodeId,
+            authorUserId: currentUserId,
+            retriever: ragConfig.retriever,
+            ragEnabled: true,
+            startedAtMs: retrievalStartedAtMs,
+            chunksReturned: 0,
+            chunksSelected: 0,
+            citationCount: 0,
+            fallbackReason: 'retrieval_failed',
+          })
+        }
+      }
+
+      const promptSectionsBeforeBudget = summarizePromptSections(retrievalState.prompt)
+      const budgetedPromptResult = applyPromptBudget(retrievalState.prompt)
+      const promptSectionsAfterBudget = summarizePromptSections(budgetedPromptResult.prompt)
+      retrievalState = {
+        ...retrievalState,
+        prompt: budgetedPromptResult.prompt,
+        promptBudgetSummary: budgetedPromptResult.summary,
+      }
+      logger.debug('[chat] prompt budget applied.', {
+        turn_id: turnResult.turn.id,
+        node_id: input.nodeId,
+        author_user_id: currentUserId,
+        prompt_sections_before_budget: promptSectionsBeforeBudget,
+        prompt_sections_after_budget: promptSectionsAfterBudget,
+        instruction_count: budgetedPromptResult.summary.instructionCount,
+        conversation_count_before: budgetedPromptResult.summary.conversationCountBefore,
+        conversation_count_after: budgetedPromptResult.summary.conversationCountAfter,
+        retrieval_count_before: budgetedPromptResult.summary.retrievalCountBefore,
+        retrieval_count_after: budgetedPromptResult.summary.retrievalCountAfter,
+        trimmed_conversation_count: budgetedPromptResult.summary.trimmedConversationCount,
+        trimmed_retrieval_count: budgetedPromptResult.summary.trimmedRetrievalCount,
+        estimated_tokens_before: budgetedPromptResult.summary.estimatedTokensBefore,
+        estimated_tokens_after: budgetedPromptResult.summary.estimatedTokensAfter,
+      })
+
+      pipelineStage = 'generating_assistant_reply'
+      await publishTurnEvent({
+        type: 'turn.status',
+        payload: {
+          status: 'generating',
+          detail: 'Generating assistant response.',
+        },
+      })
+      const provider = selectProvider({ model: input.model })
+      logger.debug('[llm] provider selected.', {
+        turn_id: turnResult.turn.id,
+        node_id: input.nodeId,
+        author_user_id: currentUserId,
+        model: input.model,
+        provider: provider.id,
+      })
+      logger.debug('[llm] provider input prepared.', {
+        turn_id: turnResult.turn.id,
+        node_id: input.nodeId,
+        author_user_id: currentUserId,
+        model: input.model,
+        provider: provider.id,
+        instruction_count: retrievalState.promptBudgetSummary?.instructionCount ?? null,
+        conversation_count: retrievalState.prompt.conversation.length,
+        retrieval_count: retrievalState.prompt.retrievalContext.length,
+        prompt_sections: summarizePromptSections(retrievalState.prompt),
+        estimated_tokens_after_budget: retrievalState.promptBudgetSummary?.estimatedTokensAfter ?? null,
+        prompt_instruction_count: retrievalState.prompt.instructions.length,
+        prompt_conversation_turn_count: retrievalState.prompt.conversation.length,
+        prompt_retrieval_chunk_count: retrievalState.prompt.retrievalContext.length,
+        prompt_current_user_message_length: retrievalState.prompt.currentUserMessage.length,
+        prompt_current_user_message_preview: toDebugPreview(
+          retrievalState.prompt.currentUserMessage,
+        ),
+      })
+      const assistantOutput = await provider.generate({
+        model: input.model,
+        prompt: retrievalState.prompt,
+        onTokenDelta: async (delta) => {
+          if (delta.length === 0) {
+            return
+          }
+          await publishTurnEvent({
+            type: 'token.delta',
+            payload: {
+              delta,
+            },
+          })
+        },
+      })
+      logger.info('[llm] assistant generation completed.', {
+        turn_id: turnResult.turn.id,
+        node_id: input.nodeId,
+        author_user_id: currentUserId,
+        provider: provider.id,
+        finish_reason: assistantOutput.finishReason,
+        provider_response_id: assistantOutput.providerResponseId,
+        output_length: assistantOutput.content.length,
+      })
+
+      pipelineStage = 'persisting_assistant_message'
+      await publishTurnEvent({
+        type: 'turn.status',
+        payload: {
+          status: 'persisting',
+          detail: 'Persisting assistant response.',
+        },
+      })
+      const assistantMessage = await createMessageForAuthorRecord({
+        nodeId: input.nodeId,
+        authorUserId: currentUserId,
+        turnId: turnResult.turn.id,
+        role: 'assistant',
+        content: assistantOutput.content,
+        ...(retrievalState.assistantMetadata !== undefined
+          ? { metadata: retrievalState.assistantMetadata }
+          : {}),
+      })
+
+      if (assistantMessage === null) {
+        await markTurnFailedOnce('Node not found.')
+        logger.warn('[chat] failed to persist assistant message because node was not found.', {
+          turn_id: turnResult.turn.id,
+          node_id: input.nodeId,
+          author_user_id: currentUserId,
+        })
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Node not found.',
+        })
+      }
+
+      pipelineStage = 'finalizing_turn'
+      const completedAt = new Date().toISOString()
+      const finalizedTurn = await updateConversationTurnForAuthorRecord(
+        {
+          id: turnResult.turn.id,
+          status: 'completed',
+          error: null,
+          completedAt,
+          ...(retrievalState.turnMetadata !== undefined
+            ? { metadata: retrievalState.turnMetadata }
+            : {}),
+        },
+        currentUserId,
+      )
+
+      if (!finalizedTurn) {
+        logger.warn('[chat] failed to finalize conversation turn because it was not found.', {
+          turn_id: turnResult.turn.id,
+          node_id: input.nodeId,
+          author_user_id: currentUserId,
+        })
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Conversation turn not found.',
+        })
+      }
+      await enqueuePostprocessJobsForTurn(finalizedTurn.id, currentUserId)
+
+      await publishTurnEvent({
+        type: 'message.completed',
+        payload: {
+          messageId: assistantMessage.id,
+          content: assistantMessage.content,
+        },
+      })
+
+      logger.info('[chat] sendConversationTurn completed.', {
+        turn_id: finalizedTurn.id,
+        node_id: input.nodeId,
+        author_user_id: currentUserId,
+        status: finalizedTurn.status,
+        user_message_id: userMessage.id,
+        assistant_message_id: assistantMessage.id,
+        duration_ms: Date.now() - requestStartedAtMs,
+      })
+
+      return {
+        turnId: finalizedTurn.id,
+        status: finalizedTurn.status,
+        userMessage,
+        assistantMessage,
+        error: finalizedTurn.error,
+      }
+    } catch (error) {
+      await handleTurnFailure(pipelineStage, error)
+    }
+
+    throw new Error('Unreachable runTurnPipeline state')
+  }
+
+  const userMessage = await (async (): Promise<SendConversationTurnResult['userMessage']> => {
+    try {
+      stage = 'persisting_user_message'
+      const persistedUserMessage = await createMessageForAuthorRecord({
+        nodeId: input.nodeId,
+        authorUserId: currentUserId,
+        turnId: turnResult.turn.id,
+        role: 'user',
+        content: input.text,
+      })
+
+      if (persistedUserMessage === null) {
+        await markTurnFailedOnce('Node not found.')
+        logger.warn('[chat] failed to persist user message because node was not found.', {
+          turn_id: turnResult.turn.id,
+          node_id: input.nodeId,
+          author_user_id: currentUserId,
+        })
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Node not found.',
+        })
+      }
+
+      return persistedUserMessage
+    } catch (error) {
+      await handleTurnFailure(stage, error)
+    }
+
+    throw new Error('Unreachable user message persistence state')
+  })()
+
+  if (!awaitCompletion) {
+    void runTurnPipeline(userMessage).catch((error) => {
+      logger.debug('[chat] background turn pipeline finished with handled error.', {
+        turn_id: turnResult.turn.id,
+        node_id: input.nodeId,
+        author_user_id: currentUserId,
+        error,
+      })
+    })
+
+    logger.info('[chat] sendConversationTurn accepted for background processing.', {
+      turn_id: turnResult.turn.id,
+      node_id: input.nodeId,
+      author_user_id: currentUserId,
+      status: turnResult.turn.status,
+      user_message_id: userMessage.id,
+      duration_ms: Date.now() - requestStartedAtMs,
+    })
+
+    return {
+      turnId: turnResult.turn.id,
+      status: turnResult.turn.status,
+      userMessage,
+      assistantMessage: null,
+      error: null,
+    }
+  }
+
+  return runTurnPipeline(userMessage)
 }

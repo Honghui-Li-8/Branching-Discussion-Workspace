@@ -14,6 +14,7 @@ import { sendConversationTurn } from './sendConversationTurn'
 import type { AssistantProvider } from './providers/provider.js'
 import { turnEventBroker } from './stream/broker.js'
 import type { ChatTurnStreamEvent } from './stream/events.js'
+import { appendConversationTurnEvent } from '../db/queries/conversationTurnEvent.js'
 
 jest.mock('../db/index.js', () => ({
   createOrGetConversationPostprocessJobForAuthor: jest.fn(),
@@ -33,6 +34,10 @@ jest.mock('./providers/selectProvider.js', () => ({
 
 jest.mock('./rag/retriever.js', () => ({
   resolveRetriever: jest.fn(),
+}))
+
+jest.mock('../db/queries/conversationTurnEvent.js', () => ({
+  appendConversationTurnEvent: jest.fn(),
 }))
 
 const createOrGetConversationPostprocessJobForAuthorMock =
@@ -58,6 +63,9 @@ const buildConversationContextMock = buildConversationContext as jest.MockedFunc
 const selectProviderMock = selectProvider as jest.MockedFunction<typeof selectProvider>
 const resolveRetrieverMock = resolveRetriever as jest.MockedFunction<
   typeof resolveRetriever
+>
+const appendConversationTurnEventMock = appendConversationTurnEvent as jest.MockedFunction<
+  typeof appendConversationTurnEvent
 >
 
 const processingTurn = {
@@ -170,6 +178,18 @@ describe('sendConversationTurn', () => {
     delete process.env.RAG_RETRIEVER
     delete process.env.RAG_ALLOWED_USER_IDS
     delete process.env.RAG_ALLOWED_WORKSPACE_IDS
+    let eventId = 100
+    appendConversationTurnEventMock.mockImplementation(async (input) => {
+      eventId += 1
+      return {
+        id: eventId,
+        turnId: input.turnId,
+        seq: input.seq,
+        eventType: input.eventType,
+        payload: input.payload ?? {},
+        createdAt: new Date().toISOString(),
+      }
+    })
     createOrGetConversationTurnForAuthorMock.mockResolvedValue({
       turn: processingTurn,
       wasCreated: true,
@@ -314,6 +334,69 @@ describe('sendConversationTurn', () => {
         .map((event) => event.payload.delta)
         .join(''),
     ).toBe('assistant reply')
+  })
+
+  test('returns processing immediately when awaitCompletion is false', async () => {
+    const releaseProviderRef: { current: () => void } = {
+      current: () => {},
+    }
+    const providerGate = new Promise<void>((resolve) => {
+      releaseProviderRef.current = () => {
+        resolve()
+      }
+    })
+
+    selectProviderMock.mockReturnValueOnce(
+      makeProvider(async (input) => {
+        await input.onTokenDelta?.('assistant ')
+        await providerGate
+        await input.onTokenDelta?.('reply')
+        return {
+          content: assistantMessage.content,
+          finishReason: 'stop',
+          providerResponseId: 'resp-background',
+        }
+      }),
+    )
+    createMessageForAuthorMock
+      .mockResolvedValueOnce(userMessage)
+      .mockResolvedValueOnce(assistantMessage)
+
+    const result = await sendConversationTurn({
+      input: {
+        nodeId: 'n1',
+        text: 'hello',
+        model: 'gpt-5',
+        idempotencyKey: 'idem-1',
+      },
+      currentUserId: 'u1',
+      awaitCompletion: false,
+    })
+
+    expect(result).toEqual({
+      turnId: 't1',
+      status: 'processing',
+      userMessage,
+      assistantMessage: null,
+      error: null,
+    })
+    expect(createMessageForAuthorMock).toHaveBeenCalledTimes(1)
+
+    releaseProviderRef.current()
+    await new Promise<void>((resolve) => {
+      setImmediate(resolve)
+    })
+    await new Promise<void>((resolve) => {
+      setImmediate(resolve)
+    })
+
+    expect(updateConversationTurnForAuthorMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 't1',
+        status: 'completed',
+      }),
+      'u1',
+    )
   })
 
   test('retrieves context, enriches the prompt, and persists citations when RAG is enabled', async () => {
