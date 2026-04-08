@@ -12,6 +12,7 @@ import type { TreeMessage, TreeNode } from '../types/tree'
 import { useAppSelector } from '../store/hooks'
 import { selectAuthUser } from '../store/slices/authSlice'
 import { useNodeConversation } from './discussion-tree/hooks/useNodeConversation'
+import type { TurnStage } from './discussion-tree/hooks/conversationStreamState'
 import { ConversationComposer, CHAT_INPUT_MAX_HEIGHT, CHAT_INPUT_MIN_HEIGHT, CHAT_MODELS } from './conversation/ConversationComposer'
 import { ConversationMessageList } from './conversation/ConversationMessageList'
 import { ConversationPanelHeader } from './conversation/ConversationPanelHeader'
@@ -63,6 +64,28 @@ const isNearBottom = (element: HTMLDivElement): boolean =>
   element.scrollHeight - (element.scrollTop + element.clientHeight) <=
   AUTO_SCROLL_BOTTOM_THRESHOLD_PX
 
+const getStageLabel = (stage: TurnStage): string => {
+  switch (stage) {
+    case 'loading_context':
+      return 'Loading'
+    case 'retrieving':
+      return 'Retrieving'
+    case 'generating':
+      return 'Generating'
+    case 'summarizing':
+      return 'Summarizing'
+    case 'persisting':
+      return 'Saving'
+    default:
+      return stage
+  }
+}
+
+const formatStageDuration = (durationMs: number): string => {
+  const seconds = Math.max(0, Math.floor(durationMs / 1000))
+  return formatStatusElapsed(seconds)
+}
+
 /**
  * Conversation side panel for a selected tree node.
  * Renders node messages, input composer, and resize/fullscreen controls.
@@ -92,8 +115,12 @@ export const NodeConversationPanel = ({
   const conversationBottomAnchorRef = useRef<HTMLDivElement | null>(null)
   const conversationInputRef = useRef<HTMLTextAreaElement | null>(null)
   const isPinnedToBottomRef = useRef(true)
+  const stageOrderRef = useRef<TurnStage[]>([])
+  const currentTimedStageRef = useRef<TurnStage | null>(null)
+  const currentStageStartedAtMsRef = useRef<number | null>(null)
   const [statusTimerStartedAtMs, setStatusTimerStartedAtMs] = useState<number | null>(null)
   const [statusTimerNowMs, setStatusTimerNowMs] = useState(0)
+  const [stageDurationsMs, setStageDurationsMs] = useState<Partial<Record<TurnStage, number>>>({})
 
   const messages = conversation.messages
   const lastMessageContent = messages[messages.length - 1]?.content ?? ''
@@ -101,6 +128,22 @@ export const NodeConversationPanel = ({
   const streamStatusLabel = conversation.streamStatusLabel
   const hasActiveStreamStatus =
     Boolean(streamStatusLabel) && !(streamStatusLabel?.startsWith('Error:') ?? false)
+  const runtimeSummary = (() => {
+    const stageOrder = stageOrderRef.current
+    if (stageOrder.length === 0) {
+      return null
+    }
+
+    const segmentSummaries: string[] = []
+    let totalDurationMs = 0
+    for (const stage of stageOrder) {
+      const durationMs = stageDurationsMs[stage] ?? 0
+      totalDurationMs += durationMs
+      segmentSummaries.push(`${getStageLabel(stage)} ${formatStageDuration(durationMs)}`)
+    }
+
+    return `${segmentSummaries.join(' • ')} • Total ${formatStageDuration(totalDurationMs)}`
+  })()
 
   const scrollConversationToBottom = () => {
     const bottomAnchor = conversationBottomAnchorRef.current
@@ -226,6 +269,50 @@ export const NodeConversationPanel = ({
   }, [hasActiveStreamStatus, node.id])
 
   useEffect(() => {
+    const now = Date.now()
+    const nextStage = hasActiveStreamStatus ? conversation.streamStage : null
+    const previousStage = currentTimedStageRef.current
+
+    if (
+      previousStage !== null &&
+      previousStage !== nextStage &&
+      currentStageStartedAtMsRef.current !== null
+    ) {
+      const elapsedMs = Math.max(0, now - currentStageStartedAtMsRef.current)
+      if (!stageOrderRef.current.includes(previousStage)) {
+        stageOrderRef.current.push(previousStage)
+      }
+      setStageDurationsMs((current) => ({
+        ...current,
+        [previousStage]: (current[previousStage] ?? 0) + elapsedMs,
+      }))
+      currentStageStartedAtMsRef.current = null
+    }
+
+    if (nextStage !== null && previousStage !== nextStage) {
+      currentTimedStageRef.current = nextStage
+      currentStageStartedAtMsRef.current = now
+      setStatusTimerStartedAtMs(now)
+      setStatusTimerNowMs(now)
+      return
+    }
+
+    if (nextStage === null) {
+      currentTimedStageRef.current = null
+      currentStageStartedAtMsRef.current = null
+    }
+  }, [conversation.streamStage, hasActiveStreamStatus])
+
+  useEffect(() => {
+    stageOrderRef.current = []
+    currentTimedStageRef.current = null
+    currentStageStartedAtMsRef.current = null
+    setStageDurationsMs({})
+    setStatusTimerStartedAtMs(null)
+    setStatusTimerNowMs(0)
+  }, [node.id])
+
+  useEffect(() => {
     if (!isResizing) {
       return
     }
@@ -280,6 +367,10 @@ export const NodeConversationPanel = ({
 
     setSendBlockAlert(null)
     setConversationInputText('')
+    stageOrderRef.current = []
+    currentTimedStageRef.current = null
+    currentStageStartedAtMsRef.current = null
+    setStageDurationsMs({})
     const now = Date.now()
     setStatusTimerStartedAtMs(now)
     setStatusTimerNowMs(now)
@@ -346,6 +437,11 @@ export const NodeConversationPanel = ({
       {streamStatusWithElapsed ? (
         <p className="m-0 shrink-0 border-t border-[#d8ebf6] bg-[#f4fbff] px-4 py-2 text-xs text-[#2f6688]">
           {streamStatusWithElapsed}
+        </p>
+      ) : null}
+      {!hasActiveStreamStatus && runtimeSummary ? (
+        <p className="m-0 shrink-0 border-t border-[#d8ebf6] bg-[#f8fcff] px-4 py-2 text-[11px] text-[#4d7086]">
+          Runtime: {runtimeSummary}
         </p>
       ) : null}
       {sendBlockAlert ? (

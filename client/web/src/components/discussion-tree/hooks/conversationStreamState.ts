@@ -1,4 +1,4 @@
-type TurnStage =
+export type TurnStage =
   | 'loading_context'
   | 'retrieving'
   | 'generating'

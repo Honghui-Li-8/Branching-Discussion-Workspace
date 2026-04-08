@@ -7,9 +7,11 @@ import type { TreeMessage } from '../../../types/tree'
 import { invalidateMessagesByNode } from './mutationInvalidation'
 import {
   conversationStreamReducer,
+  type ConversationStreamPhase,
   getConversationStreamStatusLabel,
   initialConversationStreamState,
   parseConversationStreamEvent,
+  type TurnStage,
 } from './conversationStreamState'
 
 type RouterOutputs = inferRouterOutputs<AppRouter>
@@ -93,6 +95,8 @@ type UseNodeConversationResult = {
   isUpdatingMessage: boolean
   isDeletingMessage: boolean
   isGeneratingResponse: boolean
+  streamPhase: ConversationStreamPhase
+  streamStage: TurnStage | null
   streamStatusLabel: string | null
   messagesLoadError: string | null
   messageSendError: string | null
@@ -500,6 +504,8 @@ export const useNodeConversation = ({
     isUpdatingMessage: updateMessageMutation.isPending,
     isDeletingMessage: deleteMessageMutation.isPending,
     isGeneratingResponse: streamState.phase === 'generating',
+    streamPhase: streamState.phase,
+    streamStage: streamState.stage,
     streamStatusLabel: getConversationStreamStatusLabel(streamState),
     messagesLoadError: messagesQuery.error?.message ?? null,
     messageSendError:
