@@ -58,7 +58,7 @@ export const messageBranchNewNodeMetaSchema = z.object({
 })
 
 export const messageAnnotationsByMessageInputSchema = z.object({
-  messageId: z.string(),
+  messageId: z.string().uuid(),
 })
 
 export const messageSuggestFromSelectionInputSchema = z.object({

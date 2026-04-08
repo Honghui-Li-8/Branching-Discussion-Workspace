@@ -16,7 +16,7 @@ const makeContext = (): AppRouterContext => {
 
   const annotation = {
     id: 'a1',
-    messageId: 'm1',
+    messageId: '11111111-1111-4111-8111-111111111111',
     leadsToNodeId: 'n-child-1',
     kind: 'branch' as const,
     quote: 'hello',
@@ -93,12 +93,12 @@ describe('appRouter annotation routes', () => {
 
     await expect(
       caller.messageAnnotationsByMessage({
-        messageId: 'm1',
+        messageId: '11111111-1111-4111-8111-111111111111',
       }),
     ).rejects.toThrow('Authentication required.')
     await expect(
       caller.messageBranchFromSelection({
-        messageId: 'm1',
+        messageId: '11111111-1111-4111-8111-111111111111',
         selection: {
           quote: 'hello',
           selectorJson: {
@@ -113,7 +113,7 @@ describe('appRouter annotation routes', () => {
     ).rejects.toThrow('Authentication required.')
     await expect(
       caller.messageSuggestFromSelection({
-        messageId: 'm1',
+        messageId: '11111111-1111-4111-8111-111111111111',
         selection: {
           quote: 'hello',
           selectorJson: {
@@ -133,9 +133,9 @@ describe('appRouter annotation routes', () => {
   test('annotation procedures delegate to context', async () => {
     const ctx = makeContext()
     const caller = appRouter.createCaller(ctx)
-    const listInput = { messageId: 'm1' }
+    const listInput = { messageId: '11111111-1111-4111-8111-111111111111' }
     const suggestInput = {
-      messageId: 'm1',
+      messageId: '11111111-1111-4111-8111-111111111111',
       selection: {
         quote: 'hello',
         selectorJson: {
@@ -152,7 +152,7 @@ describe('appRouter annotation routes', () => {
     }
     const deleteInput = { annotationId: 'a1' }
     const branchInput = {
-      messageId: 'm1',
+      messageId: '11111111-1111-4111-8111-111111111111',
       selection: {
         quote: 'hello',
         selectorJson: {
@@ -180,7 +180,7 @@ describe('appRouter annotation routes', () => {
     const deleteResult = await caller.messageAnnotationDelete(deleteInput)
     const branchResult = await caller.messageBranchFromSelection(branchInput)
 
-    expect(ctx.listMessageAnnotationsByMessage).toHaveBeenCalledWith('m1')
+    expect(ctx.listMessageAnnotationsByMessage).toHaveBeenCalledWith('11111111-1111-4111-8111-111111111111')
     expect(ctx.messageSuggestFromSelection).toHaveBeenCalledWith(suggestInput)
     expect(ctx.messageAnnotationDelete).toHaveBeenCalledWith(deleteInput)
     expect(ctx.messageBranchFromSelection).toHaveBeenCalledTimes(1)
@@ -199,7 +199,7 @@ describe('appRouter annotation routes', () => {
 
     await expect(
       caller.messageSuggestFromSelection({
-        messageId: 'm1',
+        messageId: '11111111-1111-4111-8111-111111111111',
         selection: {
           quote: '   ',
           selectorJson: {
@@ -212,7 +212,7 @@ describe('appRouter annotation routes', () => {
 
     await expect(
       caller.messageSuggestFromSelection({
-        messageId: 'm1',
+        messageId: '11111111-1111-4111-8111-111111111111',
         selection: {
           quote: 'hello',
           selectorJson: {
@@ -231,7 +231,7 @@ describe('appRouter annotation routes', () => {
 
     await expect(
       caller.messageBranchFromSelection({
-        messageId: 'm1',
+        messageId: '11111111-1111-4111-8111-111111111111',
         selection: {
           quote: '   ',
           selectorJson: {
@@ -244,7 +244,7 @@ describe('appRouter annotation routes', () => {
 
     await expect(
       caller.messageBranchFromSelection({
-        messageId: 'm1',
+        messageId: '11111111-1111-4111-8111-111111111111',
         selection: {
           quote: 'hello',
           selectorJson: {
@@ -257,7 +257,7 @@ describe('appRouter annotation routes', () => {
 
     await expect(
       caller.messageBranchFromSelection({
-        messageId: 'm1',
+        messageId: '11111111-1111-4111-8111-111111111111',
         selection: {
           quote: 'hello',
           selectorJson: {
@@ -273,7 +273,7 @@ describe('appRouter annotation routes', () => {
 
     await expect(
       caller.messageBranchFromSelection({
-        messageId: 'm1',
+        messageId: '11111111-1111-4111-8111-111111111111',
         selection: {
           quote: 'hello',
           selectorJson: 42,
@@ -284,7 +284,7 @@ describe('appRouter annotation routes', () => {
 
     await expect(
       caller.messageBranchFromSelection({
-        messageId: 'm1',
+        messageId: '11111111-1111-4111-8111-111111111111',
         selection: {
           quote: 'hello',
           selectorJson: {
@@ -303,7 +303,7 @@ describe('appRouter annotation routes', () => {
 
     await expect(
       caller.messageBranchFromSelection({
-        messageId: 'm1',
+        messageId: '11111111-1111-4111-8111-111111111111',
         selection: {
           quote: 'hello',
           selectorJson: {
@@ -316,7 +316,7 @@ describe('appRouter annotation routes', () => {
 
     await expect(
       caller.messageBranchFromSelection({
-        messageId: 'm1',
+        messageId: '11111111-1111-4111-8111-111111111111',
         selection: {
           quote: 'hello',
           selectorJson: {
@@ -329,7 +329,7 @@ describe('appRouter annotation routes', () => {
 
     await expect(
       caller.messageBranchFromSelection({
-        messageId: 'm1',
+        messageId: '11111111-1111-4111-8111-111111111111',
         selection: {
           quote: 'hello',
           selectorJson: {

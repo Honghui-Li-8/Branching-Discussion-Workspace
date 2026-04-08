@@ -276,6 +276,32 @@ describe('conversationStreamState', () => {
     expect(getConversationStreamStatusLabel(failed)).toBe('Error: boom')
   })
 
+  test('promotes loading_context to generating when token deltas arrive before turn.status', () => {
+    let state = conversationStreamReducer(initialConversationStreamState, {
+      type: 'sendRequested',
+    })
+
+    state = conversationStreamReducer(state, {
+      type: 'turnBound',
+      turnId: 'turn-1',
+    })
+
+    state = conversationStreamReducer(state, {
+      type: 'eventReceived',
+      event: {
+        type: 'token.delta',
+        turnId: 'turn-1',
+        seq: 1,
+        ts: '2026-04-08T00:00:01.000Z',
+        payload: { delta: 'hello' },
+      },
+    })
+
+    expect(state.phase).toBe('generating')
+    expect(state.stage).toBe('generating')
+    expect(getConversationStreamStatusLabel(state)).toBe('Generating response...')
+  })
+
   test('ignores late events after terminal completion/error states', () => {
     const doneState = conversationStreamReducer(initialConversationStreamState, {
       type: 'eventReceived',

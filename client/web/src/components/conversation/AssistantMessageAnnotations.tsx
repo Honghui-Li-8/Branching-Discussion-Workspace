@@ -44,6 +44,8 @@ const LOCAL_ANNOTATION_USER = {
 }
 
 const buildAnnotationSource = (messageId: string) => `assistant-message:${messageId}`
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+const isUuid = (value: string): boolean => UUID_REGEX.test(value)
 
 type RouterOutputs = inferRouterOutputs<AppRouter>
 type RouterInputs = inferRouterInputs<AppRouter>
@@ -712,6 +714,11 @@ export const AssistantMessageAnnotationWrapper = ({
   children,
 }: AssistantMessageAnnotationWrapperProps) => {
   const [isBranchPending, setIsBranchPending] = useState(false)
+  const isPersistedMessageId = useMemo(() => isUuid(messageId), [messageId])
+
+  if (!isPersistedMessageId) {
+    return <>{children}</>
+  }
 
   useEffect(() => {
     setIsBranchPending(false)

@@ -242,7 +242,7 @@ export const conversationStreamReducer = (
             {
               ...state,
               phase: 'generating',
-              stage: state.stage ?? 'generating',
+              stage: 'generating',
               assistantDraft: `${state.assistantDraft}${event.payload.delta}`,
               errorMessage: null,
             },
