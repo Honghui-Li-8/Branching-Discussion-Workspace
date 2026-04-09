@@ -226,6 +226,10 @@ export const createOpenAIProvider = (
         request_payload_size_bytes: estimateRequestBodySize(requestBody),
         request_input_message_count: requestBody.input.length,
       })
+      logger.debug('[llm] OpenAI Responses raw request payload.', {
+        model: input.model,
+        request_body: requestBody,
+      })
       const response = await fetchImpl(`${baseUrl}${OPENAI_RESPONSES_PATH}`, {
         method: 'POST',
         headers: {
