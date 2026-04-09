@@ -490,6 +490,17 @@ describe('sendConversationTurn', () => {
         'Node summary: summary',
         'Node status: open',
         'Node confidence: medium',
+        `Response format requirements:
+- Answer in clean Markdown format.
+    - Use short section headers and bold key conclusions when helpful.
+    - Use bullet points for collections, and use numbered points when order, priority, or steps matter.
+    - For fixed-count or clearly delineated sets, use a numbered top-level list.
+    - Avoid long paragraphs. Put thresholds or rules of thumb in a compact list.
+    - Wrap code in triple-backtick fenced code blocks and include a language tag when possible.
+- Keep responses concise:
+    - Start with a high-level response that includes only necessary details.
+    - Avoid low-level implementation details unless the user explicitly asks for them or continues with follow-up questions.
+    - Avoid long responses on short question`,
       ],
       conversation: [
         {
