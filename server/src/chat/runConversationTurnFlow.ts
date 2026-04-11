@@ -36,7 +36,27 @@ export const runConversationTurnFlow = async ({
 
   logger.info("[chat-flow] runConversationTurnFlow started.", flowContext);
 
-  // Kick off classifier in parallel with request preflight and generation path.
+  // #region: Validation and Idempotent Replay
+  validateAllowedModelOrThrow(input.model);
+  validateProviderRuntimeConfigOrThrow(input.model);
+  const resolvedTurnResult = await resolveConversationTurnOrThrow({
+    input,
+    currentUserId,
+  });
+  const replayResult = await recoverIdempotentConversationTurnReplay({
+    input,
+    currentUserId,
+    resolvedTurnResult,
+    requestStartedAtMs,
+    enqueuePostprocessJobsForTurn,
+  });
+  if (replayResult) {
+    return replayResult;
+  }
+  // #endregion
+
+  // #region: 1) Input Classify (async) @todo, extra for identify explicit summary update request
+  //    - Kick off classifier in parallel with generation path.
   const inputClassificationTask = scheduleInputClassifier({ input });
   void inputClassificationTask
     .then((classification) => {
@@ -53,25 +73,9 @@ export const runConversationTurnFlow = async ({
         error,
       });
     });
+  // #endregion
 
-  validateAllowedModelOrThrow(input.model);
-  validateProviderRuntimeConfigOrThrow(input.model);
-  const resolvedTurnResult = await resolveConversationTurnOrThrow({
-    input,
-    currentUserId,
-  });
-
-  const replayResult = await recoverIdempotentConversationTurnReplay({
-    input,
-    currentUserId,
-    resolvedTurnResult,
-    requestStartedAtMs,
-    enqueuePostprocessJobsForTurn,
-  });
-  if (replayResult) {
-    return replayResult;
-  }
-
+  // generation flow
   const result = await sendConversationTurn({
     input,
     currentUserId,
