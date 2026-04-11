@@ -1,4 +1,3 @@
-import { TRPCError } from '@trpc/server'
 import { selectProvider } from './providers/selectProvider.js'
 import { summarizePromptSections } from './promptObservability.js'
 import type {
@@ -24,6 +23,7 @@ import {
   persistAssistantMessageStage,
   persistUserMessageStage,
 } from './turnPersistencePipeline.js'
+import { handleTurnFailure } from './turnErrorHandling.js'
 import { createLogger } from '../logging/logger.js'
 
 type SendConversationTurnParams = {
@@ -49,63 +49,6 @@ type SendConversationTurnRuntime = {
 }
 
 type TurnFailureHandler = (failedStage: string, error: unknown) => Promise<never>
-
-const handleTurnFailure = async ({
-  runtime,
-  markTurnFailedOnce,
-  failedStage,
-  error,
-}: {
-  runtime: SendConversationTurnRuntime
-  markTurnFailedOnce: MarkTurnFailedOnce
-  failedStage: string
-  error: unknown
-}): Promise<never> => {
-  if (error instanceof TRPCError) {
-    await markTurnFailedOnce(error.message)
-    logger.warn('[chat] sendConversationTurn failed with TRPCError.', {
-      turn_id: runtime.turn.id,
-      node_id: runtime.input.nodeId,
-      author_user_id: runtime.currentUserId,
-      stage: failedStage,
-      code: error.code,
-      message: error.message,
-      duration_ms: Date.now() - runtime.requestStartedAtMs,
-    })
-    await runtime.publishTurnEvent({
-      type: 'turn.error',
-      payload: {
-        code: error.code,
-        message: error.message,
-      },
-    })
-    throw error
-  }
-
-  const errorMessage = error instanceof Error
-    ? error.message
-    : 'Assistant generation failed.'
-  await markTurnFailedOnce(errorMessage)
-  logger.error('[chat] sendConversationTurn failed with unexpected error.', {
-    turn_id: runtime.turn.id,
-    node_id: runtime.input.nodeId,
-    author_user_id: runtime.currentUserId,
-    stage: failedStage,
-    error,
-    duration_ms: Date.now() - runtime.requestStartedAtMs,
-  })
-  await runtime.publishTurnEvent({
-    type: 'turn.error',
-    payload: {
-      code: 'INTERNAL_SERVER_ERROR',
-      message: 'Assistant generation failed.',
-    },
-  })
-  throw new TRPCError({
-    code: 'INTERNAL_SERVER_ERROR',
-    message: 'Assistant generation failed.',
-  })
-}
 
 const generateAssistantReplyStage = async ({
   runtime,
