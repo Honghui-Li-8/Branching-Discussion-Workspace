@@ -1,8 +1,4 @@
 import { TRPCError } from '@trpc/server'
-import {
-  createMessageForAuthor as createMessageForAuthorRecord,
-  updateConversationTurnForAuthor as updateConversationTurnForAuthorRecord,
-} from '../db/index.js'
 import { selectProvider } from './providers/selectProvider.js'
 import { summarizePromptSections } from './promptObservability.js'
 import type {
@@ -11,7 +7,6 @@ import type {
   SendConversationTurnResult,
 } from './types.js'
 import { type ResolvedConversationTurn } from './resolveConversationTurnOrThrow.js'
-import { enqueuePostprocessJobsForTurn } from './enqueuePostprocessJobsForTurn.js'
 import { createMarkTurnFailedOnce, type MarkTurnFailedOnce } from './turnFailure.js'
 import {
   createTurnEventPublisher,
@@ -24,6 +19,11 @@ import {
   runRetrievalStage,
   type RetrievalStageState,
 } from './turnContextPipeline.js'
+import {
+  finalizeTurnStage,
+  persistAssistantMessageStage,
+  persistUserMessageStage,
+} from './turnPersistencePipeline.js'
 import { createLogger } from '../logging/logger.js'
 
 type SendConversationTurnParams = {
@@ -186,148 +186,6 @@ const generateAssistantReplyStage = async ({
     output_length: assistantOutput.content.length,
   })
   return assistantOutput
-}
-
-const persistUserMessageStage = async ({
-  runtime,
-  markTurnFailedOnce,
-}: {
-  runtime: SendConversationTurnRuntime
-  markTurnFailedOnce: MarkTurnFailedOnce
-}): Promise<SendConversationTurnResult['userMessage']> => {
-  const persistedUserMessage = await createMessageForAuthorRecord({
-    nodeId: runtime.input.nodeId,
-    authorUserId: runtime.currentUserId,
-    turnId: runtime.turn.id,
-    role: 'user',
-    content: runtime.input.text,
-  })
-
-  if (persistedUserMessage === null) {
-    await markTurnFailedOnce('Node not found.')
-    logger.warn('[chat] failed to persist user message because node was not found.', {
-      turn_id: runtime.turn.id,
-      node_id: runtime.input.nodeId,
-      author_user_id: runtime.currentUserId,
-    })
-    throw new TRPCError({
-      code: 'NOT_FOUND',
-      message: 'Node not found.',
-    })
-  }
-
-  return persistedUserMessage
-}
-
-const persistAssistantMessageStage = async ({
-  runtime,
-  markTurnFailedOnce,
-  assistantContent,
-  assistantMetadata,
-}: {
-  runtime: SendConversationTurnRuntime
-  markTurnFailedOnce: MarkTurnFailedOnce
-  assistantContent: string
-  assistantMetadata: RetrievalStageState['assistantMetadata']
-}) => {
-  await runtime.publishTurnEvent({
-    type: 'turn.status',
-    payload: {
-      status: 'persisting',
-      detail: 'Persisting assistant response.',
-    },
-  })
-  const assistantMessage = await createMessageForAuthorRecord({
-    nodeId: runtime.input.nodeId,
-    authorUserId: runtime.currentUserId,
-    turnId: runtime.turn.id,
-    role: 'assistant',
-    content: assistantContent,
-    ...(assistantMetadata !== undefined
-      ? { metadata: assistantMetadata }
-      : {}),
-  })
-
-  if (assistantMessage === null) {
-    await markTurnFailedOnce('Node not found.')
-    logger.warn('[chat] failed to persist assistant message because node was not found.', {
-      turn_id: runtime.turn.id,
-      node_id: runtime.input.nodeId,
-      author_user_id: runtime.currentUserId,
-    })
-    throw new TRPCError({
-      code: 'NOT_FOUND',
-      message: 'Node not found.',
-    })
-  }
-
-  return assistantMessage
-}
-
-const finalizeTurnStage = async ({
-  runtime,
-  retrievalState,
-  userMessage,
-  assistantMessage,
-}: {
-  runtime: SendConversationTurnRuntime
-  retrievalState: RetrievalStageState
-  userMessage: SendConversationTurnResult['userMessage']
-  assistantMessage: NonNullable<SendConversationTurnResult['assistantMessage']>
-}): Promise<SendConversationTurnResult> => {
-  const completedAt = new Date().toISOString()
-  const finalizedTurn = await updateConversationTurnForAuthorRecord(
-    {
-      id: runtime.turn.id,
-      status: 'completed',
-      error: null,
-      completedAt,
-      ...(retrievalState.turnMetadata !== undefined
-        ? { metadata: retrievalState.turnMetadata }
-        : {}),
-    },
-    runtime.currentUserId,
-  )
-
-  if (!finalizedTurn) {
-    logger.warn('[chat] failed to finalize conversation turn because it was not found.', {
-      turn_id: runtime.turn.id,
-      node_id: runtime.input.nodeId,
-      author_user_id: runtime.currentUserId,
-    })
-    throw new TRPCError({
-      code: 'NOT_FOUND',
-      message: 'Conversation turn not found.',
-    })
-  }
-
-  await enqueuePostprocessJobsForTurn(finalizedTurn.id, runtime.currentUserId)
-
-  await runtime.publishTurnEvent({
-    type: 'message.completed',
-    payload: {
-      messageId: assistantMessage.id,
-      content: assistantMessage.content,
-    },
-  })
-
-  logger.info('[chat] sendConversationTurn completed.', {
-    turn_id: finalizedTurn.id,
-    node_id: runtime.input.nodeId,
-    author_user_id: runtime.currentUserId,
-    status: finalizedTurn.status,
-    user_message_id: userMessage.id,
-    assistant_message_id: assistantMessage.id,
-    duration_ms: Date.now() - runtime.requestStartedAtMs,
-  })
-
-  return {
-    turnId: finalizedTurn.id,
-    status: finalizedTurn.status,
-    userMessage,
-    assistantMessage,
-    error: finalizedTurn.error,
-  }
 }
 
 const runTurnPipeline = async ({
