@@ -2,8 +2,6 @@ import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globa
 import {
   createOrGetConversationPostprocessJobForAuthor,
   createMessageForAuthor,
-  createOrGetConversationTurnForAuthor,
-  listMessagesForNodeForAuthor,
   updateConversationTurnForAuthor,
 } from '../db/index.js'
 import { buildConversationContext } from './buildConversationContext.js'
@@ -19,8 +17,6 @@ import { appendConversationTurnEvent } from '../db/queries/conversationTurnEvent
 jest.mock('../db/index.js', () => ({
   createOrGetConversationPostprocessJobForAuthor: jest.fn(),
   createMessageForAuthor: jest.fn(),
-  createOrGetConversationTurnForAuthor: jest.fn(),
-  listMessagesForNodeForAuthor: jest.fn(),
   updateConversationTurnForAuthor: jest.fn(),
 }))
 
@@ -46,13 +42,6 @@ const createOrGetConversationPostprocessJobForAuthorMock =
   >
 const createMessageForAuthorMock = createMessageForAuthor as jest.MockedFunction<
   typeof createMessageForAuthor
->
-const createOrGetConversationTurnForAuthorMock =
-  createOrGetConversationTurnForAuthor as jest.MockedFunction<
-    typeof createOrGetConversationTurnForAuthor
-  >
-const listMessagesForNodeForAuthorMock = listMessagesForNodeForAuthor as jest.MockedFunction<
-  typeof listMessagesForNodeForAuthor
 >
 const updateConversationTurnForAuthorMock = updateConversationTurnForAuthor as jest.MockedFunction<
   typeof updateConversationTurnForAuthor
@@ -81,6 +70,12 @@ const processingTurn = {
   createdAt: '2026-03-30T00:00:00.000Z',
   updatedAt: '2026-03-30T00:00:00.000Z',
 }
+
+const resolvedTurn = {
+  turn: processingTurn,
+  wasCreated: true as const,
+}
+const REQUEST_STARTED_AT_MS = Date.parse('2026-03-30T00:00:00.000Z')
 
 const completedTurn = {
   ...processingTurn,
@@ -190,10 +185,6 @@ describe('sendConversationTurn', () => {
         createdAt: new Date().toISOString(),
       }
     })
-    createOrGetConversationTurnForAuthorMock.mockResolvedValue({
-      turn: processingTurn,
-      wasCreated: true,
-    })
     createOrGetConversationPostprocessJobForAuthorMock.mockResolvedValue({
       job: queuedPostprocessJob,
       wasCreated: true,
@@ -248,6 +239,8 @@ describe('sendConversationTurn', () => {
         idempotencyKey: 'idem-1',
       },
       currentUserId: 'u1',
+      resolvedTurn,
+      requestStartedAtMs: REQUEST_STARTED_AT_MS,
     })
     unsubscribe()
     expect(buildConversationContextMock).toHaveBeenCalledWith({
@@ -381,6 +374,8 @@ describe('sendConversationTurn', () => {
       currentUserId: 'u1',
       prebuiltContext: context,
       awaitCompletion: false,
+      resolvedTurn,
+      requestStartedAtMs: REQUEST_STARTED_AT_MS,
     })
 
     expect(result).toEqual({
@@ -481,6 +476,8 @@ describe('sendConversationTurn', () => {
       },
       currentUserId: 'u1',
       prebuiltContext: context,
+      resolvedTurn,
+      requestStartedAtMs: REQUEST_STARTED_AT_MS,
     })
     unsubscribe()
 
@@ -638,6 +635,8 @@ describe('sendConversationTurn', () => {
       },
       currentUserId: 'u1',
       prebuiltContext: context,
+      resolvedTurn,
+      requestStartedAtMs: REQUEST_STARTED_AT_MS,
     })
 
     expect(generatedPrompts[0]).toMatchObject({
@@ -690,83 +689,6 @@ describe('sendConversationTurn', () => {
     expect(result.assistantMessage?.metadata).toEqual({})
   })
 
-  test('duplicate idempotency replay does not regenerate and recovers existing messages', async () => {
-    const emittedEvents: ChatTurnStreamEvent[] = []
-    const unsubscribe = turnEventBroker.subscribe({
-      turnId: processingTurn.id,
-      authorUserId: processingTurn.authorUserId,
-      onEvent: (event) => {
-        emittedEvents.push(event)
-      },
-    })
-
-    createOrGetConversationTurnForAuthorMock.mockResolvedValueOnce({
-      turn: {
-        ...completedTurn,
-        createdAt: '2026-03-30T00:00:00.000Z',
-      },
-      wasCreated: false,
-    })
-    listMessagesForNodeForAuthorMock.mockResolvedValueOnce([
-      userMessage,
-      assistantMessage,
-    ])
-
-    const result = await sendConversationTurn({
-      input: {
-        nodeId: 'n1',
-        text: 'hello',
-        model: 'gpt-5',
-        idempotencyKey: 'idem-1',
-      },
-      currentUserId: 'u1',
-      prebuiltContext: context,
-    })
-    unsubscribe()
-
-    expect(selectProviderMock).not.toHaveBeenCalled()
-    expect(createMessageForAuthorMock).not.toHaveBeenCalled()
-    expect(updateConversationTurnForAuthorMock).not.toHaveBeenCalled()
-    expect(createOrGetConversationPostprocessJobForAuthorMock).toHaveBeenCalledTimes(2)
-    expect(emittedEvents).toEqual([])
-    expect(result).toEqual({
-      turnId: 't1',
-      status: 'completed',
-      userMessage,
-      assistantMessage,
-      error: null,
-    })
-  })
-
-  test('duplicate idempotency replay without recoverable user message returns CONFLICT', async () => {
-    createOrGetConversationTurnForAuthorMock.mockResolvedValueOnce({
-      turn: completedTurn,
-      wasCreated: false,
-    })
-    listMessagesForNodeForAuthorMock.mockResolvedValueOnce([
-      {
-        ...userMessage,
-        content: 'different',
-      },
-    ])
-
-    await expect(
-      sendConversationTurn({
-        input: {
-          nodeId: 'n1',
-          text: 'hello',
-          model: 'gpt-5',
-          idempotencyKey: 'idem-1',
-        },
-        currentUserId: 'u1',
-      prebuiltContext: context,
-      }),
-    ).rejects.toMatchObject({
-      code: 'CONFLICT',
-      message: 'A turn already exists for this idempotency key.',
-    })
-  })
-
   test('provider failure marks turn failed and returns INTERNAL_SERVER_ERROR', async () => {
     const emittedEvents: ChatTurnStreamEvent[] = []
     const unsubscribe = turnEventBroker.subscribe({
@@ -793,7 +715,9 @@ describe('sendConversationTurn', () => {
           idempotencyKey: 'idem-1',
         },
         currentUserId: 'u1',
-      prebuiltContext: context,
+        prebuiltContext: context,
+        resolvedTurn,
+        requestStartedAtMs: REQUEST_STARTED_AT_MS,
       }),
     ).rejects.toMatchObject({
       code: 'INTERNAL_SERVER_ERROR',
@@ -842,7 +766,9 @@ describe('sendConversationTurn', () => {
           idempotencyKey: 'idem-1',
         },
         currentUserId: 'u1',
-      prebuiltContext: context,
+        prebuiltContext: context,
+        resolvedTurn,
+        requestStartedAtMs: REQUEST_STARTED_AT_MS,
       }),
     ).rejects.toMatchObject({
       code: 'NOT_FOUND',
@@ -866,50 +792,6 @@ describe('sendConversationTurn', () => {
       },
     })
     expect(emittedEvents.some((event) => event.type === 'message.completed')).toBe(false)
-  })
-
-  test('rejects unsupported model before creating a turn', async () => {
-    process.env.CHAT_ALLOWED_MODELS = 'gpt-5'
-
-    await expect(
-      sendConversationTurn({
-        input: {
-          nodeId: 'n1',
-          text: 'hello',
-          model: 'gpt-4o',
-          idempotencyKey: 'idem-1',
-        },
-        currentUserId: 'u1',
-      prebuiltContext: context,
-      }),
-    ).rejects.toMatchObject({
-      code: 'BAD_REQUEST',
-      message: 'Unsupported model "gpt-4o". Allowed models: gpt-5',
-    })
-
-    expect(createOrGetConversationTurnForAuthorMock).not.toHaveBeenCalled()
-  })
-
-  test('rejects gpt model when OPENAI_API_KEY is missing', async () => {
-    delete process.env.OPENAI_API_KEY
-
-    await expect(
-      sendConversationTurn({
-        input: {
-          nodeId: 'n1',
-          text: 'hello',
-          model: 'gpt-5',
-          idempotencyKey: 'idem-1',
-        },
-        currentUserId: 'u1',
-      prebuiltContext: context,
-      }),
-    ).rejects.toMatchObject({
-      code: 'PRECONDITION_FAILED',
-      message: 'OPENAI_API_KEY is required for model "gpt-5".',
-    })
-
-    expect(createOrGetConversationTurnForAuthorMock).not.toHaveBeenCalled()
   })
 
   test('enqueue postprocess failure is non-fatal to successful turn completion', async () => {
@@ -937,6 +819,8 @@ describe('sendConversationTurn', () => {
       },
       currentUserId: 'u1',
       prebuiltContext: context,
+      resolvedTurn,
+      requestStartedAtMs: REQUEST_STARTED_AT_MS,
     })
 
     expect(result.status).toBe('completed')

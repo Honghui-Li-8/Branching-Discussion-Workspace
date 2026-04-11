@@ -1,17 +1,11 @@
 import { TRPCError } from '@trpc/server'
 import {
-  createOrGetConversationPostprocessJobForAuthor as createOrGetConversationPostprocessJobForAuthorRecord,
   createMessageForAuthor as createMessageForAuthorRecord,
-  createOrGetConversationTurnForAuthor as createOrGetConversationTurnForAuthorRecord,
-  listMessagesForNodeForAuthor as listMessagesForNodeForAuthorRecord,
   updateConversationTurnForAuthor as updateConversationTurnForAuthorRecord,
 } from '../db/index.js'
-import { appendConversationTurnEvent as appendConversationTurnEventRecord } from '../db/queries/conversationTurnEvent.js'
 import {
   getRagConfig,
   isRagAllowedForTarget,
-  validateAllowedModelOrThrow,
-  validateProviderRuntimeConfigOrThrow,
 } from './config.js'
 import { buildConversationContext } from './buildConversationContext.js'
 import { buildAssistantPrompt } from './promptBuilder.js'
@@ -25,17 +19,19 @@ import {
 } from './rag/persistence.js'
 import { resolveRetriever } from './rag/retriever.js'
 import { recordRetrievalTelemetry } from './rag/telemetry.js'
-import { turnEventBroker } from './stream/broker.js'
-import {
-  createTurnStreamEvent,
-  type ChatTurnStreamEventInput,
-  TurnEventSequencer,
-} from './stream/events.js'
 import type {
   ConversationContext,
   SendConversationTurnInput,
   SendConversationTurnResult,
 } from './types.js'
+import { type ResolvedConversationTurn } from './resolveConversationTurnOrThrow.js'
+import { enqueuePostprocessJobsForTurn } from './enqueuePostprocessJobsForTurn.js'
+import { createMarkTurnFailedOnce, type MarkTurnFailedOnce } from './turnFailure.js'
+import {
+  createTurnEventPublisher,
+  type TurnEventPublisher,
+} from './turnEventPublisher.js'
+import { toDebugPreview } from './debugPreview.js'
 import { createLogger } from '../logging/logger.js'
 
 type SendConversationTurnParams = {
@@ -43,91 +39,11 @@ type SendConversationTurnParams = {
   currentUserId: string
   awaitCompletion?: boolean
   prebuiltContext?: ConversationContext
+  resolvedTurn: ResolvedConversationTurn
+  requestStartedAtMs: number
 }
 
-const POSTPROCESS_JOB_TYPES = ['summary', 'index'] as const
 const logger = createLogger('chat-turn')
-const DEBUG_TEXT_PREVIEW_MAX_CHARS = 1_200
-
-const toDebugPreview = (value: string): string =>
-  value.length <= DEBUG_TEXT_PREVIEW_MAX_CHARS
-    ? value
-    : `${value.slice(0, DEBUG_TEXT_PREVIEW_MAX_CHARS)}...`
-
-const findRecoverableUserMessage = (
-  messages: Awaited<ReturnType<typeof listMessagesForNodeForAuthorRecord>>,
-  text: string,
-  turnCreatedAt: string,
-) =>
-  messages.find(
-    (message) =>
-      message.role === 'user' &&
-      message.content === text &&
-      Date.parse(message.createdAt) >= Date.parse(turnCreatedAt),
-  ) ?? null
-
-const findRecoverableAssistantMessage = (
-  messages: Awaited<ReturnType<typeof listMessagesForNodeForAuthorRecord>>,
-  userMessageCreatedAt: string,
-) =>
-  messages.find(
-    (message) =>
-      message.role === 'assistant' &&
-      Date.parse(message.createdAt) >= Date.parse(userMessageCreatedAt),
-  ) ?? null
-
-const markTurnFailed = async (
-  turnId: string,
-  currentUserId: string,
-  errorMessage: string,
-): Promise<void> => {
-  await updateConversationTurnForAuthorRecord(
-    {
-      id: turnId,
-      status: 'failed',
-      error: errorMessage,
-    },
-    currentUserId,
-  )
-}
-
-const enqueuePostprocessJobsForTurn = async (
-  turnId: string,
-  currentUserId: string,
-): Promise<void> => {
-  for (const jobType of POSTPROCESS_JOB_TYPES) {
-    try {
-      const result = await createOrGetConversationPostprocessJobForAuthorRecord(
-        {
-          turnId,
-          jobType,
-          payload: {},
-        },
-        currentUserId,
-      )
-      if (!result) {
-        logger.warn('[postprocess] enqueue skipped because turn is not accessible.', {
-          turnId,
-          jobType,
-          currentUserId,
-          turn_id: turnId,
-          job_type: jobType,
-          author_user_id: currentUserId,
-        })
-      }
-    } catch (error) {
-      logger.warn('[postprocess] enqueue failed but response path remains successful.', {
-        turnId,
-        jobType,
-        currentUserId,
-        turn_id: turnId,
-        job_type: jobType,
-        author_user_id: currentUserId,
-        error,
-      })
-    }
-  }
-}
 
 type RetrievalStageState = {
   prompt: ReturnType<typeof buildAssistantPrompt>
@@ -138,93 +54,7 @@ type RetrievalStageState = {
   >
 }
 
-type TurnEventPublisher = (event: ChatTurnStreamEventInput) => Promise<void>
-
-const createTurnEventPublisher = (
-  turnId: string,
-  currentUserId: string,
-): TurnEventPublisher => {
-  const eventSequencer = new TurnEventSequencer(turnId)
-
-  return async (event) => {
-    const transientEvent = createTurnStreamEvent(eventSequencer, event)
-    let streamEvent = transientEvent
-
-    if (transientEvent.type === 'turn.status') {
-      logger.info('[chat-stream] turn.status event queued.', {
-        turn_id: turnId,
-        author_user_id: currentUserId,
-        seq: transientEvent.seq,
-        status: transientEvent.payload.status,
-        detail: transientEvent.payload.detail ?? null,
-      })
-    }
-
-    try {
-      const persistedEvent = await appendConversationTurnEventRecord({
-        turnId,
-        seq: transientEvent.seq,
-        eventType: transientEvent.type,
-        payload: transientEvent.payload,
-      })
-
-      if (persistedEvent) {
-        streamEvent = {
-          ...transientEvent,
-          eventId: persistedEvent.id,
-          ts: persistedEvent.createdAt,
-        }
-        if (streamEvent.type === 'turn.status') {
-          logger.info('[chat-stream] turn.status event persisted.', {
-            turn_id: turnId,
-            author_user_id: currentUserId,
-            seq: streamEvent.seq,
-            event_id: streamEvent.eventId ?? null,
-            status: streamEvent.payload.status,
-            detail: streamEvent.payload.detail ?? null,
-          })
-        }
-      }
-    } catch (error) {
-      logger.warn('[chat-stream] Failed to persist turn stream event.', {
-        turn_id: turnId,
-        author_user_id: currentUserId,
-        seq: transientEvent.seq,
-        event_type: transientEvent.type,
-        error,
-      })
-    }
-
-    try {
-      turnEventBroker.publish({
-        turnId,
-        authorUserId: currentUserId,
-        event: streamEvent,
-      })
-      if (streamEvent.type === 'turn.status') {
-        logger.info('[chat-stream] turn.status event published to broker.', {
-          turn_id: turnId,
-          author_user_id: currentUserId,
-          seq: streamEvent.seq,
-          event_id: streamEvent.eventId ?? null,
-          status: streamEvent.payload.status,
-          detail: streamEvent.payload.detail ?? null,
-        })
-      }
-    } catch (error) {
-      logger.warn('[chat-stream] Failed to publish turn event.', {
-        turn_id: turnId,
-        author_user_id: currentUserId,
-        event_type: streamEvent.type,
-        error,
-      })
-    }
-  }
-}
-
-type ActiveConversationTurn = NonNullable<
-  Awaited<ReturnType<typeof createOrGetConversationTurnForAuthorRecord>>
->['turn']
+type ActiveConversationTurn = ResolvedConversationTurn['turn']
 
 type SendConversationTurnRuntime = {
   input: SendConversationTurnInput
@@ -235,7 +65,6 @@ type SendConversationTurnRuntime = {
   publishTurnEvent: TurnEventPublisher
 }
 
-type MarkTurnFailedOnce = (errorMessage: string) => Promise<void>
 type TurnFailureHandler = (failedStage: string, error: unknown) => Promise<never>
 
 type ContextPreparationStageResult = {
@@ -244,24 +73,6 @@ type ContextPreparationStageResult = {
   ragConfig: ReturnType<typeof getRagConfig>
   ragAllowed: boolean
   contextPreparationStartedAtMs: number
-}
-
-const createMarkTurnFailedOnce = ({
-  turnId,
-  currentUserId,
-}: {
-  turnId: string
-  currentUserId: string
-}): MarkTurnFailedOnce => {
-  let hasMarkedTurnFailed = false
-
-  return async (errorMessage: string): Promise<void> => {
-    if (hasMarkedTurnFailed) {
-      return
-    }
-    hasMarkedTurnFailed = true
-    await markTurnFailed(turnId, currentUserId, errorMessage)
-  }
 }
 
 const handleTurnFailure = async ({
@@ -910,105 +721,10 @@ export const sendConversationTurn = async ({
   currentUserId,
   awaitCompletion = true,
   prebuiltContext,
+  resolvedTurn,
+  requestStartedAtMs,
 }: SendConversationTurnParams): Promise<SendConversationTurnResult> => {
-  const requestStartedAtMs = Date.now()
-  logger.info('[chat] sendConversationTurn started.', {
-    node_id: input.nodeId,
-    author_user_id: currentUserId,
-    model: input.model,
-    idempotency_key: input.idempotencyKey,
-    text_length: input.text.length,
-  })
-  logger.debug('[chat] sendConversationTurn user input.', {
-    node_id: input.nodeId,
-    author_user_id: currentUserId,
-    model: input.model,
-    idempotency_key: input.idempotencyKey,
-    text: toDebugPreview(input.text),
-  })
-
-  validateAllowedModelOrThrow(input.model)
-  validateProviderRuntimeConfigOrThrow(input.model)
-
-  const turnResult = await createOrGetConversationTurnForAuthorRecord({
-    nodeId: input.nodeId,
-    authorUserId: currentUserId,
-    model: input.model,
-    idempotencyKey: input.idempotencyKey,
-    status: 'processing',
-  })
-
-  if (!turnResult) {
-    logger.warn('[chat] sendConversationTurn could not resolve node while creating turn.', {
-      node_id: input.nodeId,
-      author_user_id: currentUserId,
-      model: input.model,
-      idempotency_key: input.idempotencyKey,
-    })
-    throw new TRPCError({
-      code: 'NOT_FOUND',
-      message: 'Node not found.',
-    })
-  }
-
-  logger.info('[chat] conversation turn resolved.', {
-    turn_id: turnResult.turn.id,
-    node_id: input.nodeId,
-    author_user_id: currentUserId,
-    status: turnResult.turn.status,
-    was_created: turnResult.wasCreated,
-  })
-
-  if (!turnResult.wasCreated) {
-    const existingNodeMessages = await listMessagesForNodeForAuthorRecord(
-      input.nodeId,
-      currentUserId,
-    )
-    const existingUserMessage = findRecoverableUserMessage(
-      existingNodeMessages,
-      input.text,
-      turnResult.turn.createdAt,
-    )
-
-    if (!existingUserMessage) {
-      logger.warn('[chat] idempotency recovery failed due to missing user message.', {
-        turn_id: turnResult.turn.id,
-        node_id: input.nodeId,
-        author_user_id: currentUserId,
-        idempotency_key: input.idempotencyKey,
-      })
-      throw new TRPCError({
-        code: 'CONFLICT',
-        message: 'A turn already exists for this idempotency key.',
-      })
-    }
-    const existingAssistantMessage = findRecoverableAssistantMessage(
-      existingNodeMessages,
-      existingUserMessage.createdAt,
-    )
-    if (existingAssistantMessage) {
-      await enqueuePostprocessJobsForTurn(turnResult.turn.id, currentUserId)
-    }
-
-    logger.info('[chat] idempotent turn replay completed.', {
-      turn_id: turnResult.turn.id,
-      node_id: input.nodeId,
-      author_user_id: currentUserId,
-      has_assistant_message: Boolean(existingAssistantMessage),
-      status: turnResult.turn.status,
-      duration_ms: Date.now() - requestStartedAtMs,
-    })
-
-    return {
-      turnId: turnResult.turn.id,
-      status: turnResult.turn.status,
-      userMessage: existingUserMessage,
-      assistantMessage: existingAssistantMessage,
-      error: turnResult.turn.error,
-    }
-  }
-
-  const publishTurnEvent = createTurnEventPublisher(turnResult.turn.id, currentUserId)
+  const publishTurnEvent = createTurnEventPublisher(resolvedTurn.turn.id, currentUserId)
 
   await publishTurnEvent({
     type: 'turn.started',
@@ -1028,7 +744,7 @@ export const sendConversationTurn = async ({
     input,
     currentUserId,
     prebuiltContext,
-    turn: turnResult.turn,
+    turn: resolvedTurn.turn,
     requestStartedAtMs,
     publishTurnEvent,
   }
