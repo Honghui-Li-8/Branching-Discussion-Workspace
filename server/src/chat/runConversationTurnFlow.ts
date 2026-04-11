@@ -1,7 +1,6 @@
 import type { SendConversationTurnInput, SendConversationTurnResult } from './types.js'
 import { sendConversationTurn } from './sendConversationTurn.js'
 import { scheduleInputClassifier } from './flow/inputClassifier.js'
-import { dispatchConversationContextBuild } from './flow/contextDispatch.js'
 import { createLogger } from '../logging/logger.js'
 
 type RunConversationTurnFlowParams = {
@@ -44,41 +43,17 @@ export const runConversationTurnFlow = async ({
       })
     })
 
-  // 2) Context builder
-  // 2-1) Pre-build
-  let prebuiltContext: Awaited<ReturnType<typeof dispatchConversationContextBuild>> | undefined
-  try {
-    prebuiltContext = await dispatchConversationContextBuild({
-      nodeId: input.nodeId,
-      currentUserId,
-      userInput: input.text,
-    })
-    logger.info('[chat-flow] context prebuild completed.', {
-      ...flowContext,
-      workspace_id: prebuiltContext.node.workspaceId,
-      recent_message_count: prebuiltContext.recentMessages.length,
-      has_memory_placeholder: Boolean(prebuiltContext.memoryPlaceholder),
-    })
-  } catch (error) {
-    logger.warn('[chat-flow] context prebuild failed; falling back to in-turn context build.', {
-      ...flowContext,
-      error,
-    })
-  }
-
-  // Response Generation & Stream
+  // 2) Response Generation & Stream
   const result = await sendConversationTurn({
     input,
     currentUserId,
     awaitCompletion,
-    prebuiltContext,
   })
 
   logger.info('[chat-flow] runConversationTurnFlow completed.', {
     ...flowContext,
     turn_id: result.turnId,
     status: result.status,
-    used_prebuilt_context: Boolean(prebuiltContext),
   })
 
   return result

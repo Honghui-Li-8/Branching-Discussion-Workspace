@@ -248,14 +248,11 @@ describe('sendConversationTurn', () => {
         idempotencyKey: 'idem-1',
       },
       currentUserId: 'u1',
-        prebuiltContext: context,
     })
     unsubscribe()
-
     expect(buildConversationContextMock).toHaveBeenCalledWith({
       nodeId: 'n1',
       currentUserId: 'u1',
-        prebuiltContext: context,
       userInput: 'hello',
       currentTurnId: 't1',
     })
@@ -676,7 +673,6 @@ describe('sendConversationTurn', () => {
         turnId: 't1',
         nodeId: 'n1',
         currentUserId: 'u1',
-      prebuiltContext: context,
       }),
     )
     expect(ragMetrics.snapshot().counters['rag.retrieval_fallbacks_total{reason=retrieval_failed,retriever=vector_v1}']).toBe(1)
@@ -724,11 +720,10 @@ describe('sendConversationTurn', () => {
         idempotencyKey: 'idem-1',
       },
       currentUserId: 'u1',
-        prebuiltContext: context,
+      prebuiltContext: context,
     })
     unsubscribe()
 
-    expect(buildConversationContextMock).not.toHaveBeenCalled()
     expect(selectProviderMock).not.toHaveBeenCalled()
     expect(createMessageForAuthorMock).not.toHaveBeenCalled()
     expect(updateConversationTurnForAuthorMock).not.toHaveBeenCalled()
@@ -953,7 +948,6 @@ describe('sendConversationTurn', () => {
         turnId: 't1',
         jobType: 'summary',
         currentUserId: 'u1',
-      prebuiltContext: context,
       }),
     )
   })
