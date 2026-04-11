@@ -248,12 +248,14 @@ describe('sendConversationTurn', () => {
         idempotencyKey: 'idem-1',
       },
       currentUserId: 'u1',
+        prebuiltContext: context,
     })
     unsubscribe()
 
     expect(buildConversationContextMock).toHaveBeenCalledWith({
       nodeId: 'n1',
       currentUserId: 'u1',
+        prebuiltContext: context,
       userInput: 'hello',
       currentTurnId: 't1',
     })
@@ -380,6 +382,7 @@ describe('sendConversationTurn', () => {
         idempotencyKey: 'idem-1',
       },
       currentUserId: 'u1',
+      prebuiltContext: context,
       awaitCompletion: false,
     })
 
@@ -480,6 +483,7 @@ describe('sendConversationTurn', () => {
         idempotencyKey: 'idem-1',
       },
       currentUserId: 'u1',
+      prebuiltContext: context,
     })
     unsubscribe()
 
@@ -636,6 +640,7 @@ describe('sendConversationTurn', () => {
         idempotencyKey: 'idem-1',
       },
       currentUserId: 'u1',
+      prebuiltContext: context,
     })
 
     expect(generatedPrompts[0]).toMatchObject({
@@ -671,6 +676,7 @@ describe('sendConversationTurn', () => {
         turnId: 't1',
         nodeId: 'n1',
         currentUserId: 'u1',
+      prebuiltContext: context,
       }),
     )
     expect(ragMetrics.snapshot().counters['rag.retrieval_fallbacks_total{reason=retrieval_failed,retriever=vector_v1}']).toBe(1)
@@ -718,6 +724,7 @@ describe('sendConversationTurn', () => {
         idempotencyKey: 'idem-1',
       },
       currentUserId: 'u1',
+        prebuiltContext: context,
     })
     unsubscribe()
 
@@ -757,6 +764,7 @@ describe('sendConversationTurn', () => {
           idempotencyKey: 'idem-1',
         },
         currentUserId: 'u1',
+      prebuiltContext: context,
       }),
     ).rejects.toMatchObject({
       code: 'CONFLICT',
@@ -790,6 +798,7 @@ describe('sendConversationTurn', () => {
           idempotencyKey: 'idem-1',
         },
         currentUserId: 'u1',
+      prebuiltContext: context,
       }),
     ).rejects.toMatchObject({
       code: 'INTERNAL_SERVER_ERROR',
@@ -838,6 +847,7 @@ describe('sendConversationTurn', () => {
           idempotencyKey: 'idem-1',
         },
         currentUserId: 'u1',
+      prebuiltContext: context,
       }),
     ).rejects.toMatchObject({
       code: 'NOT_FOUND',
@@ -875,6 +885,7 @@ describe('sendConversationTurn', () => {
           idempotencyKey: 'idem-1',
         },
         currentUserId: 'u1',
+      prebuiltContext: context,
       }),
     ).rejects.toMatchObject({
       code: 'BAD_REQUEST',
@@ -896,6 +907,7 @@ describe('sendConversationTurn', () => {
           idempotencyKey: 'idem-1',
         },
         currentUserId: 'u1',
+      prebuiltContext: context,
       }),
     ).rejects.toMatchObject({
       code: 'PRECONDITION_FAILED',
@@ -929,6 +941,7 @@ describe('sendConversationTurn', () => {
         idempotencyKey: 'idem-1',
       },
       currentUserId: 'u1',
+      prebuiltContext: context,
     })
 
     expect(result.status).toBe('completed')
@@ -940,6 +953,7 @@ describe('sendConversationTurn', () => {
         turnId: 't1',
         jobType: 'summary',
         currentUserId: 'u1',
+      prebuiltContext: context,
       }),
     )
   })

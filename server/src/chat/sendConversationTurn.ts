@@ -32,6 +32,7 @@ import {
   TurnEventSequencer,
 } from './stream/events.js'
 import type {
+  ConversationContext,
   SendConversationTurnInput,
   SendConversationTurnResult,
 } from './types.js'
@@ -41,6 +42,7 @@ type SendConversationTurnParams = {
   input: SendConversationTurnInput
   currentUserId: string
   awaitCompletion?: boolean
+  prebuiltContext?: ConversationContext
 }
 
 const POSTPROCESS_JOB_TYPES = ['summary', 'index'] as const
@@ -224,6 +226,7 @@ export const sendConversationTurn = async ({
   input,
   currentUserId,
   awaitCompletion = true,
+  prebuiltContext,
 }: SendConversationTurnParams): Promise<SendConversationTurnResult> => {
   const requestStartedAtMs = Date.now()
   let stage = 'validating'
@@ -414,17 +417,26 @@ export const sendConversationTurn = async ({
         current_turn_id: turnResult.turn.id,
       })
 
-      logger.info('[chat] context preparation step: loading node and recent message history.', {
-        turn_id: turnResult.turn.id,
-        node_id: input.nodeId,
-        author_user_id: currentUserId,
-      })
-      const context = await buildConversationContext({
-        nodeId: input.nodeId,
-        currentUserId,
-        userInput: input.text,
-        currentTurnId: turnResult.turn.id,
-      })
+      const context = prebuiltContext
+        ?? await buildConversationContext({
+          nodeId: input.nodeId,
+          currentUserId,
+          userInput: input.text,
+          currentTurnId: turnResult.turn.id,
+        })
+      if (prebuiltContext) {
+        logger.info('[chat] context preparation step: using prebuilt context from flow orchestrator.', {
+          turn_id: turnResult.turn.id,
+          node_id: input.nodeId,
+          author_user_id: currentUserId,
+        })
+      } else {
+        logger.info('[chat] context preparation step: loading node and recent message history.', {
+          turn_id: turnResult.turn.id,
+          node_id: input.nodeId,
+          author_user_id: currentUserId,
+        })
+      }
       if (context.memoryPlaceholder) {
         logger.warn('[chat] older conversation context would use a placeholder summary path.', {
           turn_id: turnResult.turn.id,
