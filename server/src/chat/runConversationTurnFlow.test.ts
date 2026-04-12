@@ -1,75 +1,63 @@
 import { beforeEach, describe, expect, jest, test } from '@jest/globals'
+import { runConversationTurnFlow } from './runConversationTurnFlow.js'
 import {
-  validateAllowedModelOrThrow,
-  validateProviderRuntimeConfigOrThrow,
-} from './config.js'
-import { resolveConversationTurnOrThrow } from './resolveConversationTurnOrThrow.js'
-import { recoverIdempotentConversationTurnReplay } from './recoverIdempotentConversationTurnReplay.js'
-import { enqueuePostprocessJobsForTurn } from './enqueuePostprocessJobsForTurn.js'
-import { sendConversationTurn } from './sendConversationTurn.js'
-import { runConversationTurnFlow } from './runConversationTurnFlow'
-import { scheduleInputClassifier } from './flow/inputClassifier.js'
+  buildConversationTurnFlowContext,
+  runTurnFlowPreflight,
+  scheduleInputClassificationTask,
+} from './turnFlowPreflight.js'
+import { buildTurnFlowRuntime } from './turnFlowRuntime.js'
+import {
+  persistUserMessageOrHandleFailure,
+  runTurnPipeline,
+} from './turnExecutionPipeline.js'
 
-jest.mock('./config.js', () => ({
-  validateAllowedModelOrThrow: jest.fn(),
-  validateProviderRuntimeConfigOrThrow: jest.fn(),
+jest.mock('./turnFlowPreflight.js', () => ({
+  buildConversationTurnFlowContext: jest.fn(),
+  runTurnFlowPreflight: jest.fn(),
+  scheduleInputClassificationTask: jest.fn(),
 }))
-jest.mock('./resolveConversationTurnOrThrow.js', () => ({
-  resolveConversationTurnOrThrow: jest.fn(),
+jest.mock('./turnFlowRuntime.js', () => ({
+  buildTurnFlowRuntime: jest.fn(),
 }))
-jest.mock('./recoverIdempotentConversationTurnReplay.js', () => ({
-  recoverIdempotentConversationTurnReplay: jest.fn(),
-}))
-jest.mock('./enqueuePostprocessJobsForTurn.js', () => ({
-  enqueuePostprocessJobsForTurn: jest.fn(),
-}))
-jest.mock('./sendConversationTurn.js', () => ({
-  sendConversationTurn: jest.fn(),
-}))
-jest.mock('./flow/inputClassifier.js', () => ({
-  scheduleInputClassifier: jest.fn(),
+jest.mock('./turnExecutionPipeline.js', () => ({
+  persistUserMessageOrHandleFailure: jest.fn(),
+  runTurnPipeline: jest.fn(),
 }))
 
-const validateAllowedModelOrThrowMock = validateAllowedModelOrThrow as jest.MockedFunction<
-  typeof validateAllowedModelOrThrow
->
-const validateProviderRuntimeConfigOrThrowMock =
-  validateProviderRuntimeConfigOrThrow as jest.MockedFunction<
-    typeof validateProviderRuntimeConfigOrThrow
+const buildConversationTurnFlowContextMock =
+  buildConversationTurnFlowContext as jest.MockedFunction<
+    typeof buildConversationTurnFlowContext
   >
-const resolveConversationTurnOrThrowMock = resolveConversationTurnOrThrow as jest.MockedFunction<
-  typeof resolveConversationTurnOrThrow
+const runTurnFlowPreflightMock = runTurnFlowPreflight as jest.MockedFunction<
+  typeof runTurnFlowPreflight
 >
-const recoverIdempotentConversationTurnReplayMock =
-  recoverIdempotentConversationTurnReplay as jest.MockedFunction<
-    typeof recoverIdempotentConversationTurnReplay
+const scheduleInputClassificationTaskMock =
+  scheduleInputClassificationTask as jest.MockedFunction<
+    typeof scheduleInputClassificationTask
   >
-const enqueuePostprocessJobsForTurnMock =
-  enqueuePostprocessJobsForTurn as jest.MockedFunction<
-    typeof enqueuePostprocessJobsForTurn
-  >
-const sendConversationTurnMock = sendConversationTurn as jest.MockedFunction<
-  typeof sendConversationTurn
+const buildTurnFlowRuntimeMock = buildTurnFlowRuntime as jest.MockedFunction<
+  typeof buildTurnFlowRuntime
 >
-const scheduleInputClassifierMock = scheduleInputClassifier as jest.MockedFunction<
-  typeof scheduleInputClassifier
+const persistUserMessageOrHandleFailureMock =
+  persistUserMessageOrHandleFailure as jest.MockedFunction<
+    typeof persistUserMessageOrHandleFailure
+  >
+const runTurnPipelineMock = runTurnPipeline as jest.MockedFunction<
+  typeof runTurnPipeline
 >
 
-const flowResult = {
-  turnId: 'turn-1',
-  status: 'processing' as const,
-  userMessage: {
-    id: 'message-1',
-    nodeId: 'node-1',
-    turnId: null,
-    authorUserId: 'user-1',
-    role: 'user' as const,
-    content: 'hello',
-    metadata: {},
-    createdAt: '2026-04-10T00:00:00.000Z',
-  },
-  assistantMessage: null,
-  error: null,
+const input = {
+  nodeId: 'node-1',
+  text: 'hello',
+  model: 'gpt-5',
+  idempotencyKey: 'idem-1',
+}
+
+const flowContext = {
+  node_id: 'node-1',
+  author_user_id: 'user-1',
+  model: 'gpt-5',
+  idempotency_key: 'idem-1',
 }
 
 const resolvedTurnResult = {
@@ -86,110 +74,161 @@ const resolvedTurnResult = {
     createdAt: '2026-04-10T00:00:00.000Z',
     updatedAt: '2026-04-10T00:00:00.000Z',
   },
-  wasCreated: true,
+  wasCreated: true as const,
 }
+
+const userMessage = {
+  id: 'm-user',
+  nodeId: 'node-1',
+  turnId: 'turn-1',
+  authorUserId: 'user-1',
+  role: 'user' as const,
+  content: 'hello',
+  metadata: {},
+  createdAt: '2026-04-10T00:00:00.000Z',
+}
+
+const completedResult = {
+  turnId: 'turn-1',
+  status: 'completed' as const,
+  userMessage,
+  assistantMessage: {
+    id: 'm-assistant',
+    nodeId: 'node-1',
+    turnId: 'turn-1',
+    authorUserId: 'user-1',
+    role: 'assistant' as const,
+    content: 'assistant reply',
+    metadata: {},
+    createdAt: '2026-04-10T00:00:01.000Z',
+  },
+  error: null,
+}
+
+const runtime = {
+  input,
+  currentUserId: 'user-1',
+  turn: resolvedTurnResult.turn,
+  requestStartedAtMs: 1,
+  publishTurnEvent: jest.fn(),
+}
+
+const markTurnFailedOnce = jest.fn(async () => undefined)
+const handleFailure = jest.fn(async () => {
+  throw new Error('handled')
+})
 
 describe('runConversationTurnFlow', () => {
   beforeEach(() => {
-    validateAllowedModelOrThrowMock.mockReset()
-    validateProviderRuntimeConfigOrThrowMock.mockReset()
-    resolveConversationTurnOrThrowMock.mockReset()
-    recoverIdempotentConversationTurnReplayMock.mockReset()
-    enqueuePostprocessJobsForTurnMock.mockReset()
-    sendConversationTurnMock.mockReset()
-    sendConversationTurnMock.mockResolvedValue(flowResult)
-    scheduleInputClassifierMock.mockReset()
-    scheduleInputClassifierMock.mockResolvedValue({
-      intent: 'follow_up_discussion',
-      confidence: 0.6,
-      matchedSignals: [],
-      classifiedAt: '2026-04-10T00:00:00.000Z',
-    })
-    resolveConversationTurnOrThrowMock.mockResolvedValue(resolvedTurnResult)
-    recoverIdempotentConversationTurnReplayMock.mockResolvedValue(null)
-  })
+    jest.clearAllMocks()
 
-  test('delegates params to sendConversationTurn and defaults awaitCompletion to false', async () => {
-    const input = {
-      nodeId: 'node-1',
-      text: 'hello',
-      model: 'gpt-5' as const,
-      idempotencyKey: 'idem-1',
-    }
-
-    const result = await runConversationTurnFlow({
-      input,
-      currentUserId: 'user-1',
-    })
-
-    expect(sendConversationTurnMock).toHaveBeenCalledWith({
-      input,
-      currentUserId: 'user-1',
-      awaitCompletion: false,
-      resolvedTurn: resolvedTurnResult,
-      requestStartedAtMs: expect.any(Number),
-    })
-    expect(validateAllowedModelOrThrowMock).toHaveBeenCalledWith('gpt-5')
-    expect(validateProviderRuntimeConfigOrThrowMock).toHaveBeenCalledWith('gpt-5')
-    expect(resolveConversationTurnOrThrowMock).toHaveBeenCalledWith({
-      input,
-      currentUserId: 'user-1',
-    })
-    expect(recoverIdempotentConversationTurnReplayMock).toHaveBeenCalledWith({
-      input,
-      currentUserId: 'user-1',
+    buildConversationTurnFlowContextMock.mockReturnValue(flowContext)
+    runTurnFlowPreflightMock.mockResolvedValue({
       resolvedTurnResult,
-      requestStartedAtMs: expect.any(Number),
-      enqueuePostprocessJobsForTurn: enqueuePostprocessJobsForTurnMock,
-    })
-    expect(scheduleInputClassifierMock).toHaveBeenCalledWith({
-      input,
-    })
-    expect(result).toBe(flowResult)
+      replayResult: null,
+    } as any)
+    buildTurnFlowRuntimeMock.mockResolvedValue({
+      runtime,
+      markTurnFailedOnce,
+      handleFailure,
+    } as any)
+    persistUserMessageOrHandleFailureMock.mockResolvedValue(userMessage as any)
+    runTurnPipelineMock.mockResolvedValue(completedResult as any)
   })
 
-  test('passes explicit awaitCompletion to sendConversationTurn', async () => {
-    const input = {
-      nodeId: 'node-1',
-      text: 'hello',
-      model: 'gpt-5' as const,
-      idempotencyKey: 'idem-2',
-    }
-
-    await runConversationTurnFlow({
-      input,
-      currentUserId: 'user-1',
-      awaitCompletion: true,
-    })
-
-    expect(sendConversationTurnMock).toHaveBeenCalledWith({
-      input,
-      currentUserId: 'user-1',
-      awaitCompletion: true,
-      resolvedTurn: resolvedTurnResult,
-      requestStartedAtMs: expect.any(Number),
-    })
-  })
-
-  test('returns replay result without calling sendConversationTurn', async () => {
+  test('returns replay result and skips runtime/pipeline when preflight resolves replay', async () => {
     const replayResult = {
-      ...flowResult,
-      status: 'completed' as const,
+      ...completedResult,
+      status: 'processing' as const,
+      assistantMessage: null,
     }
-    recoverIdempotentConversationTurnReplayMock.mockResolvedValueOnce(replayResult)
-    const input = {
-      nodeId: 'node-1',
-      text: 'hello',
-      model: 'gpt-5' as const,
-      idempotencyKey: 'idem-3',
-    }
+    runTurnFlowPreflightMock.mockResolvedValueOnce({
+      resolvedTurnResult,
+      replayResult,
+    } as any)
 
     const result = await runConversationTurnFlow({
       input,
       currentUserId: 'user-1',
     })
 
-    expect(sendConversationTurnMock).not.toHaveBeenCalled()
+    expect(buildConversationTurnFlowContextMock).toHaveBeenCalledWith({
+      input,
+      currentUserId: 'user-1',
+    })
+    expect(runTurnFlowPreflightMock).toHaveBeenCalledWith({
+      input,
+      currentUserId: 'user-1',
+      requestStartedAtMs: expect.any(Number),
+    })
+    expect(scheduleInputClassificationTaskMock).not.toHaveBeenCalled()
+    expect(buildTurnFlowRuntimeMock).not.toHaveBeenCalled()
     expect(result).toEqual(replayResult)
+  })
+
+  test('returns processing by default and runs pipeline in background', async () => {
+    let releasePipeline = () => {}
+    const pipelineGate = new Promise<void>((resolve) => {
+      releasePipeline = resolve
+    })
+    runTurnPipelineMock.mockImplementationOnce(async () => {
+      await pipelineGate
+      return completedResult as any
+    })
+
+    const result = await runConversationTurnFlow({
+      input,
+      currentUserId: 'user-1',
+    })
+
+    expect(scheduleInputClassificationTaskMock).toHaveBeenCalledWith({
+      input,
+      flowContext,
+    })
+    expect(buildTurnFlowRuntimeMock).toHaveBeenCalledWith({
+      input,
+      currentUserId: 'user-1',
+      resolvedTurn: resolvedTurnResult,
+      requestStartedAtMs: expect.any(Number),
+    })
+    expect(persistUserMessageOrHandleFailureMock).toHaveBeenCalledWith({
+      runtime,
+      markTurnFailedOnce,
+      handleFailure,
+    })
+    expect(runTurnPipelineMock).toHaveBeenCalledWith({
+      runtime,
+      userMessage,
+      markTurnFailedOnce,
+      handleFailure,
+    })
+    expect(result).toEqual({
+      turnId: 'turn-1',
+      status: 'processing',
+      userMessage,
+      assistantMessage: null,
+      error: null,
+    })
+
+    releasePipeline()
+    await new Promise<void>((resolve) => {
+      setImmediate(resolve)
+    })
+  })
+
+  test('returns pipeline result when awaitCompletion is true', async () => {
+    const result = await runConversationTurnFlow({
+      input,
+      currentUserId: 'user-1',
+      awaitCompletion: true,
+    })
+
+    expect(runTurnPipelineMock).toHaveBeenCalledWith({
+      runtime,
+      userMessage,
+      markTurnFailedOnce,
+      handleFailure,
+    })
+    expect(result).toEqual(completedResult)
   })
 })

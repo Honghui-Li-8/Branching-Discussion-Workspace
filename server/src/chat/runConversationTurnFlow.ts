@@ -1,94 +1,135 @@
-import type {
-  SendConversationTurnInput,
-  SendConversationTurnResult,
-} from "./types.js";
-import { sendConversationTurn } from "./sendConversationTurn.js";
-import { scheduleInputClassifier } from "./flow/inputClassifier.js";
-import { createLogger } from "../logging/logger.js";
+import type { SendConversationTurnInput, SendConversationTurnResult } from './types.js'
+import { createLogger } from '../logging/logger.js'
 import {
-  validateAllowedModelOrThrow,
-  validateProviderRuntimeConfigOrThrow,
-} from "./config.js";
-import { resolveConversationTurnOrThrow } from "./resolveConversationTurnOrThrow.js";
-import { recoverIdempotentConversationTurnReplay } from "./recoverIdempotentConversationTurnReplay.js";
-import { enqueuePostprocessJobsForTurn } from "./enqueuePostprocessJobsForTurn.js";
+  type ConversationTurnFlowContext,
+  buildConversationTurnFlowContext,
+  runTurnFlowPreflight,
+  scheduleInputClassificationTask,
+} from './turnFlowPreflight.js'
+import { buildTurnFlowRuntime } from './turnFlowRuntime.js'
+import {
+  persistUserMessageOrHandleFailure,
+  runTurnPipeline,
+} from './turnExecutionPipeline.js'
 
 type RunConversationTurnFlowParams = {
-  input: SendConversationTurnInput;
-  currentUserId: string;
-  awaitCompletion?: boolean;
-};
+  input: SendConversationTurnInput
+  currentUserId: string
+  awaitCompletion?: boolean
+}
 
-const logger = createLogger("chat-turn-flow");
+const logger = createLogger('chat-turn-flow')
+
+type TurnPipelineParams = Parameters<typeof runTurnPipeline>[0]
+
+const runTurnPipelineInBackground = ({
+  pipelineParams,
+  flowContext,
+}: {
+  pipelineParams: TurnPipelineParams
+  flowContext: ConversationTurnFlowContext
+}): void => {
+  void runTurnPipeline(pipelineParams).catch((error) => {
+    logger.debug('[chat-flow] background turn pipeline finished with handled error.', {
+      ...flowContext,
+      turn_id: pipelineParams.runtime.turn.id,
+      error,
+    })
+  })
+}
+
+const buildProcessingResult = ({
+  runtime,
+  userMessage,
+}: {
+  runtime: TurnPipelineParams['runtime']
+  userMessage: SendConversationTurnResult['userMessage']
+}): SendConversationTurnResult => ({
+  turnId: runtime.turn.id,
+  status: runtime.turn.status,
+  userMessage,
+  assistantMessage: null,
+  error: null,
+})
 
 export const runConversationTurnFlow = async ({
   input,
   currentUserId,
   awaitCompletion = false,
 }: RunConversationTurnFlowParams): Promise<SendConversationTurnResult> => {
-  const requestStartedAtMs = Date.now();
-  const flowContext = {
-    node_id: input.nodeId,
-    author_user_id: currentUserId,
-    model: input.model,
-    idempotency_key: input.idempotencyKey,
-  };
+  const requestStartedAtMs = Date.now()
+  const flowContext = buildConversationTurnFlowContext({
+    input,
+    currentUserId,
+  })
 
-  logger.info("[chat-flow] runConversationTurnFlow started.", flowContext);
+  logger.info('[chat-flow] runConversationTurnFlow started.', flowContext)
 
   // #region: Validation and Idempotent Replay
-  validateAllowedModelOrThrow(input.model);
-  validateProviderRuntimeConfigOrThrow(input.model);
-  const resolvedTurnResult = await resolveConversationTurnOrThrow({
+  const { resolvedTurnResult, replayResult } = await runTurnFlowPreflight({
     input,
     currentUserId,
-  });
-  const replayResult = await recoverIdempotentConversationTurnReplay({
-    input,
-    currentUserId,
-    resolvedTurnResult,
     requestStartedAtMs,
-    enqueuePostprocessJobsForTurn,
-  });
+  })
   if (replayResult) {
-    return replayResult;
+    return replayResult
   }
   // #endregion
 
   // #region: 1) Input Classify (async) @todo, extra for identify explicit summary update request
   //    - Kick off classifier in parallel with generation path.
-  const inputClassificationTask = scheduleInputClassifier({ input });
-  void inputClassificationTask
-    .then((classification) => {
-      logger.debug("[chat-flow] input classifier completed.", {
-        ...flowContext,
-        intent: classification.intent,
-        confidence: classification.confidence,
-        matched_signals: classification.matchedSignals,
-      });
-    })
-    .catch((error) => {
-      logger.warn("[chat-flow] input classifier failed.", {
-        ...flowContext,
-        error,
-      });
-    });
+  scheduleInputClassificationTask({
+    input,
+    flowContext,
+  })
   // #endregion
 
-  // generation flow
-  const result = await sendConversationTurn({
+  const {
+    runtime,
+    markTurnFailedOnce,
+    handleFailure,
+  } = await buildTurnFlowRuntime({
     input,
     currentUserId,
-    awaitCompletion,
     resolvedTurn: resolvedTurnResult,
     requestStartedAtMs,
-  });
+  })
 
-  logger.info("[chat-flow] runConversationTurnFlow completed.", {
+  const userMessage = await persistUserMessageOrHandleFailure({
+    runtime,
+    markTurnFailedOnce,
+    handleFailure,
+  })
+  const turnPipelineParams: TurnPipelineParams = {
+    runtime,
+    userMessage,
+    markTurnFailedOnce,
+    handleFailure,
+  }
+
+  if (!awaitCompletion) {
+    runTurnPipelineInBackground({
+      pipelineParams: turnPipelineParams,
+      flowContext,
+    })
+    const result = buildProcessingResult({
+      runtime,
+      userMessage,
+    })
+    logger.info('[chat-flow] runConversationTurnFlow completed.', {
+      ...flowContext,
+      turn_id: result.turnId,
+      status: result.status,
+    })
+    return result
+  }
+
+  const result = await runTurnPipeline(turnPipelineParams)
+
+  logger.info('[chat-flow] runConversationTurnFlow completed.', {
     ...flowContext,
     turn_id: result.turnId,
     status: result.status,
-  });
-
-  return result;
-};
+  })
+  return result
+}
