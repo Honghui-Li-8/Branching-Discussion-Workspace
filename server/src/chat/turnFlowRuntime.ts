@@ -5,7 +5,7 @@ import type { ResolvedConversationTurn } from './resolveConversationTurnOrThrow.
 import type { TurnGenerationRuntime } from './generateAssistantReplyForTurn.js'
 import type { SendConversationTurnInput } from './types.js'
 
-export type ConversationTurnFlowRuntime = TurnGenerationRuntime & {
+export type TurnFlowRuntime = TurnGenerationRuntime & {
   requestStartedAtMs: number
 }
 
@@ -22,7 +22,7 @@ export const buildTurnFlowRuntime = async ({
   resolvedTurn: ResolvedConversationTurn
   requestStartedAtMs: number
 }): Promise<{
-  runtime: ConversationTurnFlowRuntime
+  runtime: TurnFlowRuntime
   markTurnFailedOnce: MarkTurnFailedOnce
   handleFailure: TurnFailureHandler
 }> => {
@@ -41,7 +41,7 @@ export const buildTurnFlowRuntime = async ({
     },
   })
 
-  const runtime: ConversationTurnFlowRuntime = {
+  const runtime: TurnFlowRuntime = {
     input,
     currentUserId,
     turn: resolvedTurn.turn,

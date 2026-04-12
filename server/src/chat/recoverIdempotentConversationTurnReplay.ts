@@ -14,7 +14,7 @@ type EnqueuePostprocessJobsForTurn = (
 type RecoverIdempotentConversationTurnReplayParams = {
   input: SendConversationTurnInput
   currentUserId: string
-  resolvedTurnResult: ResolvedConversationTurn
+  resolvedTurn: ResolvedConversationTurn
   requestStartedAtMs: number
   enqueuePostprocessJobsForTurn: EnqueuePostprocessJobsForTurn
 }
@@ -44,11 +44,11 @@ const findRecoverableAssistantMessage = (
 export const recoverIdempotentConversationTurnReplay = async ({
   input,
   currentUserId,
-  resolvedTurnResult,
+  resolvedTurn,
   requestStartedAtMs,
   enqueuePostprocessJobsForTurn,
 }: RecoverIdempotentConversationTurnReplayParams): Promise<SendConversationTurnResult | null> => {
-  if (resolvedTurnResult.wasCreated) {
+  if (resolvedTurn.wasCreated) {
     return null
   }
 
@@ -59,12 +59,12 @@ export const recoverIdempotentConversationTurnReplay = async ({
   const existingUserMessage = findRecoverableUserMessage(
     existingNodeMessages,
     input.text,
-    resolvedTurnResult.turn.createdAt,
+    resolvedTurn.turn.createdAt,
   )
 
   if (!existingUserMessage) {
     logger.warn('[chat] idempotency recovery failed due to missing user message.', {
-      turn_id: resolvedTurnResult.turn.id,
+      turn_id: resolvedTurn.turn.id,
       node_id: input.nodeId,
       author_user_id: currentUserId,
       idempotency_key: input.idempotencyKey,
@@ -80,23 +80,23 @@ export const recoverIdempotentConversationTurnReplay = async ({
     existingUserMessage.createdAt,
   )
   if (existingAssistantMessage) {
-    await enqueuePostprocessJobsForTurn(resolvedTurnResult.turn.id, currentUserId)
+    await enqueuePostprocessJobsForTurn(resolvedTurn.turn.id, currentUserId)
   }
 
   logger.info('[chat] idempotent turn replay completed.', {
-    turn_id: resolvedTurnResult.turn.id,
+    turn_id: resolvedTurn.turn.id,
     node_id: input.nodeId,
     author_user_id: currentUserId,
     has_assistant_message: Boolean(existingAssistantMessage),
-    status: resolvedTurnResult.turn.status,
+    status: resolvedTurn.turn.status,
     duration_ms: Date.now() - requestStartedAtMs,
   })
 
   return {
-    turnId: resolvedTurnResult.turn.id,
-    status: resolvedTurnResult.turn.status,
+    turnId: resolvedTurn.turn.id,
+    status: resolvedTurn.turn.status,
     userMessage: existingUserMessage,
     assistantMessage: existingAssistantMessage,
-    error: resolvedTurnResult.turn.error,
+    error: resolvedTurn.turn.error,
   }
 }

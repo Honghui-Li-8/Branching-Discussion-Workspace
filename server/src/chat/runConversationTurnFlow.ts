@@ -1,15 +1,15 @@
 import type { SendConversationTurnInput, SendConversationTurnResult } from './types.js'
 import { createLogger } from '../logging/logger.js'
 import {
-  type ConversationTurnFlowContext,
-  buildConversationTurnFlowContext,
-  runTurnFlowPreflight,
+  type TurnFlowContext,
+  buildTurnFlowContext,
+  runConversationTurnPreflight,
   scheduleInputClassificationTask,
 } from './turnFlowPreflight.js'
 import { buildTurnFlowRuntime } from './turnFlowRuntime.js'
 import {
-  persistUserMessageOrHandleFailure,
-  runTurnPipeline,
+  executeTurnPipeline,
+  persistUserMessageWithFailureHandling,
 } from './turnExecutionPipeline.js'
 
 type RunConversationTurnFlowParams = {
@@ -20,16 +20,16 @@ type RunConversationTurnFlowParams = {
 
 const logger = createLogger('chat-turn-flow')
 
-type TurnPipelineParams = Parameters<typeof runTurnPipeline>[0]
+type TurnPipelineParams = Parameters<typeof executeTurnPipeline>[0]
 
-const runTurnPipelineInBackground = ({
+const startTurnPipelineInBackground = ({
   pipelineParams,
   flowContext,
 }: {
   pipelineParams: TurnPipelineParams
-  flowContext: ConversationTurnFlowContext
+  flowContext: TurnFlowContext
 }): void => {
-  void runTurnPipeline(pipelineParams).catch((error) => {
+  void executeTurnPipeline(pipelineParams).catch((error) => {
     logger.debug('[chat-flow] background turn pipeline finished with handled error.', {
       ...flowContext,
       turn_id: pipelineParams.runtime.turn.id,
@@ -38,7 +38,7 @@ const runTurnPipelineInBackground = ({
   })
 }
 
-const buildProcessingResult = ({
+const buildProcessingTurnResult = ({
   runtime,
   userMessage,
 }: {
@@ -58,7 +58,7 @@ export const runConversationTurnFlow = async ({
   awaitCompletion = false,
 }: RunConversationTurnFlowParams): Promise<SendConversationTurnResult> => {
   const requestStartedAtMs = Date.now()
-  const flowContext = buildConversationTurnFlowContext({
+  const flowContext = buildTurnFlowContext({
     input,
     currentUserId,
   })
@@ -66,13 +66,13 @@ export const runConversationTurnFlow = async ({
   logger.info('[chat-flow] runConversationTurnFlow started.', flowContext)
 
   // #region: Validation and Idempotent Replay
-  const { resolvedTurn, replayResult } = await runTurnFlowPreflight({
+  const { resolvedTurn, idempotentReplay } = await runConversationTurnPreflight({
     input,
     currentUserId,
     requestStartedAtMs,
   })
-  if (replayResult) {
-    return replayResult
+  if (idempotentReplay) {
+    return idempotentReplay
   }
   // #endregion
 
@@ -95,7 +95,7 @@ export const runConversationTurnFlow = async ({
     requestStartedAtMs,
   })
 
-  const userMessage = await persistUserMessageOrHandleFailure({
+  const userMessage = await persistUserMessageWithFailureHandling({
     runtime,
     markTurnFailedOnce,
     handleFailure,
@@ -108,11 +108,11 @@ export const runConversationTurnFlow = async ({
   }
 
   if (!awaitCompletion) {
-    runTurnPipelineInBackground({
+    startTurnPipelineInBackground({
       pipelineParams: turnPipelineParams,
       flowContext,
     })
-    const result = buildProcessingResult({
+    const result = buildProcessingTurnResult({
       runtime,
       userMessage,
     })
@@ -124,7 +124,7 @@ export const runConversationTurnFlow = async ({
     return result
   }
 
-  const result = await runTurnPipeline(turnPipelineParams)
+  const result = await executeTurnPipeline(turnPipelineParams)
 
   logger.info('[chat-flow] runConversationTurnFlow completed.', {
     ...flowContext,

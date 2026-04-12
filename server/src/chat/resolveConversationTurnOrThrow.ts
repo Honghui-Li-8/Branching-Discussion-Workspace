@@ -18,7 +18,7 @@ export const resolveConversationTurnOrThrow = async ({
   input,
   currentUserId,
 }: ResolveConversationTurnOrThrowParams): Promise<ResolvedConversationTurn> => {
-  const turnResult = await createOrGetConversationTurnForAuthorRecord({
+  const resolvedTurn = await createOrGetConversationTurnForAuthorRecord({
     nodeId: input.nodeId,
     authorUserId: currentUserId,
     model: input.model,
@@ -26,7 +26,7 @@ export const resolveConversationTurnOrThrow = async ({
     status: 'processing',
   })
 
-  if (!turnResult) {
+  if (!resolvedTurn) {
     logger.warn('[chat] sendConversationTurn could not resolve node while creating turn.', {
       node_id: input.nodeId,
       author_user_id: currentUserId,
@@ -40,12 +40,12 @@ export const resolveConversationTurnOrThrow = async ({
   }
 
   logger.info('[chat] conversation turn resolved.', {
-    turn_id: turnResult.turn.id,
+    turn_id: resolvedTurn.turn.id,
     node_id: input.nodeId,
     author_user_id: currentUserId,
-    status: turnResult.turn.status,
-    was_created: turnResult.wasCreated,
+    status: resolvedTurn.turn.status,
+    was_created: resolvedTurn.wasCreated,
   })
 
-  return turnResult
+  return resolvedTurn
 }

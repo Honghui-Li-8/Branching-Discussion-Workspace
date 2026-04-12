@@ -8,27 +8,27 @@ import type { SendConversationTurnInput, SendConversationTurnResult } from './ty
 
 const logger = createLogger('chat-turn-flow')
 
-export type ConversationTurnFlowContext = {
+export type TurnFlowContext = {
   node_id: string
   author_user_id: string
   model: string
   idempotency_key: string
 }
 
-export const buildConversationTurnFlowContext = ({
+export const buildTurnFlowContext = ({
   input,
   currentUserId,
 }: {
   input: SendConversationTurnInput
   currentUserId: string
-}): ConversationTurnFlowContext => ({
+}): TurnFlowContext => ({
   node_id: input.nodeId,
   author_user_id: currentUserId,
   model: input.model,
   idempotency_key: input.idempotencyKey,
 })
 
-export const runTurnFlowPreflight = async ({
+export const runConversationTurnPreflight = async ({
   input,
   currentUserId,
   requestStartedAtMs,
@@ -38,7 +38,7 @@ export const runTurnFlowPreflight = async ({
   requestStartedAtMs: number
 }): Promise<{
   resolvedTurn: Awaited<ReturnType<typeof resolveConversationTurnOrThrow>>
-  replayResult: SendConversationTurnResult | null
+  idempotentReplay: SendConversationTurnResult | null
 }> => {
   // #region: Validation and Idempotent Replay
   validateAllowedModelOrThrow(input.model)
@@ -48,10 +48,10 @@ export const runTurnFlowPreflight = async ({
     input,
     currentUserId,
   })
-  const replayResult = await recoverIdempotentConversationTurnReplay({
+  const idempotentReplay = await recoverIdempotentConversationTurnReplay({
     input,
     currentUserId,
-    resolvedTurnResult: resolvedTurn,
+    resolvedTurn,
     requestStartedAtMs,
     enqueuePostprocessJobsForTurn,
   })
@@ -59,7 +59,7 @@ export const runTurnFlowPreflight = async ({
   // #endregion
   return {
     resolvedTurn,
-    replayResult,
+    idempotentReplay,
   }
 }
 
@@ -68,7 +68,7 @@ export const scheduleInputClassificationTask = ({
   flowContext,
 }: {
   input: SendConversationTurnInput
-  flowContext: ConversationTurnFlowContext
+  flowContext: TurnFlowContext
 }): void => {
   // #region: 1) Input Classify (async) @todo, extra for identify explicit summary update request
   //    - Kick off classifier in parallel with generation path.

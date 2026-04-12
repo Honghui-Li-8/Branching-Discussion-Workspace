@@ -9,16 +9,16 @@ import {
   persistAssistantMessageStage,
   persistUserMessageStage,
 } from './turnPersistencePipeline.js'
-import type { ConversationTurnFlowRuntime, TurnFailureHandler } from './turnFlowRuntime.js'
+import type { TurnFlowRuntime, TurnFailureHandler } from './turnFlowRuntime.js'
 import type { MarkTurnFailedOnce } from './turnFailure.js'
 import type { SendConversationTurnResult } from './types.js'
 
-export const persistUserMessageOrHandleFailure = async ({
+export const persistUserMessageWithFailureHandling = async ({
   runtime,
   markTurnFailedOnce,
   handleFailure,
 }: {
-  runtime: ConversationTurnFlowRuntime
+  runtime: TurnFlowRuntime
   markTurnFailedOnce: MarkTurnFailedOnce
   handleFailure: TurnFailureHandler
 }): Promise<SendConversationTurnResult['userMessage']> => {
@@ -34,13 +34,13 @@ export const persistUserMessageOrHandleFailure = async ({
   throw new Error('Unreachable user message persistence state')
 }
 
-export const runTurnPipeline = async ({
+export const executeTurnPipeline = async ({
   runtime,
   userMessage,
   markTurnFailedOnce,
   handleFailure,
 }: {
-  runtime: ConversationTurnFlowRuntime
+  runtime: TurnFlowRuntime
   userMessage: SendConversationTurnResult['userMessage']
   markTurnFailedOnce: MarkTurnFailedOnce
   handleFailure: TurnFailureHandler
@@ -90,5 +90,5 @@ export const runTurnPipeline = async ({
     await handleFailure(pipelineStage, error)
   }
 
-  throw new Error('Unreachable runTurnPipeline state')
+  throw new Error('Unreachable executeTurnPipeline state')
 }

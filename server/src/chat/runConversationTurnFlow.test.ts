@@ -1,35 +1,36 @@
 import { beforeEach, describe, expect, jest, test } from '@jest/globals'
 import { runConversationTurnFlow } from './runConversationTurnFlow.js'
 import {
-  buildConversationTurnFlowContext,
-  runTurnFlowPreflight,
+  buildTurnFlowContext,
+  runConversationTurnPreflight,
   scheduleInputClassificationTask,
 } from './turnFlowPreflight.js'
 import { buildTurnFlowRuntime } from './turnFlowRuntime.js'
 import {
-  persistUserMessageOrHandleFailure,
-  runTurnPipeline,
+  executeTurnPipeline,
+  persistUserMessageWithFailureHandling,
 } from './turnExecutionPipeline.js'
 
 jest.mock('./turnFlowPreflight.js', () => ({
-  buildConversationTurnFlowContext: jest.fn(),
-  runTurnFlowPreflight: jest.fn(),
+  buildTurnFlowContext: jest.fn(),
+  runConversationTurnPreflight: jest.fn(),
   scheduleInputClassificationTask: jest.fn(),
 }))
 jest.mock('./turnFlowRuntime.js', () => ({
   buildTurnFlowRuntime: jest.fn(),
 }))
 jest.mock('./turnExecutionPipeline.js', () => ({
-  persistUserMessageOrHandleFailure: jest.fn(),
-  runTurnPipeline: jest.fn(),
+  persistUserMessageWithFailureHandling: jest.fn(),
+  executeTurnPipeline: jest.fn(),
 }))
 
-const buildConversationTurnFlowContextMock =
-  buildConversationTurnFlowContext as jest.MockedFunction<
-    typeof buildConversationTurnFlowContext
+const buildTurnFlowContextMock =
+  buildTurnFlowContext as jest.MockedFunction<
+    typeof buildTurnFlowContext
   >
-const runTurnFlowPreflightMock = runTurnFlowPreflight as jest.MockedFunction<
-  typeof runTurnFlowPreflight
+const runConversationTurnPreflightMock =
+  runConversationTurnPreflight as jest.MockedFunction<
+    typeof runConversationTurnPreflight
 >
 const scheduleInputClassificationTaskMock =
   scheduleInputClassificationTask as jest.MockedFunction<
@@ -38,12 +39,12 @@ const scheduleInputClassificationTaskMock =
 const buildTurnFlowRuntimeMock = buildTurnFlowRuntime as jest.MockedFunction<
   typeof buildTurnFlowRuntime
 >
-const persistUserMessageOrHandleFailureMock =
-  persistUserMessageOrHandleFailure as jest.MockedFunction<
-    typeof persistUserMessageOrHandleFailure
+const persistUserMessageWithFailureHandlingMock =
+  persistUserMessageWithFailureHandling as jest.MockedFunction<
+    typeof persistUserMessageWithFailureHandling
   >
-const runTurnPipelineMock = runTurnPipeline as jest.MockedFunction<
-  typeof runTurnPipeline
+const executeTurnPipelineMock = executeTurnPipeline as jest.MockedFunction<
+  typeof executeTurnPipeline
 >
 
 const input = {
@@ -122,29 +123,29 @@ describe('runConversationTurnFlow', () => {
   beforeEach(() => {
     jest.clearAllMocks()
 
-    buildConversationTurnFlowContextMock.mockReturnValue(flowContext)
-    runTurnFlowPreflightMock.mockResolvedValue({
+    buildTurnFlowContextMock.mockReturnValue(flowContext)
+    runConversationTurnPreflightMock.mockResolvedValue({
       resolvedTurn,
-      replayResult: null,
+      idempotentReplay: null,
     } as any)
     buildTurnFlowRuntimeMock.mockResolvedValue({
       runtime,
       markTurnFailedOnce,
       handleFailure,
     } as any)
-    persistUserMessageOrHandleFailureMock.mockResolvedValue(userMessage as any)
-    runTurnPipelineMock.mockResolvedValue(completedResult as any)
+    persistUserMessageWithFailureHandlingMock.mockResolvedValue(userMessage as any)
+    executeTurnPipelineMock.mockResolvedValue(completedResult as any)
   })
 
   test('returns replay result and skips runtime/pipeline when preflight resolves replay', async () => {
-    const replayResult = {
+    const idempotentReplay = {
       ...completedResult,
       status: 'processing' as const,
       assistantMessage: null,
     }
-    runTurnFlowPreflightMock.mockResolvedValueOnce({
+    runConversationTurnPreflightMock.mockResolvedValueOnce({
       resolvedTurn,
-      replayResult,
+      idempotentReplay,
     } as any)
 
     const result = await runConversationTurnFlow({
@@ -152,18 +153,18 @@ describe('runConversationTurnFlow', () => {
       currentUserId: 'user-1',
     })
 
-    expect(buildConversationTurnFlowContextMock).toHaveBeenCalledWith({
+    expect(buildTurnFlowContextMock).toHaveBeenCalledWith({
       input,
       currentUserId: 'user-1',
     })
-    expect(runTurnFlowPreflightMock).toHaveBeenCalledWith({
+    expect(runConversationTurnPreflightMock).toHaveBeenCalledWith({
       input,
       currentUserId: 'user-1',
       requestStartedAtMs: expect.any(Number),
     })
     expect(scheduleInputClassificationTaskMock).not.toHaveBeenCalled()
     expect(buildTurnFlowRuntimeMock).not.toHaveBeenCalled()
-    expect(result).toEqual(replayResult)
+    expect(result).toEqual(idempotentReplay)
   })
 
   test('returns processing by default and runs pipeline in background', async () => {
@@ -171,7 +172,7 @@ describe('runConversationTurnFlow', () => {
     const pipelineGate = new Promise<void>((resolve) => {
       releasePipeline = resolve
     })
-    runTurnPipelineMock.mockImplementationOnce(async () => {
+    executeTurnPipelineMock.mockImplementationOnce(async () => {
       await pipelineGate
       return completedResult as any
     })
@@ -191,12 +192,12 @@ describe('runConversationTurnFlow', () => {
       resolvedTurn,
       requestStartedAtMs: expect.any(Number),
     })
-    expect(persistUserMessageOrHandleFailureMock).toHaveBeenCalledWith({
+    expect(persistUserMessageWithFailureHandlingMock).toHaveBeenCalledWith({
       runtime,
       markTurnFailedOnce,
       handleFailure,
     })
-    expect(runTurnPipelineMock).toHaveBeenCalledWith({
+    expect(executeTurnPipelineMock).toHaveBeenCalledWith({
       runtime,
       userMessage,
       markTurnFailedOnce,
@@ -223,7 +224,7 @@ describe('runConversationTurnFlow', () => {
       awaitCompletion: true,
     })
 
-    expect(runTurnPipelineMock).toHaveBeenCalledWith({
+    expect(executeTurnPipelineMock).toHaveBeenCalledWith({
       runtime,
       userMessage,
       markTurnFailedOnce,
