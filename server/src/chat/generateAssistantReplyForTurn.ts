@@ -12,22 +12,22 @@ import { createLogger } from '../logging/logger.js'
 
 const logger = createLogger('chat-turn')
 
-export type SendConversationTurnRuntime = {
+export type TurnGenerationRuntime = {
   input: SendConversationTurnInput
   currentUserId: string
   turn: ResolvedConversationTurn['turn']
   publishTurnEvent: TurnEventPublisher
 }
 
-type SendConversationTurnParams = {
-  runtime: SendConversationTurnRuntime
+type GenerateAssistantReplyForTurnParams = {
+  runtime: TurnGenerationRuntime
   retrievalState: RetrievalStageState
 }
 
-export const sendConversationTurn = async ({
+export const generateAssistantReplyForTurn = async ({
   runtime,
   retrievalState,
-}: SendConversationTurnParams): Promise<GenerateAssistantResult> => {
+}: GenerateAssistantReplyForTurnParams): Promise<GenerateAssistantResult> => {
   await runtime.publishTurnEvent({
     type: 'turn.status',
     payload: {

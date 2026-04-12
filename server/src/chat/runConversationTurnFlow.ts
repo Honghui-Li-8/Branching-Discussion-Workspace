@@ -66,7 +66,7 @@ export const runConversationTurnFlow = async ({
   logger.info('[chat-flow] runConversationTurnFlow started.', flowContext)
 
   // #region: Validation and Idempotent Replay
-  const { resolvedTurnResult, replayResult } = await runTurnFlowPreflight({
+  const { resolvedTurn, replayResult } = await runTurnFlowPreflight({
     input,
     currentUserId,
     requestStartedAtMs,
@@ -91,7 +91,7 @@ export const runConversationTurnFlow = async ({
   } = await buildTurnFlowRuntime({
     input,
     currentUserId,
-    resolvedTurn: resolvedTurnResult,
+    resolvedTurn,
     requestStartedAtMs,
   })
 

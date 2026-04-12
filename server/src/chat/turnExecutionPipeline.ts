@@ -1,4 +1,4 @@
-import { sendConversationTurn } from './sendConversationTurn.js'
+import { generateAssistantReplyForTurn } from './generateAssistantReplyForTurn.js'
 import {
   applyPromptBudgetStage,
   prepareContextStage,
@@ -66,7 +66,7 @@ export const runTurnPipeline = async ({
     })
 
     pipelineStage = 'generating_assistant_reply'
-    const assistantOutput = await sendConversationTurn({
+    const assistantOutput = await generateAssistantReplyForTurn({
       runtime,
       retrievalState: budgetedState,
     })

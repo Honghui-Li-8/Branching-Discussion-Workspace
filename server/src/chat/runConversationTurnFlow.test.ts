@@ -60,7 +60,7 @@ const flowContext = {
   idempotency_key: 'idem-1',
 }
 
-const resolvedTurnResult = {
+const resolvedTurn = {
   turn: {
     id: 'turn-1',
     nodeId: 'node-1',
@@ -108,7 +108,7 @@ const completedResult = {
 const runtime = {
   input,
   currentUserId: 'user-1',
-  turn: resolvedTurnResult.turn,
+  turn: resolvedTurn.turn,
   requestStartedAtMs: 1,
   publishTurnEvent: jest.fn(),
 }
@@ -124,7 +124,7 @@ describe('runConversationTurnFlow', () => {
 
     buildConversationTurnFlowContextMock.mockReturnValue(flowContext)
     runTurnFlowPreflightMock.mockResolvedValue({
-      resolvedTurnResult,
+      resolvedTurn,
       replayResult: null,
     } as any)
     buildTurnFlowRuntimeMock.mockResolvedValue({
@@ -143,7 +143,7 @@ describe('runConversationTurnFlow', () => {
       assistantMessage: null,
     }
     runTurnFlowPreflightMock.mockResolvedValueOnce({
-      resolvedTurnResult,
+      resolvedTurn,
       replayResult,
     } as any)
 
@@ -188,7 +188,7 @@ describe('runConversationTurnFlow', () => {
     expect(buildTurnFlowRuntimeMock).toHaveBeenCalledWith({
       input,
       currentUserId: 'user-1',
-      resolvedTurn: resolvedTurnResult,
+      resolvedTurn,
       requestStartedAtMs: expect.any(Number),
     })
     expect(persistUserMessageOrHandleFailureMock).toHaveBeenCalledWith({

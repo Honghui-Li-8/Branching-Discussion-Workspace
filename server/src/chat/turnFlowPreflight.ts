@@ -37,28 +37,28 @@ export const runTurnFlowPreflight = async ({
   currentUserId: string
   requestStartedAtMs: number
 }): Promise<{
-  resolvedTurnResult: Awaited<ReturnType<typeof resolveConversationTurnOrThrow>>
+  resolvedTurn: Awaited<ReturnType<typeof resolveConversationTurnOrThrow>>
   replayResult: SendConversationTurnResult | null
 }> => {
   // #region: Validation and Idempotent Replay
   validateAllowedModelOrThrow(input.model)
   validateProviderRuntimeConfigOrThrow(input.model)
 
-  const resolvedTurnResult = await resolveConversationTurnOrThrow({
+  const resolvedTurn = await resolveConversationTurnOrThrow({
     input,
     currentUserId,
   })
   const replayResult = await recoverIdempotentConversationTurnReplay({
     input,
     currentUserId,
-    resolvedTurnResult,
+    resolvedTurnResult: resolvedTurn,
     requestStartedAtMs,
     enqueuePostprocessJobsForTurn,
   })
 
   // #endregion
   return {
-    resolvedTurnResult,
+    resolvedTurn,
     replayResult,
   }
 }

@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, jest, test } from '@jest/globals'
-import { sendConversationTurn, type SendConversationTurnRuntime } from './sendConversationTurn.js'
+import {
+  generateAssistantReplyForTurn,
+  type TurnGenerationRuntime,
+} from './generateAssistantReplyForTurn.js'
 import { selectProvider } from './providers/selectProvider.js'
 import type { AssistantProvider } from './providers/provider.js'
 import type { RetrievalStageState } from './turnContextPipeline.js'
@@ -11,7 +14,7 @@ jest.mock('./providers/selectProvider.js', () => ({
 
 const selectProviderMock = selectProvider as jest.MockedFunction<typeof selectProvider>
 
-const baseRuntime: Omit<SendConversationTurnRuntime, 'publishTurnEvent'> = {
+const baseRuntime: Omit<TurnGenerationRuntime, 'publishTurnEvent'> = {
   input: {
     nodeId: 'n1',
     text: 'hello',
@@ -59,7 +62,7 @@ const makeProvider = (impl: AssistantProvider['generate']): AssistantProvider =>
   generate: impl,
 })
 
-describe('sendConversationTurn', () => {
+describe('generateAssistantReplyForTurn', () => {
   beforeEach(() => {
     jest.clearAllMocks()
   })
@@ -69,7 +72,7 @@ describe('sendConversationTurn', () => {
     const publishTurnEvent: TurnEventPublisher = async (event) => {
       publishedEvents.push(event)
     }
-    const runtime: SendConversationTurnRuntime = {
+    const runtime: TurnGenerationRuntime = {
       ...baseRuntime,
       publishTurnEvent,
     }
@@ -86,7 +89,7 @@ describe('sendConversationTurn', () => {
       }),
     )
 
-    const result = await sendConversationTurn({
+    const result = await generateAssistantReplyForTurn({
       runtime,
       retrievalState,
     })
@@ -129,7 +132,7 @@ describe('sendConversationTurn', () => {
 
   test('publishes generating status only once even with multiple token deltas', async () => {
     const publishedEvents: Parameters<TurnEventPublisher>[0][] = []
-    const runtime: SendConversationTurnRuntime = {
+    const runtime: TurnGenerationRuntime = {
       ...baseRuntime,
       publishTurnEvent: async (event) => {
         publishedEvents.push(event)
@@ -149,7 +152,7 @@ describe('sendConversationTurn', () => {
       }),
     )
 
-    await sendConversationTurn({
+    await generateAssistantReplyForTurn({
       runtime,
       retrievalState,
     })
@@ -169,7 +172,7 @@ describe('sendConversationTurn', () => {
 
   test('skips empty token deltas and avoids generating status when nothing is streamed', async () => {
     const publishedEvents: Parameters<TurnEventPublisher>[0][] = []
-    const runtime: SendConversationTurnRuntime = {
+    const runtime: TurnGenerationRuntime = {
       ...baseRuntime,
       publishTurnEvent: async (event) => {
         publishedEvents.push(event)
@@ -187,7 +190,7 @@ describe('sendConversationTurn', () => {
       }),
     )
 
-    await sendConversationTurn({
+    await generateAssistantReplyForTurn({
       runtime,
       retrievalState,
     })
@@ -205,7 +208,7 @@ describe('sendConversationTurn', () => {
 
   test('bubbles provider errors after emitting awaiting_model status', async () => {
     const publishedEvents: Parameters<TurnEventPublisher>[0][] = []
-    const runtime: SendConversationTurnRuntime = {
+    const runtime: TurnGenerationRuntime = {
       ...baseRuntime,
       publishTurnEvent: async (event) => {
         publishedEvents.push(event)
@@ -219,7 +222,7 @@ describe('sendConversationTurn', () => {
     )
 
     await expect(
-      sendConversationTurn({
+      generateAssistantReplyForTurn({
         runtime,
         retrievalState,
       }),

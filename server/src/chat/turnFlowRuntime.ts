@@ -2,10 +2,10 @@ import { createMarkTurnFailedOnce, type MarkTurnFailedOnce } from './turnFailure
 import { handleTurnFailure } from './turnErrorHandling.js'
 import { createTurnEventPublisher } from './turnEventPublisher.js'
 import type { ResolvedConversationTurn } from './resolveConversationTurnOrThrow.js'
-import type { SendConversationTurnRuntime } from './sendConversationTurn.js'
+import type { TurnGenerationRuntime } from './generateAssistantReplyForTurn.js'
 import type { SendConversationTurnInput } from './types.js'
 
-export type ConversationTurnFlowRuntime = SendConversationTurnRuntime & {
+export type ConversationTurnFlowRuntime = TurnGenerationRuntime & {
   requestStartedAtMs: number
 }
 
