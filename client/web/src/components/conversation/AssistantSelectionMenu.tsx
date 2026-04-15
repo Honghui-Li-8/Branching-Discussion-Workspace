@@ -204,7 +204,7 @@ export const AssistantSelectionMenu = ({
   //   setHintText(selectHintText(el.offsetWidth))
   // }, [])
 
-  // Track width continuously for suggestion sizing (does not affect hint text)
+  // Track width for suggestion sizing
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
@@ -215,6 +215,23 @@ export const AssistantSelectionMenu = ({
     })
     ro.observe(el)
     return () => ro.disconnect()
+  }, [])
+
+  // On mouse release, snap modal back if it overflows the right edge of the screen
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const handleMouseUp = () => {
+      const rect = el.getBoundingClientRect()
+      const maxRight = window.innerWidth - 40
+      if (rect.right > maxRight) {
+        const clampedWidth = maxRight - rect.left
+        el.style.width = `${clampedWidth}px`
+        setContainerWidth(clampedWidth)
+      }
+    }
+    document.addEventListener('mouseup', handleMouseUp)
+    return () => document.removeEventListener('mouseup', handleMouseUp)
   }, [])
 
   const handleBranchClick = () => {
