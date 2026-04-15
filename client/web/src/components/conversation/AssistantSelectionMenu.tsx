@@ -26,6 +26,29 @@ const selectHintText = (widthPx: number): string => {
   return pool[Math.floor(Math.random() * pool.length)]!
 }
 
+// ── useTypewriter ─────────────────────────────────────────────────────────────
+// Animates text in character-by-character on mount. Stable once complete.
+const TYPEWRITER_CHAR_MS = 38 // ms per character
+
+const useTypewriter = (fullText: string): string => {
+  const [displayed, setDisplayed] = useState('')
+
+  useEffect(() => {
+    setDisplayed('')
+    if (!fullText) return
+    let i = 0
+    const step = () => {
+      i += 1
+      setDisplayed(fullText.slice(0, i))
+      if (i < fullText.length) setTimeout(step, TYPEWRITER_CHAR_MS)
+    }
+    const timer = setTimeout(step, TYPEWRITER_CHAR_MS)
+    return () => clearTimeout(timer)
+  }, [fullText])
+
+  return displayed
+}
+
 // ── AutoResizeTextarea ────────────────────────────────────────────────────────
 const TEXTAREA_LINE_HEIGHT_PX = 20
 const TEXTAREA_MAX_LINES = 5
@@ -184,19 +207,23 @@ export const AssistantSelectionMenu = ({
   const [hintText, setHintText] = useState(() => selectHintText(440))
   const [containerWidth, setContainerWidth] = useState(560)
   const containerRef = useRef<HTMLDivElement | null>(null)
+  const displayedHint = useTypewriter(hintText)
 
-  // Measure width on mount and keep it updated as the modal is resized
+  // Set hint text once on mount based on initial width
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
-    const update = (width: number) => {
-      setContainerWidth(width)
-      setHintText(selectHintText(width))
-    }
-    update(el.offsetWidth)
+    setHintText(selectHintText(el.offsetWidth))
+  }, [])
+
+  // Track width continuously for suggestion sizing (does not affect hint text)
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    setContainerWidth(el.offsetWidth)
     const ro = new ResizeObserver((entries) => {
       const w = entries[0]?.contentRect.width
-      if (w !== undefined) update(w)
+      if (w !== undefined) setContainerWidth(w)
     })
     ro.observe(el)
     return () => ro.disconnect()
@@ -247,7 +274,7 @@ export const AssistantSelectionMenu = ({
       </button>
 
       {/* 1. Selected text — read-only, left-border accent as visual quote indicator */}
-      <div className="px-3 pt-3 pb-2">
+      <div className="px-3 pt-3 pb-3">
         <div
           className="overflow-y-auto border-l-2 border-[#7fb2cf] bg-[#f3f9fd] px-2.5 py-2 text-xs italic leading-relaxed text-[#244f67]"
           style={{ maxHeight: '250px' }}
@@ -256,14 +283,27 @@ export const AssistantSelectionMenu = ({
         </div>
       </div>
 
-      {/* 2. Hint heading */}
-      <p className="m-0 px-3 pb-2 text-center text-[12px] font-semibold tracking-wide text-[#487089]">
-        {hintText}
-      </p>
+      {/* Divider — separates context (display) from action area */}
+      <hr className="mx-3 border-t border-[#ddeef6]" />
 
-      {/* 3. Suggestions row — horizontal scroll if overflow */}
-      <div className="px-3 pb-2">
-        <div className="flex gap-1.5 overflow-x-auto pb-0.5">
+      {/* Action zone — hint + suggestions + input */}
+      <div className="px-3 pt-3 pb-3">
+
+        {/* 2. Hint heading — left-aligned, medium weight, introduces the action zone */}
+        <p className="m-0 pb-2 text-[12px] font-medium tracking-wide text-[#487089]">
+          {displayedHint}
+        </p>
+
+        {/* 3. Suggestions row — horizontal scroll if overflow */}
+        <style>{`
+          .suggestion-scroll::-webkit-scrollbar { height: 2px; }
+          .suggestion-scroll::-webkit-scrollbar-track { background: transparent; }
+          .suggestion-scroll::-webkit-scrollbar-thumb { background: #c8dfe8; border-radius: 9999px; }
+        `}</style>
+        <div
+          className="suggestion-scroll flex gap-1.5 overflow-x-auto pb-2"
+          style={{ scrollbarWidth: 'thin', scrollbarColor: '#c8dfe8 transparent' }}
+        >
           {BRANCH_SUGGESTIONS.map((suggestion) => (
             <button
               key={suggestion}
@@ -284,10 +324,8 @@ export const AssistantSelectionMenu = ({
             </button>
           ))}
         </div>
-      </div>
 
-      {/* 4 + 5. Input area + Branch button inline (send-button layout) */}
-      <div className="px-3">
+        {/* 4 + 5. Input area + Branch button inline (send-button layout) */}
         <div className="flex items-end gap-2 rounded-lg border border-[#a7d2e8] bg-white px-2 py-2 transition-colors focus-within:border-[#5da8d2]">
           <AutoResizeTextarea
             value={inputText}
@@ -307,7 +345,8 @@ export const AssistantSelectionMenu = ({
             {isBranchActionPending ? 'Branching…' : 'Branch'}
           </button>
         </div>
-      </div>
+
+      </div>{/* end action zone */}
     </div>
   )
 }
