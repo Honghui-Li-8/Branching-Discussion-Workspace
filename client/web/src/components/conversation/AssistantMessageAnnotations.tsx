@@ -347,19 +347,39 @@ const AssistantAnnotationPopup = ({
         const selectedText = getSelectedTextFromAnnotation(annotation)
         setPendingDismissAnnotation(annotation.id)
 
-        const handleDismissSelection = () => {
+        // Dismiss — closes the popup without deleting the annotation.
+        // For transient annotations (just selected, not yet saved) the selection is cancelled.
+        // Deletion of persisted annotations is routed to the 5 s long-press on Branch.
+        const handleDismiss = () => {
           if (!annotator) {
             return
           }
 
+          clearPendingDismissState()
+
           const isPersistedAnnotation = persistedAnnotationIdSet.has(annotation.id)
+          if (!isPersistedAnnotation) {
+            // Cancel the just-made selection
+            annotator.removeAnnotation(annotation.id)
+            removeAnnotationTracking(annotation.id)
+          }
+
+          annotator.cancelSelected()
+        }
+
+        // Delete — removes the annotation locally and from the backend if persisted.
+        // Triggered by the 5 s long-press on the Branch button.
+        const handleDeleteAnnotation = () => {
+          if (!annotator) {
+            return
+          }
 
           clearPendingDismissState()
           annotator.removeAnnotation(annotation.id)
           removeAnnotationTracking(annotation.id)
-
           annotator.cancelSelected()
 
+          const isPersistedAnnotation = persistedAnnotationIdSet.has(annotation.id)
           if (!isPersistedAnnotation) {
             return
           }
@@ -374,7 +394,7 @@ const AssistantAnnotationPopup = ({
                 ])
               },
               onError: async (error) => {
-                console.error('[assistant-selection] failed to delete annotation branch', {
+                console.error('[assistant-selection] failed to delete annotation', {
                   messageId,
                   annotationId: annotation.id,
                   error: error.message,
@@ -388,7 +408,7 @@ const AssistantAnnotationPopup = ({
           )
         }
 
-        const handleConfirmSelection = () => {
+        const handleConfirmSelection = (inputText: string) => {
           if (!annotator || isBranchActionPending) {
             return
           }
@@ -425,6 +445,7 @@ const AssistantAnnotationPopup = ({
             messageId,
             kind: nextKind,
             text: selectedText,
+            inputText,
             annotationId: annotation.id,
           })
 
@@ -464,7 +485,7 @@ const AssistantAnnotationPopup = ({
           })
         }
 
-        const handleSuggestSelection = () => {
+        const handleSuggestSelection = (inputText: string) => {
           if (!annotator || suggestMutation.isPending) {
             return
           }
@@ -487,6 +508,7 @@ const AssistantAnnotationPopup = ({
             messageId,
             kind: 'suggestion',
             text: selectedText,
+            inputText,
             annotationId: annotation.id,
           })
           annotator.cancelSelected()
@@ -533,9 +555,10 @@ const AssistantAnnotationPopup = ({
         return (
           <AssistantSelectionMenu
             selectedText={selectedText}
-            onDismissSelection={handleDismissSelection}
-            onConfirmSelection={handleConfirmSelection}
-            onSuggestSelection={handleSuggestSelection}
+            onBranch={handleConfirmSelection}
+            onSuggest={handleSuggestSelection}
+            onDelete={handleDeleteAnnotation}
+            onDismiss={handleDismiss}
             isBranchActionPending={isBranchActionPending}
           />
         )
