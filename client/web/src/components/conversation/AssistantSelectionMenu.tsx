@@ -262,9 +262,9 @@ export const AssistantSelectionMenu = ({
       </button>
 
       {/* 1. Selected text — read-only, left-border accent as visual quote indicator */}
-      <div className="px-4 pt-4 pb-4">
+      <div className="px-4 pt-4 pb-0">
         <div
-          className="overflow-y-auto border-l-2 border-[#7fb2cf] bg-[#f3f9fd] px-2.5 py-2 text-xs italic leading-relaxed text-[#244f67]"
+          className="overflow-y-auto border-l-2 border-[#7fb2cf] bg-[#f3f9fd] px-2.5 py-2 text-xs font-medium italic leading-relaxed text-[#244f67]"
           style={{ maxHeight: '250px' }}
         >
           {selectedText.trim() || 'No text selected.'}
@@ -272,10 +272,10 @@ export const AssistantSelectionMenu = ({
       </div>
 
       {/* Divider — separates context (display) from action area */}
-      <hr className="mx-4 border-t border-[#ddeef6]" />
+      <div className="mx-4 my-3 h-[2px] rounded-full bg-[#ddeef6]" />
 
       {/* Action zone — hint + suggestions + input */}
-      <div className="px-4 pt-4 pb-4">
+      <div className="px-4 pt-0 pb-4">
 
         {/* 2. Hint heading — left-aligned, medium weight, introduces the action zone */}
         {/* <p className="m-0 pb-2 text-[12px] font-medium tracking-wide text-[#487089]">
@@ -292,7 +292,7 @@ export const AssistantSelectionMenu = ({
               onClick={() => handleSuggestionClick(suggestion)}
               title={suggestion}
               // TODO: Show full suggestion in a tooltip after 1 s hover (deferred)
-              className="flex-shrink-0 rounded-md border border-[#d4e9c1] bg-[#edf7e4] px-2 py-0.5 text-left text-[10px] leading-4 text-[#3d6b22] transition-colors hover:bg-[#ddf0d0]"
+              className="flex-shrink-0 rounded-md border border-[#d4e9c1] bg-[#edf7e4] px-2 py-0.5 text-left text-[11px] leading-4 text-[#3d6b22] transition-colors hover:bg-[#ddf0d0]"
               style={{
                 minWidth: '72px',
                 maxWidth: `${containerWidth * 0.4}px`,
