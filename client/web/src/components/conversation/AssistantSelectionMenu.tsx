@@ -8,46 +8,33 @@ const BRANCH_SUGGESTIONS = [
   'How does this compare to alternatives?',
 ]
 
-// ── Hint text variants, shortest → longest, with minimum modal width ─────────
-const HINT_ENTRIES: Array<{ minWidth: number; text: string }> = [
-  { minWidth: 0,   text: 'Expand' },
-  { minWidth: 120, text: 'Dig deeper' },
-  { minWidth: 180, text: 'Ask a follow-up' },
-  { minWidth: 240, text: 'Explore this further' },
-  { minWidth: 320, text: 'What would you like to explore?' },
-  { minWidth: 400, text: 'Ask a follow-up to branch from this selection' },
-]
-
-const selectHintText = (widthPx: number): string => {
-  const eligible = HINT_ENTRIES
-    .filter(({ minWidth }) => widthPx >= minWidth)
-    .map(({ text }) => text)
-  const pool = eligible.length > 0 ? eligible : [HINT_ENTRIES[0]!.text]
-  return pool[Math.floor(Math.random() * pool.length)]!
-}
-
-// ── useTypewriter ─────────────────────────────────────────────────────────────
-// Animates text in character-by-character on mount. Stable once complete.
-const TYPEWRITER_CHAR_MS = 38 // ms per character
-
-const useTypewriter = (fullText: string): string => {
-  const [displayed, setDisplayed] = useState('')
-
-  useEffect(() => {
-    setDisplayed('')
-    if (!fullText) return
-    let i = 0
-    const step = () => {
-      i += 1
-      setDisplayed(fullText.slice(0, i))
-      if (i < fullText.length) setTimeout(step, TYPEWRITER_CHAR_MS)
-    }
-    const timer = setTimeout(step, TYPEWRITER_CHAR_MS)
-    return () => clearTimeout(timer)
-  }, [fullText])
-
-  return displayed
-}
+// ── Hint text (commented out — section hidden) ───────────────────────────────
+// const HINT_ENTRIES: Array<{ minWidth: number; text: string }> = [
+//   { minWidth: 0,   text: 'Expand' },
+//   { minWidth: 120, text: 'Dig deeper' },
+//   { minWidth: 180, text: 'Ask a follow-up' },
+//   { minWidth: 240, text: 'Explore this further' },
+//   { minWidth: 320, text: 'What would you like to explore?' },
+//   { minWidth: 400, text: 'Ask a follow-up to branch from this selection' },
+// ]
+// const selectHintText = (widthPx: number): string => {
+//   const eligible = HINT_ENTRIES.filter(({ minWidth }) => widthPx >= minWidth).map(({ text }) => text)
+//   const pool = eligible.length > 0 ? eligible : [HINT_ENTRIES[0]!.text]
+//   return pool[Math.floor(Math.random() * pool.length)]!
+// }
+// const TYPEWRITER_CHAR_MS = 38
+// const useTypewriter = (fullText: string): string => {
+//   const [displayed, setDisplayed] = useState('')
+//   useEffect(() => {
+//     setDisplayed('')
+//     if (!fullText) return
+//     let i = 0
+//     const step = () => { i += 1; setDisplayed(fullText.slice(0, i)); if (i < fullText.length) setTimeout(step, TYPEWRITER_CHAR_MS) }
+//     const timer = setTimeout(step, TYPEWRITER_CHAR_MS)
+//     return () => clearTimeout(timer)
+//   }, [fullText])
+//   return displayed
+// }
 
 
 // ── AutoResizeTextarea ────────────────────────────────────────────────────────
@@ -205,17 +192,17 @@ export const AssistantSelectionMenu = ({
   isBranchActionPending = false,
 }: AssistantSelectionMenuProps) => {
   const [inputText, setInputText] = useState('')
-  const [hintText, setHintText] = useState(() => selectHintText(440))
+  // const [hintText, setHintText] = useState(() => selectHintText(440))
   const [containerWidth, setContainerWidth] = useState(560)
   const containerRef = useRef<HTMLDivElement | null>(null)
-  const displayedHint = useTypewriter(hintText)
+  // const displayedHint = useTypewriter(hintText)
 
   // Set hint text once on mount based on initial width
-  useEffect(() => {
-    const el = containerRef.current
-    if (!el) return
-    setHintText(selectHintText(el.offsetWidth))
-  }, [])
+  // useEffect(() => {
+  //   const el = containerRef.current
+  //   if (!el) return
+  //   setHintText(selectHintText(el.offsetWidth))
+  // }, [])
 
   // Track width continuously for suggestion sizing (does not affect hint text)
   useEffect(() => {
@@ -291,9 +278,9 @@ export const AssistantSelectionMenu = ({
       <div className="px-4 pt-4 pb-4">
 
         {/* 2. Hint heading — left-aligned, medium weight, introduces the action zone */}
-        <p className="m-0 pb-2 text-[12px] font-medium tracking-wide text-[#487089]">
+        {/* <p className="m-0 pb-2 text-[12px] font-medium tracking-wide text-[#487089]">
           {displayedHint}
-        </p>
+        </p> */}
 
         {/* 3. Suggestions row — horizontal scroll, narrower than input */}
         <style>{`.sugg-row::-webkit-scrollbar{height:0.5px}.sugg-row::-webkit-scrollbar-track{background:transparent}.sugg-row::-webkit-scrollbar-thumb{background:#b9d6e8;border-radius:9999px}`}</style>
