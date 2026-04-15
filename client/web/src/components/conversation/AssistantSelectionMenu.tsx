@@ -49,6 +49,7 @@ const useTypewriter = (fullText: string): string => {
   return displayed
 }
 
+
 // ── AutoResizeTextarea ────────────────────────────────────────────────────────
 const TEXTAREA_LINE_HEIGHT_PX = 20
 const TEXTAREA_MAX_LINES = 5
@@ -81,7 +82,7 @@ const AutoResizeTextarea = ({ value, onChange, placeholder }: AutoResizeTextarea
       onInput={adjust}
       placeholder={placeholder}
       rows={1}
-      className="w-full resize-none bg-transparent px-1 text-sm text-[#12384c] focus:outline-none placeholder:text-[#8bb5cc]"
+      className="w-full resize-none bg-transparent px-1 py-1 text-sm text-[#12384c] focus:outline-none placeholder:text-[#8bb5cc]"
       style={{
         lineHeight: `${TEXTAREA_LINE_HEIGHT_PX}px`,
         minHeight: `${TEXTAREA_LINE_HEIGHT_PX}px`,
@@ -274,7 +275,7 @@ export const AssistantSelectionMenu = ({
       </button>
 
       {/* 1. Selected text — read-only, left-border accent as visual quote indicator */}
-      <div className="px-3 pt-3 pb-3">
+      <div className="px-4 pt-4 pb-4">
         <div
           className="overflow-y-auto border-l-2 border-[#7fb2cf] bg-[#f3f9fd] px-2.5 py-2 text-xs italic leading-relaxed text-[#244f67]"
           style={{ maxHeight: '250px' }}
@@ -284,26 +285,19 @@ export const AssistantSelectionMenu = ({
       </div>
 
       {/* Divider — separates context (display) from action area */}
-      <hr className="mx-3 border-t border-[#ddeef6]" />
+      <hr className="mx-4 border-t border-[#ddeef6]" />
 
       {/* Action zone — hint + suggestions + input */}
-      <div className="px-3 pt-3 pb-3">
+      <div className="px-4 pt-4 pb-4">
 
         {/* 2. Hint heading — left-aligned, medium weight, introduces the action zone */}
         <p className="m-0 pb-2 text-[12px] font-medium tracking-wide text-[#487089]">
           {displayedHint}
         </p>
 
-        {/* 3. Suggestions row — horizontal scroll if overflow */}
-        <style>{`
-          .suggestion-scroll::-webkit-scrollbar { height: 2px; }
-          .suggestion-scroll::-webkit-scrollbar-track { background: transparent; }
-          .suggestion-scroll::-webkit-scrollbar-thumb { background: #c8dfe8; border-radius: 9999px; }
-        `}</style>
-        <div
-          className="suggestion-scroll flex gap-1.5 overflow-x-auto pb-2"
-          style={{ scrollbarWidth: 'thin', scrollbarColor: '#c8dfe8 transparent' }}
-        >
+        {/* 3. Suggestions row — horizontal scroll, narrower than input */}
+        <style>{`.sugg-row::-webkit-scrollbar{height:0.5px}.sugg-row::-webkit-scrollbar-track{background:transparent}.sugg-row::-webkit-scrollbar-thumb{background:#b9d6e8;border-radius:9999px}`}</style>
+        <div className="sugg-row mx-1 mb-2 flex gap-1.5 overflow-x-auto rounded-md px-2 py-1.5" style={{ scrollbarWidth: 'thin', scrollbarColor: '#b9d6e8 transparent' }}>
           {BRANCH_SUGGESTIONS.map((suggestion) => (
             <button
               key={suggestion}
@@ -311,7 +305,7 @@ export const AssistantSelectionMenu = ({
               onClick={() => handleSuggestionClick(suggestion)}
               title={suggestion}
               // TODO: Show full suggestion in a tooltip after 1 s hover (deferred)
-              className="flex-shrink-0 rounded-md border border-[#d4e9c1] bg-[#edf7e4] px-2 py-1 text-left text-[11px] leading-4 text-[#3d6b22] transition-colors hover:bg-[#ddf0d0]"
+              className="flex-shrink-0 rounded-md border border-[#d4e9c1] bg-[#edf7e4] px-2 py-0.5 text-left text-[10px] leading-4 text-[#3d6b22] transition-colors hover:bg-[#ddf0d0]"
               style={{
                 minWidth: '72px',
                 maxWidth: `${containerWidth * 0.4}px`,
