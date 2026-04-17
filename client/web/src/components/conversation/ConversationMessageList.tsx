@@ -1,28 +1,36 @@
 import type { RefObject } from "react";
+import type { BranchFollowupBootstrap } from "../discussion-tree/hooks/useDiscussionTreeUiState";
 import type { TreeMessage } from "../../types/tree";
 import { UserConversationMessage } from "./UserConversationMessage";
 import { AssistantConversationMessage } from "./AssistantConversationMessage";
 
 type ConversationMessageListProps = {
   messages: TreeMessage[];
+  conversationModel: string;
   isLoading: boolean;
   errorMessage: string | null;
   pendingMessageIds: Set<string>;
   failedMessageIds: Set<string>;
   onRetryFailedMessage: (messageId: string) => void;
   onDismissFailedMessage: (messageId: string) => void;
+  onBranchFollowupCreated: (
+    nodeId: string,
+    branchFollowupBootstrap: BranchFollowupBootstrap,
+  ) => void;
   conversationScrollRef: RefObject<HTMLDivElement | null>;
   bottomAnchorRef: RefObject<HTMLDivElement | null>;
 };
 
 export const ConversationMessageList = ({
   messages,
+  conversationModel,
   isLoading,
   errorMessage,
   pendingMessageIds,
   failedMessageIds,
   onRetryFailedMessage,
   onDismissFailedMessage,
+  onBranchFollowupCreated,
   conversationScrollRef,
   bottomAnchorRef,
 }: ConversationMessageListProps) => {
@@ -64,6 +72,9 @@ export const ConversationMessageList = ({
               <AssistantConversationMessage
                 key={message.id}
                 message={message}
+                conversationModel={conversationModel}
+                sourceText={message.content}
+                onBranchFollowupCreated={onBranchFollowupCreated}
               />
             );
           })

@@ -5,6 +5,7 @@ import { parseMessageMetadata } from '@branching/shared/metadata'
 import { trpc } from '../../../trpc'
 import type { TreeMessage } from '../../../types/tree'
 import { invalidateMessagesByNode } from './mutationInvalidation'
+import type { BranchFollowupBootstrap } from './useDiscussionTreeUiState'
 import {
   conversationStreamReducer,
   type ConversationStreamPhase,
@@ -72,6 +73,7 @@ type UseNodeConversationParams = {
   nodeId: string | null
   canSendMessages: boolean
   conversationModel: string
+  branchFollowupBootstrap?: BranchFollowupBootstrap | null
 }
 
 type MessageUpdatePatch = {
@@ -117,9 +119,11 @@ export const useNodeConversation = ({
   nodeId,
   canSendMessages,
   conversationModel,
+  branchFollowupBootstrap = null,
 }: UseNodeConversationParams) => {
   const utils = trpc.useUtils()
   const [pendingMessages, setPendingMessages] = useState<PendingMessage[]>([])
+  const [hiddenPersistedMessageIds, setHiddenPersistedMessageIds] = useState<string[]>([])
   const [streamState, dispatchStreamAction] = useReducer(
     conversationStreamReducer,
     initialConversationStreamState,
@@ -128,6 +132,8 @@ export const useNodeConversation = ({
   const streamSourceRef = useRef<EventSource | null>(null)
   const streamTurnIdRef = useRef<string | null>(null)
   const streamAuthorUserIdRef = useRef<string | null>(null)
+  const streamPendingMessageIdRef = useRef<string | null>(null)
+  const appliedBranchBootstrapKeyRef = useRef<string | null>(null)
   const fallbackTimerRef = useRef<number | null>(null)
   const postprocessWindowTimerRef = useRef<number | null>(null)
 
@@ -139,6 +145,31 @@ export const useNodeConversation = ({
   const invalidateNodeMessages = useCallback(async (targetNodeId: string) => {
     await invalidateMessagesByNode(utils.messagesByNode.invalidate, targetNodeId)
   }, [utils.messagesByNode.invalidate])
+
+  const clearStreamPendingMessage = useCallback((messageId: string) => {
+    setPendingMessages((current) =>
+      current.filter((message) => message.id !== messageId),
+    )
+    setHiddenPersistedMessageIds((current) =>
+      current.filter((hiddenMessageId) => hiddenMessageId !== messageId),
+    )
+    if (streamPendingMessageIdRef.current === messageId) {
+      streamPendingMessageIdRef.current = null
+    }
+  }, [])
+
+  const markStreamPendingMessageFailed = useCallback((messageId: string) => {
+    setPendingMessages((current) =>
+      current.map((message) =>
+        message.id === messageId
+          ? { ...message, status: 'failed' }
+          : message,
+      ),
+    )
+    if (streamPendingMessageIdRef.current === messageId) {
+      streamPendingMessageIdRef.current = null
+    }
+  }, [])
 
   const clearStreamTimers = () => {
     if (fallbackTimerRef.current === null) {
@@ -220,6 +251,11 @@ export const useNodeConversation = ({
             })
           })
 
+          const pendingStreamMessageId = streamPendingMessageIdRef.current
+          if (pendingStreamMessageId) {
+            clearStreamPendingMessage(pendingStreamMessageId)
+          }
+
           void invalidateNodeMessages(nodeId)
         }
 
@@ -227,6 +263,13 @@ export const useNodeConversation = ({
           type: 'eventReceived',
           event: parsedEvent,
         })
+
+        if (parsedEvent.type === 'turn.error') {
+          const pendingStreamMessageId = streamPendingMessageIdRef.current
+          if (pendingStreamMessageId) {
+            markStreamPendingMessageFailed(pendingStreamMessageId)
+          }
+        }
 
         if (
           parsedEvent.type === 'turn.error' ||
@@ -245,7 +288,14 @@ export const useNodeConversation = ({
     bindEvent('turn.error')
     bindEvent('summary.completed')
     bindEvent('summary.failed')
-  }, [closeTurnStream, invalidateNodeMessages, nodeId, utils.messagesByNode])
+  }, [
+    clearStreamPendingMessage,
+    closeTurnStream,
+    invalidateNodeMessages,
+    markStreamPendingMessageFailed,
+    nodeId,
+    utils.messagesByNode,
+  ])
 
   useEffect(() => {
     streamStateRef.current = streamState
@@ -254,7 +304,10 @@ export const useNodeConversation = ({
   useEffect(() => {
     dispatchStreamAction({ type: 'reset' })
     setPendingMessages([])
+    setHiddenPersistedMessageIds([])
     streamAuthorUserIdRef.current = null
+    streamPendingMessageIdRef.current = null
+    appliedBranchBootstrapKeyRef.current = null
     closeTurnStream()
   }, [closeTurnStream, nodeId])
 
@@ -264,6 +317,76 @@ export const useNodeConversation = ({
     },
     [closeTurnStream],
   )
+
+  useEffect(() => {
+    if (!nodeId || !branchFollowupBootstrap) {
+      return
+    }
+
+    const bootstrapKey = [
+      nodeId,
+      branchFollowupBootstrap.turnId,
+      branchFollowupBootstrap.userFollowupMessageId,
+    ].join(':')
+    if (appliedBranchBootstrapKeyRef.current === bootstrapKey) {
+      return
+    }
+    appliedBranchBootstrapKeyRef.current = bootstrapKey
+
+    if (branchFollowupBootstrap.status === 'failed') {
+      dispatchStreamAction({
+        type: 'sendFailed',
+        errorMessage: 'Follow-up generation failed.',
+      })
+      setPendingMessages((current) => [
+        ...current.filter(
+          (message) => message.id !== branchFollowupBootstrap.userFollowupMessageId,
+        ),
+        {
+          id: branchFollowupBootstrap.userFollowupMessageId,
+          role: 'user',
+          content: branchFollowupBootstrap.text,
+          status: 'failed',
+        },
+      ])
+      setHiddenPersistedMessageIds((current) =>
+        current.includes(branchFollowupBootstrap.userFollowupMessageId)
+          ? current
+          : [...current, branchFollowupBootstrap.userFollowupMessageId],
+      )
+      return
+    }
+
+    if (branchFollowupBootstrap.status === 'completed') {
+      void invalidateNodeMessages(nodeId)
+      return
+    }
+
+    dispatchStreamAction({ type: 'sendRequested' })
+    dispatchStreamAction({
+      type: 'turnBound',
+      turnId: branchFollowupBootstrap.turnId,
+    })
+    setPendingMessages((current) => [
+      ...current.filter(
+        (message) => message.id !== branchFollowupBootstrap.userFollowupMessageId,
+      ),
+      {
+        id: branchFollowupBootstrap.userFollowupMessageId,
+        role: 'user',
+        content: branchFollowupBootstrap.text,
+        status: 'pending',
+      },
+    ])
+    setHiddenPersistedMessageIds((current) =>
+      current.includes(branchFollowupBootstrap.userFollowupMessageId)
+        ? current
+        : [...current, branchFollowupBootstrap.userFollowupMessageId],
+    )
+    streamPendingMessageIdRef.current = branchFollowupBootstrap.userFollowupMessageId
+    connectTurnStream(branchFollowupBootstrap.turnId)
+    void invalidateNodeMessages(nodeId)
+  }, [branchFollowupBootstrap, connectTurnStream, invalidateNodeMessages, nodeId])
 
   const conversationSendMutation = trpc.conversationSend.useMutation()
 
@@ -292,13 +415,20 @@ export const useNodeConversation = ({
     },
   })
 
+  const persistedMessages = useMemo<TreeMessage[]>(
+    () =>
+      (messagesQuery.data ?? [])
+        .filter((message) => !hiddenPersistedMessageIds.includes(message.id))
+        .map((message) => ({
+          id: message.id,
+          role: mapMessageRoleToTreeRole(message.role),
+          content: message.content,
+          metadata: parseMessageMetadata(message.metadata),
+        })),
+    [hiddenPersistedMessageIds, messagesQuery.data],
+  )
+
   const messages = useMemo<TreeMessage[]>(() => {
-    const persistedMessages = (messagesQuery.data ?? []).map((message) => ({
-      id: message.id,
-      role: mapMessageRoleToTreeRole(message.role),
-      content: message.content,
-      metadata: parseMessageMetadata(message.metadata),
-    }))
     const localPendingMessages = pendingMessages.map((message) => ({
       id: message.id,
       role: message.role,
@@ -315,7 +445,7 @@ export const useNodeConversation = ({
         : []
 
     return [...persistedMessages, ...localPendingMessages, ...activeStreamingDraft]
-  }, [messagesQuery.data, pendingMessages, streamState.assistantDraft, streamState.turnId])
+  }, [pendingMessages, persistedMessages, streamState.assistantDraft, streamState.turnId])
 
   const pendingMessageIds = useMemo(
     () =>
@@ -521,3 +651,5 @@ export const useNodeConversation = ({
 
   return result
 }
+
+export type { BranchFollowupBootstrap } from './useDiscussionTreeUiState'

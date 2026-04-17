@@ -2,6 +2,18 @@ import { useMemo, useState } from 'react'
 const DEFAULT_PANEL_WIDTH = 560
 const MIN_PANEL_WIDTH = 300
 
+export type BranchFollowupBootstrap = {
+  turnId: string
+  userFollowupMessageId: string
+  text: string
+  status: 'pending' | 'processing' | 'completed' | 'failed'
+}
+
+type ConversationTarget = {
+  nodeId: string
+  branchFollowupBootstrap: BranchFollowupBootstrap | null
+}
+
 type UseDiscussionTreeUiStateParams = {
   containerWidth: number
 }
@@ -15,7 +27,7 @@ export const useDiscussionTreeUiState = ({
 }: UseDiscussionTreeUiStateParams) => {
   const [expandedFoldMenuNodeId, setExpandedFoldMenuNodeId] = useState<string | null>(null)
   const [expandedCardOptionsNodeId, setExpandedCardOptionsNodeId] = useState<string | null>(null)
-  const [conversationNodeId, setConversationNodeId] = useState<string | null>(null)
+  const [conversationTarget, setConversationTarget] = useState<ConversationTarget | null>(null)
   const [conversationPanelWidth, setConversationPanelWidth] = useState(DEFAULT_PANEL_WIDTH)
   const [conversationPanelFullscreen, setConversationPanelFullscreen] = useState(false)
   const [foldedNodeIds, setFoldedNodeIds] = useState<Record<string, true>>({})
@@ -58,14 +70,30 @@ export const useDiscussionTreeUiState = ({
   }
 
   const openConversation = (nodeId: string) => {
-    setConversationNodeId(nodeId)
+    setConversationTarget({
+      nodeId,
+      branchFollowupBootstrap: null,
+    })
+    clearMenus()
+    setConversationPanelFullscreen(false)
+    setConversationPanelWidth((current) => clampPanelWidth(current))
+  }
+
+  const openConversationWithBranchFollowup = (
+    nodeId: string,
+    branchFollowupBootstrap: BranchFollowupBootstrap,
+  ) => {
+    setConversationTarget({
+      nodeId,
+      branchFollowupBootstrap,
+    })
     clearMenus()
     setConversationPanelFullscreen(false)
     setConversationPanelWidth((current) => clampPanelWidth(current))
   }
 
   const closeConversation = () => {
-    setConversationNodeId(null)
+    setConversationTarget(null)
   }
 
   const handlePanelResize = (nextWidth: number) => {
@@ -123,7 +151,8 @@ export const useDiscussionTreeUiState = ({
     foldedNodeIds,
     expandedFoldMenuNodeId,
     expandedCardOptionsNodeId,
-    conversationNodeId,
+    conversationTarget,
+    conversationNodeId: conversationTarget?.nodeId ?? null,
     conversationPanelWidth,
     conversationPanelFullscreen,
     isPanelFullscreenLike,
@@ -131,6 +160,7 @@ export const useDiscussionTreeUiState = ({
     foldNode,
     unfoldNode,
     openConversation,
+    openConversationWithBranchFollowup,
     closeConversation,
     handlePanelResize,
     togglePanelFullScreen,
