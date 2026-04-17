@@ -11,6 +11,7 @@ type AssistantConversationMessageProps = {
   message: TreeMessage
   conversationModel: string
   sourceText?: string
+  readOnly?: boolean
   onBranchFollowupCreated?: (
     nodeId: string,
     branchFollowupBootstrap: BranchFollowupBootstrap,
@@ -21,6 +22,7 @@ export const AssistantConversationMessage = ({
   message,
   conversationModel,
   sourceText,
+  readOnly = false,
   onBranchFollowupCreated,
 }: AssistantConversationMessageProps) => {
   const citations = getRenderableCitations(message)
@@ -36,6 +38,7 @@ export const AssistantConversationMessage = ({
             messageId={message.id}
             conversationModel={conversationModel}
             sourceText={sourceText ?? message.content}
+            readOnly={readOnly}
             onBranchFollowupCreated={onBranchFollowupCreated}
           >
             <ModelMarkdown content={message.content} />
