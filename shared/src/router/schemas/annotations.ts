@@ -13,7 +13,12 @@ export type SelectorJson = {
   selector: SelectorRange[]
 }
 
-export const assistantAnnotationKindSchema = z.enum(['suggestion', 'branch', 'suggestion-branch'])
+export const assistantAnnotationKindSchema = z.enum([
+  'suggestion',
+  'branch',
+  'suggestion-branch',
+  'branch-origin',
+])
 
 const selectorRangeSchema = z
   .object({

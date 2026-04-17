@@ -1,4 +1,4 @@
-export type MessageAnnotationKind = 'suggestion' | 'branch' | 'suggestion-branch'
+export type MessageAnnotationKind = 'suggestion' | 'branch' | 'suggestion-branch' | 'branch-origin'
 
 export interface MessageAnnotationSelectorRange {
   quote: string

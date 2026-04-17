@@ -1,9 +1,9 @@
-export type AssistantAnnotationKind = 'suggestion' | 'branch' | 'suggestion-branch'
+export type AssistantAnnotationKind = 'suggestion' | 'branch' | 'suggestion-branch' | 'branch-origin'
 
 export const ASSISTANT_ANNOTATION_KIND_PREFIX = 'assistant-kind:'
 
 export const isAnnotationKind = (kind: string): kind is AssistantAnnotationKind =>
-  kind === 'suggestion' || kind === 'branch' || kind === 'suggestion-branch'
+  kind === 'suggestion' || kind === 'branch' || kind === 'suggestion-branch' || kind === 'branch-origin'
 
 export const parseAnnotationKindTag = (
   value?: string,

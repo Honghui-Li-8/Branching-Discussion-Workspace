@@ -1,9 +1,12 @@
 import {
   parseConversationTurnMetadata,
   parseMessageMetadata,
+  parseBranchEventMetadata,
+  serializeBranchEventMetadata,
   serializeConversationTurnMetadata,
   serializeMessageMetadata,
   retrieverInputSchema,
+  branchEventMetadataSchema,
 } from './metadata.js'
 
 describe('metadata contracts', () => {
@@ -81,5 +84,117 @@ describe('metadata contracts', () => {
       nodeId: 'n1',
       authorUserId: 'u1',
     })
+  })
+
+  test('parseBranchEventMetadata returns payload for valid branch event', () => {
+    expect(
+      parseBranchEventMetadata({
+        eventType: 'branch_event',
+        sourceNodeId: 'node-1',
+        sourceMessageId: 'msg-1',
+        branchNodeId: 'branch-node-1',
+      }),
+    ).toEqual({
+      eventType: 'branch_event',
+      sourceNodeId: 'node-1',
+      sourceMessageId: 'msg-1',
+      branchNodeId: 'branch-node-1',
+    })
+  })
+
+  test('parseBranchEventMetadata includes optional fields when present', () => {
+    expect(
+      parseBranchEventMetadata({
+        eventType: 'branch_event',
+        sourceNodeId: 'node-1',
+        sourceMessageId: 'msg-1',
+        sourceAnnotationId: 'ann-1',
+        sourceContext: 'some surrounding text',
+        branchNodeId: 'branch-node-1',
+      }),
+    ).toEqual({
+      eventType: 'branch_event',
+      sourceNodeId: 'node-1',
+      sourceMessageId: 'msg-1',
+      sourceAnnotationId: 'ann-1',
+      sourceContext: 'some surrounding text',
+      branchNodeId: 'branch-node-1',
+    })
+  })
+
+  test('parseBranchEventMetadata returns null when eventType is missing', () => {
+    expect(
+      parseBranchEventMetadata({
+        sourceNodeId: 'node-1',
+        sourceMessageId: 'msg-1',
+        branchNodeId: 'branch-node-1',
+      }),
+    ).toBeNull()
+  })
+
+  test('parseBranchEventMetadata returns null when required fields are missing', () => {
+    expect(
+      parseBranchEventMetadata({
+        eventType: 'branch_event',
+        sourceNodeId: 'node-1',
+      }),
+    ).toBeNull()
+  })
+
+  test('parseBranchEventMetadata returns null for wrong eventType', () => {
+    expect(
+      parseBranchEventMetadata({
+        eventType: 'other_event',
+        sourceNodeId: 'node-1',
+        sourceMessageId: 'msg-1',
+        branchNodeId: 'branch-node-1',
+      }),
+    ).toBeNull()
+  })
+
+  test('parseMessageMetadata includes branch event fields when present', () => {
+    expect(
+      parseMessageMetadata({
+        eventType: 'branch_event',
+        sourceNodeId: 'node-1',
+        sourceMessageId: 'msg-1',
+        branchNodeId: 'branch-node-1',
+      }),
+    ).toEqual({
+      eventType: 'branch_event',
+      sourceNodeId: 'node-1',
+      sourceMessageId: 'msg-1',
+      branchNodeId: 'branch-node-1',
+    })
+  })
+
+  test('branchEventMetadataSchema rejects empty string ids', () => {
+    expect(() =>
+      branchEventMetadataSchema.parse({
+        eventType: 'branch_event',
+        sourceNodeId: '',
+        sourceMessageId: 'msg-1',
+        branchNodeId: 'branch-node-1',
+      }),
+    ).toThrow()
+  })
+
+  test('serializeBranchEventMetadata accepts a complete valid payload', () => {
+    const input = {
+      eventType: 'branch_event' as const,
+      sourceNodeId: 'node-1',
+      sourceMessageId: 'msg-1',
+      branchNodeId: 'branch-node-1',
+    }
+    expect(serializeBranchEventMetadata(input)).toEqual(input)
+  })
+
+  test('serializeBranchEventMetadata throws on partial branch event payload', () => {
+    expect(() =>
+      serializeBranchEventMetadata({
+        eventType: 'branch_event',
+        sourceNodeId: 'node-1',
+      } as never),
+    ).toThrow()
   })
 })
