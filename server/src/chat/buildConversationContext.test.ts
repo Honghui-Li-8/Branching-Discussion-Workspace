@@ -236,6 +236,69 @@ describe('buildConversationContext', () => {
     expect(result.memoryPlaceholder).toBeNull()
   })
 
+  test('loads only current node history for child nodes and does not merge parent messages', async () => {
+    getNodeByIdForAuthorMock.mockResolvedValueOnce({
+      ...nodeRecord,
+      id: 'n-child',
+      parentNodeId: 'n-parent',
+      depth: 1,
+      title: 'Child Branch',
+      summary: 'Child summary',
+    })
+    listMessagesForNodeForAuthorMock.mockResolvedValueOnce([
+      {
+        id: 'm-branch-event',
+        authorUserId: 'u1',
+        nodeId: 'n-child',
+        turnId: null,
+        role: 'user' as const,
+        content: 'surrounding branch context',
+        metadata: {
+          eventType: 'branch_event' as const,
+          sourceNodeId: 'n-parent',
+          sourceMessageId: 'm-parent-source',
+          branchNodeId: 'n-child',
+        },
+        createdAt: '2026-03-30T00:03:00.000Z',
+      },
+      {
+        id: 'm-child-followup',
+        authorUserId: 'u1',
+        nodeId: 'n-child',
+        turnId: 't-child-1',
+        role: 'user' as const,
+        content: 'follow-up question',
+        metadata: {},
+        createdAt: '2026-03-30T00:04:00.000Z',
+      },
+    ])
+
+    const result = await buildConversationContext({
+      nodeId: 'n-child',
+      currentUserId: 'u1',
+      userInput: 'next child turn',
+      recentMessageLimit: 10,
+    })
+
+    expect(getNodeByIdForAuthorMock).toHaveBeenCalledWith('n-child', 'u1')
+    expect(listMessagesForNodeForAuthorMock).toHaveBeenCalledWith('n-child', 'u1')
+    expect(result.recentMessages).toEqual([
+      {
+        id: 'm-branch-event',
+        role: 'user',
+        content: 'surrounding branch context',
+        createdAt: '2026-03-30T00:03:00.000Z',
+      },
+      {
+        id: 'm-child-followup',
+        role: 'user',
+        content: 'follow-up question',
+        createdAt: '2026-03-30T00:04:00.000Z',
+      },
+    ])
+    expect(result.node.parentNodeId).toBe('n-parent')
+  })
+
   test('throws NOT_FOUND when node is not accessible', async () => {
     getNodeByIdForAuthorMock.mockResolvedValueOnce(null)
 
