@@ -109,6 +109,15 @@ export const createMessageInputSchema = z.object({
   content: z.string(),
 })
 
+export const parentMessagesUpToSourceInputSchema = z.object({
+  sourceNodeId: z.string(),
+  sourceMessageId: z.string(),
+})
+
+export const inheritedMessagesByNodeInputSchema = z.object({
+  nodeId: z.string(),
+})
+
 export const updateMessageInputSchema = z
   .object({
     id: z.string(),
@@ -134,3 +143,5 @@ export type CreateNodeInput = z.infer<typeof createNodeInputSchema>
 export type UpdateNodeInput = z.infer<typeof updateNodeInputSchema>
 export type CreateMessageInput = z.infer<typeof createMessageInputSchema>
 export type UpdateMessageInput = z.infer<typeof updateMessageInputSchema>
+export type ParentMessagesUpToSourceInput = z.infer<typeof parentMessagesUpToSourceInputSchema>
+export type InheritedMessagesByNodeInput = z.infer<typeof inheritedMessagesByNodeInputSchema>

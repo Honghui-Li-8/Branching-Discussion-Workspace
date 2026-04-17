@@ -3,7 +3,9 @@ import type { AppRouterContext } from '@branching/shared'
 import {
   createMessageForAuthor as createMessageForAuthorRecord,
   deleteMessageForAuthor as deleteMessageForAuthorRecord,
+  getBranchEventMetadataFromRecord,
   getNodeByIdForAuthor as getNodeByIdForAuthorRecord,
+  listParentMessagesUpToSourceForAuthor as listParentMessagesUpToSourceForAuthorRecord,
   listMessagesForNodeForAuthor as listMessagesForNodeForAuthorRecord,
   updateMessageForAuthor as updateMessageForAuthorRecord,
 } from '../db/index.js'
@@ -17,8 +19,51 @@ const logger = createLogger('trpc-context')
 
 type MessageHandlers = Pick<
   AppRouterContext,
-  'listMessagesForNode' | 'createMessage' | 'updateMessage' | 'deleteMessage'
+  | 'listMessagesForNode'
+  | 'listParentMessagesUpToSource'
+  | 'listInheritedMessagesForNode'
+  | 'createMessage'
+  | 'updateMessage'
+  | 'deleteMessage'
 >
+
+const listInheritedMessageChainForAuthor = async (
+  sourceNodeId: string,
+  sourceMessageId: string,
+  authorUserId: string,
+  visited: Set<string>,
+): Promise<Awaited<ReturnType<typeof listMessagesForNodeForAuthorRecord>>> => {
+  const visitKey = `${sourceNodeId}:${sourceMessageId}`
+  if (visited.has(visitKey)) {
+    return []
+  }
+  visited.add(visitKey)
+
+  const parentMessages = await listParentMessagesUpToSourceForAuthorRecord(
+    sourceNodeId,
+    sourceMessageId,
+    authorUserId,
+  )
+  const upstreamBranchEvent = parentMessages.find((message) =>
+    getBranchEventMetadataFromRecord(message) !== null,
+  )
+  const upstreamBranchEventMetadata = upstreamBranchEvent
+    ? getBranchEventMetadataFromRecord(upstreamBranchEvent)
+    : null
+
+  if (!upstreamBranchEventMetadata) {
+    return parentMessages
+  }
+
+  const ancestorMessages = await listInheritedMessageChainForAuthor(
+    upstreamBranchEventMetadata.sourceNodeId,
+    upstreamBranchEventMetadata.sourceMessageId,
+    authorUserId,
+    visited,
+  )
+
+  return [...ancestorMessages, ...parentMessages]
+}
 
 export const createMessageHandlers = ({
   requireSessionUserId,
@@ -46,6 +91,78 @@ export const createMessageHandlers = ({
       })
       logger.debug('[message] list-by-node request debug error details.', {
         node_id: nodeId,
+        author_user_id: currentUserId,
+        error,
+      })
+      throw error
+    }
+  },
+  listParentMessagesUpToSource: async (input) => {
+    const currentUserId = requireSessionUserId()
+    try {
+      const sourceNode = await getNodeByIdForSessionUser(input.sourceNodeId)
+      if (!sourceNode) {
+        return []
+      }
+
+      return await listParentMessagesUpToSourceForAuthorRecord(
+        input.sourceNodeId,
+        input.sourceMessageId,
+        currentUserId,
+      )
+    } catch (error) {
+      logger.error('[message] list-parent-up-to-source request failed.', {
+        source_node_id: input.sourceNodeId,
+        source_message_id: input.sourceMessageId,
+        author_user_id: currentUserId,
+        error,
+      })
+      logger.debug('[message] list-parent-up-to-source request debug error details.', {
+        source_node_id: input.sourceNodeId,
+        source_message_id: input.sourceMessageId,
+        author_user_id: currentUserId,
+        error,
+      })
+      throw error
+    }
+  },
+  listInheritedMessagesForNode: async (input) => {
+    const currentUserId = requireSessionUserId()
+    try {
+      const node = await getNodeByIdForSessionUser(input.nodeId)
+      if (!node) {
+        return []
+      }
+
+      const localMessages = await listMessagesForNodeForAuthorRecord(
+        input.nodeId,
+        currentUserId,
+      )
+      const branchEventMessage = localMessages.find((message) =>
+        getBranchEventMetadataFromRecord(message) !== null,
+      )
+      const branchEventMetadata = branchEventMessage
+        ? getBranchEventMetadataFromRecord(branchEventMessage)
+        : null
+
+      if (!branchEventMetadata) {
+        return []
+      }
+
+      return await listInheritedMessageChainForAuthor(
+        branchEventMetadata.sourceNodeId,
+        branchEventMetadata.sourceMessageId,
+        currentUserId,
+        new Set<string>(),
+      )
+    } catch (error) {
+      logger.error('[message] list-inherited-messages-for-node request failed.', {
+        node_id: input.nodeId,
+        author_user_id: currentUserId,
+        error,
+      })
+      logger.debug('[message] list-inherited-messages-for-node request debug error details.', {
+        node_id: input.nodeId,
         author_user_id: currentUserId,
         error,
       })

@@ -74,6 +74,8 @@ const makeContext = (): AppRouterContext => {
       deletedMessageCount: 4,
     })),
     listMessagesForNode: jest.fn(async () => [message]),
+    listParentMessagesUpToSource: jest.fn(async () => [message]),
+    listInheritedMessagesForNode: jest.fn(async () => [message]),
     createMessage: jest.fn(async () => message),
     updateMessage: jest.fn(async () => message),
     deleteMessage: jest.fn(async () => ({ id: message.id })),
@@ -216,6 +218,33 @@ describe('appRouter core routes', () => {
 
     expect(ctx.createMessage).toHaveBeenCalledWith(input)
     expect(result.nodeId).toBe('n1')
+  })
+
+  test('parentMessagesUpToSource delegates to context', async () => {
+    const ctx = makeContext()
+    const caller = appRouter.createCaller(ctx)
+    const input = {
+      sourceNodeId: 'n1',
+      sourceMessageId: 'm1',
+    }
+
+    const result = await caller.parentMessagesUpToSource(input)
+
+    expect(ctx.listParentMessagesUpToSource).toHaveBeenCalledWith(input)
+    expect(result).toHaveLength(1)
+    expect(result[0]?.id).toBe('m1')
+  })
+
+  test('inheritedMessagesByNode delegates to context', async () => {
+    const ctx = makeContext()
+    const caller = appRouter.createCaller(ctx)
+    const input = { nodeId: 'n1' }
+
+    const result = await caller.inheritedMessagesByNode(input)
+
+    expect(ctx.listInheritedMessagesForNode).toHaveBeenCalledWith(input)
+    expect(result).toHaveLength(1)
+    expect(result[0]?.id).toBe('m1')
   })
 
   test('messageUpdate validates patch payload', async () => {

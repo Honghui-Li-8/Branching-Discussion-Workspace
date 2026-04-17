@@ -6,6 +6,8 @@ import {
   deleteMessageInputSchema,
   deleteNodeInputSchema,
   deleteWorkspaceInputSchema,
+  inheritedMessagesByNodeInputSchema,
+  parentMessagesUpToSourceInputSchema,
   updateMessageInputSchema,
   updateNodeInputSchema,
   updateWorkspaceInputSchema,
@@ -71,6 +73,12 @@ export const appRouter = t.router({
   messagesByNode: protectedProcedure
     .input(z.object({ nodeId: z.string() }))
     .query(({ ctx, input }) => ctx.listMessagesForNode(input.nodeId)),
+  parentMessagesUpToSource: protectedProcedure
+    .input(parentMessagesUpToSourceInputSchema)
+    .query(({ ctx, input }) => ctx.listParentMessagesUpToSource(input)),
+  inheritedMessagesByNode: protectedProcedure
+    .input(inheritedMessagesByNodeInputSchema)
+    .query(({ ctx, input }) => ctx.listInheritedMessagesForNode(input)),
   messageCreate: protectedProcedure
     .input(createMessageInputSchema)
     .mutation(({ ctx, input }) => ctx.createMessage(input)),

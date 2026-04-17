@@ -56,6 +56,8 @@ const makeContext = (): AppRouterContext => {
     updateNode: jest.fn(async () => null),
     deleteNode: jest.fn(async () => null),
     listMessagesForNode: jest.fn(async () => []),
+    listParentMessagesUpToSource: jest.fn(async () => []),
+    listInheritedMessagesForNode: jest.fn(async () => []),
     createMessage: jest.fn(async () => {
       throw new Error('Not implemented in annotation test context')
     }),

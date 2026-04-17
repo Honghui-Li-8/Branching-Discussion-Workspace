@@ -41,6 +41,8 @@ const makeContext = (): AppRouterContext => ({
   updateNode: jest.fn(async () => null),
   deleteNode: jest.fn(async () => null),
   listMessagesForNode: jest.fn(async () => []),
+  listParentMessagesUpToSource: jest.fn(async () => []),
+  listInheritedMessagesForNode: jest.fn(async () => []),
   createMessage: jest.fn(async () => ({
     id: 'm1',
     authorUserId: 'u1',
@@ -116,6 +118,8 @@ describe('shared public API router surface', () => {
     expect(typeof caller.messageAnnotationDelete).toBe('function')
     expect(typeof caller.messageBranchFromSelection).toBe('function')
     expect(typeof caller.branchAndSendFollowup).toBe('function')
+    expect(typeof caller.parentMessagesUpToSource).toBe('function')
+    expect(typeof caller.inheritedMessagesByNode).toBe('function')
     expect(typeof caller.conversationSend).toBe('function')
   })
 })
