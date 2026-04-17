@@ -1,6 +1,7 @@
 import { describe, expect, test } from '@jest/globals'
 import {
   assistantAnnotationKindSchema,
+  branchAndSendFollowupInputSchema,
   messageAnnotationSchema,
 } from './annotations.js'
 
@@ -19,6 +20,53 @@ describe('annotation schema contracts', () => {
     test('rejects unknown kinds', () => {
       expect(() => assistantAnnotationKindSchema.parse('unknown')).toThrow()
       expect(() => assistantAnnotationKindSchema.parse('')).toThrow()
+    })
+  })
+
+  describe('branchAndSendFollowupInputSchema', () => {
+    const baseInput = {
+      messageId: 'm1',
+      selection: {
+        quote: 'hello',
+        selectorJson: { selector: [{ quote: 'hello', start: 0, end: 5 }] },
+      },
+      sourceContext: 'surrounding text',
+      text: 'follow-up question',
+      model: 'claude-sonnet-4-6',
+      idempotencyKey: 'key-1',
+    }
+
+    test('accepts a valid fresh-branch input', () => {
+      expect(() => branchAndSendFollowupInputSchema.parse(baseInput)).not.toThrow()
+    })
+
+    test('accepts annotationKind branch', () => {
+      expect(() =>
+        branchAndSendFollowupInputSchema.parse({ ...baseInput, annotationKind: 'branch' }),
+      ).not.toThrow()
+    })
+
+    test('rejects suggestion-branch annotationKind — unsupported by this mutation', () => {
+      expect(() =>
+        branchAndSendFollowupInputSchema.parse({ ...baseInput, annotationKind: 'suggestion-branch' }),
+      ).toThrow()
+    })
+
+    test('rejects missing sourceContext', () => {
+      const { sourceContext: _omit, ...withoutContext } = baseInput
+      expect(() => branchAndSendFollowupInputSchema.parse(withoutContext)).toThrow()
+    })
+
+    test('rejects empty sourceContext', () => {
+      expect(() =>
+        branchAndSendFollowupInputSchema.parse({ ...baseInput, sourceContext: '' }),
+      ).toThrow()
+    })
+
+    test('rejects empty text', () => {
+      expect(() =>
+        branchAndSendFollowupInputSchema.parse({ ...baseInput, text: '' }),
+      ).toThrow()
     })
   })
 

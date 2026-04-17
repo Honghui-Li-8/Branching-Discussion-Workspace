@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { conversationTurnStatusSchema } from './conversation.js'
 
 const nonEmptyTrimmedStringSchema = z
   .string()
@@ -106,9 +107,31 @@ export const messageBranchFromSelectionResultSchema = z.object({
   branchNodeId: z.string(),
 })
 
+export const branchAndSendFollowupInputSchema = z.object({
+  messageId: z.string(),
+  selection: annotationSelectionInputSchema,
+  annotationKind: z.literal('branch').optional(),
+  newNodeMeta: messageBranchNewNodeMetaSchema.optional(),
+  sourceContext: z.string().min(1),
+  text: z.string().min(1),
+  model: z.string().min(1),
+  idempotencyKey: z.string().min(1),
+})
+
+export const branchAndSendFollowupResultSchema = z.object({
+  branchNodeId: z.string(),
+  annotationId: z.string(),
+  branchEventMessageId: z.string(),
+  userFollowupMessageId: z.string(),
+  turnId: z.string(),
+  status: conversationTurnStatusSchema,
+})
+
 export type MessageAnnotation = z.infer<typeof messageAnnotationSchema>
 export type MessageAnnotationDeleteInput = z.infer<typeof messageAnnotationDeleteInputSchema>
 export type MessageAnnotationDeleteResult = z.infer<typeof messageAnnotationDeleteResultSchema>
 export type MessageSuggestFromSelectionInput = z.infer<typeof messageSuggestFromSelectionInputSchema>
 export type MessageBranchFromSelectionInput = z.infer<typeof messageBranchFromSelectionInputSchema>
 export type MessageBranchFromSelectionResult = z.infer<typeof messageBranchFromSelectionResultSchema>
+export type BranchAndSendFollowupInput = z.infer<typeof branchAndSendFollowupInputSchema>
+export type BranchAndSendFollowupResult = z.infer<typeof branchAndSendFollowupResultSchema>

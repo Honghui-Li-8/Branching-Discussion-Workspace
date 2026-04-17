@@ -11,6 +11,8 @@ import type {
   Workspace,
 } from './schemas/core.js'
 import type {
+  BranchAndSendFollowupInput,
+  BranchAndSendFollowupResult,
   MessageAnnotation,
   MessageAnnotationDeleteInput,
   MessageAnnotationDeleteResult,
@@ -66,6 +68,9 @@ export type AppRouterContext = {
   messageBranchFromSelection: (
     input: MessageBranchFromSelectionInput,
   ) => Promise<MessageBranchFromSelectionResult>
+  branchAndSendFollowup: (
+    input: BranchAndSendFollowupInput,
+  ) => Promise<BranchAndSendFollowupResult>
   conversationSend: (
     input: ConversationSendInput,
   ) => Promise<ConversationSendResult>

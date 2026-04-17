@@ -11,6 +11,8 @@ import {
   updateWorkspaceInputSchema,
 } from './schemas/core.js'
 import {
+  branchAndSendFollowupInputSchema,
+  branchAndSendFollowupResultSchema,
   messageAnnotationDeleteInputSchema,
   messageAnnotationDeleteResultSchema,
   messageAnnotationsByMessageInputSchema,
@@ -93,6 +95,11 @@ export const appRouter = t.router({
     .input(messageBranchFromSelectionInputSchema)
     .output(messageBranchFromSelectionResultSchema)
     .mutation(({ ctx, input }) => ctx.messageBranchFromSelection(input)),
+
+  branchAndSendFollowup: protectedProcedure
+    .input(branchAndSendFollowupInputSchema)
+    .output(branchAndSendFollowupResultSchema)
+    .mutation(({ ctx, input }) => ctx.branchAndSendFollowup(input)),
 
   conversationSend: protectedProcedure
     .input(conversationSendInputSchema)

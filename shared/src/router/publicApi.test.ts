@@ -88,6 +88,9 @@ const makeContext = (): AppRouterContext => ({
     },
     branchNodeId: 'n2',
   })),
+  branchAndSendFollowup: jest.fn(async () => {
+    throw new Error('Not implemented in public API test context')
+  }),
   conversationSend: jest.fn(async () => ({
     turnId: 't1',
     status: 'completed' as const,
@@ -112,6 +115,7 @@ describe('shared public API router surface', () => {
     expect(typeof caller.messageSuggestFromSelection).toBe('function')
     expect(typeof caller.messageAnnotationDelete).toBe('function')
     expect(typeof caller.messageBranchFromSelection).toBe('function')
+    expect(typeof caller.branchAndSendFollowup).toBe('function')
     expect(typeof caller.conversationSend).toBe('function')
   })
 })

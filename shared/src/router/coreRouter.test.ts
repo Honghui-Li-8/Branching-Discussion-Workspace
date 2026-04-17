@@ -114,6 +114,9 @@ const makeContext = (): AppRouterContext => {
       },
       branchNodeId: 'n-child-1',
     })),
+    branchAndSendFollowup: jest.fn(async () => {
+      throw new Error('Not implemented in core router test context')
+    }),
     conversationSend: jest.fn(async () => ({
       turnId: 't1',
       status: 'completed' as const,
