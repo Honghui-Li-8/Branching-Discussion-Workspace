@@ -5,6 +5,7 @@ import {
   createMessageForAuthor,
   deleteMessageForAuthor,
   deleteMessage,
+  getBranchEventMetadataFromRecord,
   getMessageBranchSourceContextForAuthor,
   getMessageBranchSourceContextForAuthorInTransaction,
   getMessageByIdForAuthor,
@@ -12,6 +13,8 @@ import {
   listMessagesByTurn,
   listMessagesForNodeForAuthor,
   listMessagesForNode,
+  listParentMessagesUpToSource,
+  listParentMessagesUpToSourceForAuthor,
   updateMessageForAuthor,
   updateMessage,
 } from './message'
@@ -314,5 +317,161 @@ describe('message queries', () => {
       expect.stringContaining('AND w.author_user_id = $2'),
       ['m1', 'u2'],
     )
+  })
+
+  describe('listParentMessagesUpToSource', () => {
+    const parentRow1 = { ...messageRow, id: 'pm1', node_id: 'parent-node', created_at: '2026-03-17T00:00:01.000Z' }
+    const parentRow2 = { ...messageRow, id: 'pm2', node_id: 'parent-node', created_at: '2026-03-17T00:00:02.000Z' }
+    const sourceRow  = { ...messageRow, id: 'pm3', node_id: 'parent-node', created_at: '2026-03-17T00:00:03.000Z' }
+
+    test('returns messages in ascending order up to and including source', async () => {
+      queryMock.mockResolvedValueOnce({ rows: [parentRow1, parentRow2, sourceRow] } as never)
+
+      const result = await listParentMessagesUpToSource('parent-node', 'pm3')
+
+      expect(result).toHaveLength(3)
+      expect(result[0]?.id).toBe('pm1')
+      expect(result[2]?.id).toBe('pm3')
+      expect(queryMock).toHaveBeenCalledWith(
+        expect.stringContaining('ORDER BY m.created_at ASC, m.id ASC'),
+        ['parent-node', 'pm3'],
+      )
+    })
+
+    test('returns empty array when parent node has no messages', async () => {
+      queryMock.mockResolvedValueOnce({ rows: [] } as never)
+
+      const result = await listParentMessagesUpToSource('parent-node', 'pm3')
+
+      expect(result).toEqual([])
+    })
+
+    test('returns empty array when source message does not exist', async () => {
+      queryMock.mockResolvedValueOnce({ rows: [] } as never)
+
+      const result = await listParentMessagesUpToSource('parent-node', 'nonexistent')
+
+      expect(result).toEqual([])
+    })
+
+    test('returns empty array when source message is from a different node', async () => {
+      queryMock.mockResolvedValueOnce({ rows: [] } as never)
+
+      const result = await listParentMessagesUpToSource('parent-node', 'msg-from-other-node')
+
+      expect(result).toEqual([])
+      expect(queryMock).toHaveBeenCalledWith(
+        expect.stringContaining('AND node_id = $1'),
+        ['parent-node', 'msg-from-other-node'],
+      )
+    })
+
+    test('includes source message at exact boundary', async () => {
+      queryMock.mockResolvedValueOnce({ rows: [sourceRow] } as never)
+
+      const result = await listParentMessagesUpToSource('parent-node', 'pm3')
+
+      expect(result).toHaveLength(1)
+      expect(result[0]?.id).toBe('pm3')
+    })
+
+    test('uses CTE with node binding and composite id tiebreak for boundary', async () => {
+      queryMock.mockResolvedValueOnce({ rows: [] } as never)
+
+      await listParentMessagesUpToSource('parent-node', 'pm3')
+
+      expect(queryMock).toHaveBeenCalledWith(
+        expect.stringMatching(/WITH source AS[\s\S]*WHERE id = \$2[\s\S]*AND node_id = \$1/),
+        ['parent-node', 'pm3'],
+      )
+      expect(queryMock).toHaveBeenCalledWith(
+        expect.stringContaining('m.id <= source.id'),
+        ['parent-node', 'pm3'],
+      )
+    })
+  })
+
+  describe('listParentMessagesUpToSourceForAuthor', () => {
+    const parentRow = { ...messageRow, id: 'pm1', node_id: 'parent-node', created_at: '2026-03-17T00:00:01.000Z' }
+
+    test('returns rows for owner', async () => {
+      queryMock.mockResolvedValueOnce({ rows: [parentRow] } as never)
+
+      const result = await listParentMessagesUpToSourceForAuthor('parent-node', 'pm1', 'u1')
+
+      expect(result).toHaveLength(1)
+      expect(queryMock).toHaveBeenCalledWith(
+        expect.stringContaining('AND w.author_user_id = $3'),
+        ['parent-node', 'pm1', 'u1'],
+      )
+    })
+
+    test('returns empty array for non-owner', async () => {
+      queryMock.mockResolvedValueOnce({ rows: [] } as never)
+
+      const result = await listParentMessagesUpToSourceForAuthor('parent-node', 'pm1', 'u2')
+
+      expect(result).toEqual([])
+      expect(queryMock).toHaveBeenCalledWith(
+        expect.stringContaining('AND w.author_user_id = $3'),
+        ['parent-node', 'pm1', 'u2'],
+      )
+    })
+
+    test('CTE binds source message to sourceNodeId in author-scoped variant', async () => {
+      queryMock.mockResolvedValueOnce({ rows: [] } as never)
+
+      await listParentMessagesUpToSourceForAuthor('parent-node', 'pm1', 'u1')
+
+      expect(queryMock).toHaveBeenCalledWith(
+        expect.stringMatching(/WITH source AS[\s\S]*WHERE id = \$2[\s\S]*AND node_id = \$1/),
+        ['parent-node', 'pm1', 'u1'],
+      )
+    })
+  })
+
+  describe('getBranchEventMetadataFromRecord', () => {
+    const baseRecord = {
+      id: 'm1',
+      authorUserId: 'u1',
+      nodeId: 'n1',
+      turnId: null,
+      content: 'hello',
+      createdAt: '2026-03-17T00:00:00.000Z',
+    }
+
+    test('returns branch event metadata when record has valid branch event metadata', () => {
+      const record = {
+        ...baseRecord,
+        role: 'user' as const,
+        metadata: {
+          eventType: 'branch_event' as const,
+          sourceNodeId: 'node-1',
+          sourceMessageId: 'msg-1',
+          branchNodeId: 'branch-node-1',
+        },
+      }
+
+      const result = getBranchEventMetadataFromRecord(record)
+
+      expect(result).toEqual({
+        eventType: 'branch_event',
+        sourceNodeId: 'node-1',
+        sourceMessageId: 'msg-1',
+        branchNodeId: 'branch-node-1',
+      })
+    })
+
+    test('returns null for a regular user message', () => {
+      const record = { ...baseRecord, role: 'user' as const, metadata: {} }
+
+      expect(getBranchEventMetadataFromRecord(record)).toBeNull()
+    })
+
+    test('returns null for an assistant message', () => {
+      const record = { ...baseRecord, role: 'assistant' as const, metadata: {} }
+
+      expect(getBranchEventMetadataFromRecord(record)).toBeNull()
+    })
   })
 })
