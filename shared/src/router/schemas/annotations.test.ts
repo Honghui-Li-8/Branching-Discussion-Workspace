@@ -46,9 +46,22 @@ describe('annotation schema contracts', () => {
       ).not.toThrow()
     })
 
-    test('rejects suggestion-branch annotationKind — unsupported by this mutation', () => {
+    test('accepts suggestion-branch annotationKind when sourceAnnotationId is present', () => {
       expect(() =>
-        branchAndSendFollowupInputSchema.parse({ ...baseInput, annotationKind: 'suggestion-branch' }),
+        branchAndSendFollowupInputSchema.parse({
+          ...baseInput,
+          annotationKind: 'suggestion-branch',
+          sourceAnnotationId: 'a1',
+        }),
+      ).not.toThrow()
+    })
+
+    test('rejects suggestion-branch annotationKind without sourceAnnotationId', () => {
+      expect(() =>
+        branchAndSendFollowupInputSchema.parse({
+          ...baseInput,
+          annotationKind: 'suggestion-branch',
+        }),
       ).toThrow()
     })
 

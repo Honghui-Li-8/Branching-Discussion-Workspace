@@ -107,22 +107,31 @@ export const messageBranchFromSelectionResultSchema = z.object({
   branchNodeId: z.string(),
 })
 
-export const branchAndSendFollowupInputSchema = z.object({
-  messageId: z.string(),
-  selection: annotationSelectionInputSchema,
-  annotationKind: z.literal('branch').optional(),
-  newNodeMeta: messageBranchNewNodeMetaSchema.optional(),
-  sourceContext: z.string().min(1),
-  text: z.string().min(1),
-  model: z.string().min(1),
-  idempotencyKey: z.string().min(1),
-})
+export const branchAndSendFollowupInputSchema = z
+  .object({
+    messageId: z.string(),
+    sourceAnnotationId: z.string().optional(),
+    selection: annotationSelectionInputSchema,
+    annotationKind: z.enum(['branch', 'suggestion-branch']).optional(),
+    newNodeMeta: messageBranchNewNodeMetaSchema.optional(),
+    sourceContext: z.string().min(1),
+    text: z.string().min(1),
+    model: z.string().min(1),
+    idempotencyKey: z.string().min(1),
+  })
+  .refine(
+    (value) => value.annotationKind !== 'suggestion-branch' || Boolean(value.sourceAnnotationId),
+    {
+      message: 'sourceAnnotationId is required when annotationKind is suggestion-branch.',
+      path: ['sourceAnnotationId'],
+    },
+  )
 
 export const branchAndSendFollowupResultSchema = z.object({
   branchNodeId: z.string(),
   annotationId: z.string(),
-  branchEventMessageId: z.string(),
-  userFollowupMessageId: z.string(),
+  branchEventMessageId: z.string().nullable(),
+  userFollowupMessageId: z.string().nullable(),
   turnId: z.string(),
   status: conversationTurnStatusSchema,
 })
