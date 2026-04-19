@@ -83,6 +83,7 @@ const makeContext = (): AppRouterContext => {
     branchAndSendFollowup: jest.fn(async () => {
       throw new Error('Not implemented in annotation test context')
     }),
+    branchFollowupStatus: jest.fn(async () => null),
     conversationSend: jest.fn(async () => {
       throw new Error('Not implemented in annotation test context')
     }),

@@ -3,6 +3,7 @@ import type { AppRouterContext } from '@branching/shared'
 import {
   createMessageAnnotationForAuthor as createMessageAnnotationForAuthorRecord,
   deleteNodeForAuthor as deleteNodeForAuthorRecord,
+  getConversationTurnByIdForAuthor as getConversationTurnByIdForAuthorRecord,
   getNodeByIdForAuthor as getNodeByIdForAuthorRecord,
   getMessageAnnotationByIdForAuthor as getMessageAnnotationByIdForAuthorRecord,
   getMessageByIdForAuthor as getMessageByIdForAuthorRecord,
@@ -10,7 +11,10 @@ import {
   softDeleteMessageAnnotationForAuthor as softDeleteMessageAnnotationForAuthorRecord,
   transitionMessageAnnotationToSuggestionForAuthor as transitionMessageAnnotationToSuggestionForAuthorRecord,
 } from '../db/index.js'
-import { messageExists as messageExistsRecord } from '../db/queries/message.js'
+import {
+  listMessagesByTurn as listMessagesByTurnRecord,
+  messageExists as messageExistsRecord,
+} from '../db/queries/message.js'
 import { messageAnnotationExists as messageAnnotationExistsRecord } from '../db/queries/messageAnnotation.js'
 import {
   branchMessageFromSelectionInTransaction,
@@ -21,6 +25,7 @@ import {
   branchAndSendFollowup as branchAndSendFollowupService,
 } from '../annotations/branchAndSendFollowup.js'
 import { createLogger } from '../logging/logger.js'
+import { getFollowupUserMessageForTurn } from './annotationHelpers.js'
 import type { ContextOwnershipHelpers } from './types.js'
 
 type AnnotationHandlers = Pick<
@@ -30,6 +35,7 @@ type AnnotationHandlers = Pick<
   | 'messageAnnotationDelete'
   | 'messageBranchFromSelection'
   | 'branchAndSendFollowup'
+  | 'branchFollowupStatus'
 >
 
 const logger = createLogger('trpc-context')
@@ -435,6 +441,36 @@ export const createAnnotationHandlers = ({
         message_id: input.messageId,
         author_user_id: currentUserId,
         idempotency_key: input.idempotencyKey,
+        error,
+      })
+      throw error
+    }
+  },
+  branchFollowupStatus: async (input) => {
+    let currentUserId: string | null = null
+
+    try {
+      const resolvedUserId = requireSessionUserId()
+      currentUserId = resolvedUserId
+
+      const turn = await getConversationTurnByIdForAuthorRecord(input.turnId, resolvedUserId)
+      if (!turn) {
+        return null
+      }
+
+      const turnMessages = await listMessagesByTurnRecord(turn.id)
+      const userFollowupMessage = getFollowupUserMessageForTurn(turnMessages)
+
+      return {
+        turnId: turn.id,
+        status: turn.status,
+        userFollowupMessageId: userFollowupMessage?.id ?? null,
+        error: turn.error ?? null,
+      }
+    } catch (error) {
+      logger.error('[annotations] branch-followup-status request failed.', {
+        turn_id: input.turnId,
+        author_user_id: currentUserId,
         error,
       })
       throw error

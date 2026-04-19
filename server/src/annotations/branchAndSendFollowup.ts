@@ -4,7 +4,9 @@ import {
   createMessageForAuthor,
   getMessageBranchSourceContextForAuthor,
 } from '../db/queries/message.js'
+import { updateConversationTurnForAuthor } from '../db/index.js'
 import { runConversationTurnFlow } from '../chat/runConversationTurnFlow.js'
+import { resolveConversationTurnOrThrow } from '../chat/resolveConversationTurnOrThrow.js'
 import { createLogger } from '../logging/logger.js'
 import {
   branchMessageFromSelectionInTransaction,
@@ -24,6 +26,105 @@ type BranchAndSendFollowupParams = {
 
 const logger = createLogger('annotations')
 
+const markBackgroundTurnFailed = async ({
+  turnId,
+  currentUserId,
+  error,
+}: {
+  turnId: string
+  currentUserId: string
+  error: unknown
+}) => {
+  const errorMessage = error instanceof Error ? error.message : 'Branch follow-up failed.'
+  await updateConversationTurnForAuthor(
+    {
+      id: turnId,
+      status: 'failed',
+      error: errorMessage,
+    },
+    currentUserId,
+  )
+}
+
+const startBranchFollowupInBackground = ({
+  input,
+  currentUserId,
+  sourceNodeId,
+  branchNodeId,
+  branchAnnotationId,
+  turnId,
+}: {
+  input: BranchAndSendFollowupInput
+  currentUserId: string
+  sourceNodeId: string
+  branchNodeId: string
+  branchAnnotationId: string
+  turnId: string
+}) => {
+  const turnInput = {
+    nodeId: branchNodeId,
+    text: input.text,
+    model: input.model,
+    idempotencyKey: `${input.idempotencyKey}:turn`,
+  }
+
+  void (async () => {
+    try {
+      const branchEventMessage = await createMessageForAuthor({
+        nodeId: branchNodeId,
+        authorUserId: currentUserId,
+        role: 'user',
+        content: input.sourceContext,
+        metadata: serializeBranchEventMetadata({
+          eventType: 'branch_event',
+          sourceNodeId,
+          sourceMessageId: input.messageId,
+          sourceAnnotationId: input.sourceAnnotationId ?? branchAnnotationId,
+          sourceContext: input.sourceContext,
+          branchNodeId,
+        }),
+      })
+      if (!branchEventMessage) {
+        throw new Error('Failed to create branch event message in child node.')
+      }
+
+      logger.debug('[annotations] branch-and-send-followup: branch event message created.', {
+        message_id: input.messageId,
+        author_user_id: currentUserId,
+        branch_node_id: branchNodeId,
+        branch_event_message_id: branchEventMessage.id,
+      })
+
+      const turnResult = await runConversationTurnFlow({
+        input: turnInput,
+        currentUserId,
+        awaitCompletion: false,
+      })
+
+      logger.debug('[annotations] branch-and-send-followup: conversation turn started.', {
+        message_id: input.messageId,
+        author_user_id: currentUserId,
+        branch_node_id: branchNodeId,
+        turn_id: turnResult.turnId,
+        status: turnResult.status,
+      })
+    } catch (error) {
+      await markBackgroundTurnFailed({
+        turnId,
+        currentUserId,
+        error,
+      })
+      logger.error('[annotations] branch-and-send-followup background work failed.', {
+        message_id: input.messageId,
+        author_user_id: currentUserId,
+        branch_node_id: branchNodeId,
+        turn_id: turnId,
+        error,
+      })
+    }
+  })()
+}
+
 export const branchAndSendFollowup = async ({
   input,
   currentUserId,
@@ -41,14 +142,14 @@ export const branchAndSendFollowup = async ({
   }
 
   // Step 1: Create branch node + annotation in a transaction.
-  // annotationKind is always 'branch' — suggestion-to-branch conversion is not supported
-  // by this mutation (it has no sourceAnnotationId). Idempotency for this step is scoped
-  // to the ':branch' sub-key. Full retry-safety across all steps is hardened in Commit 7.
+  // Idempotency for this step is scoped to the ':branch' sub-key.
+  // Full retry-safety across all steps is added in the later idempotency-hardening commit.
   const branchResult = await branchMessageFromSelectionInTransaction({
     input: {
       messageId: input.messageId,
+      sourceAnnotationId: input.sourceAnnotationId,
       selection: input.selection,
-      annotationKind: 'branch',
+      annotationKind: input.annotationKind ?? 'branch',
       newNodeMeta: input.newNodeMeta,
       idempotencyKey: `${input.idempotencyKey}:branch`,
     },
@@ -65,61 +166,32 @@ export const branchAndSendFollowup = async ({
     annotation_id: branchResult.annotation.id,
   })
 
-  // Step 2: Persist branch event message in the child node.
-  // sourceContext is guaranteed non-empty by the input schema.
-  // The UI computes a display label from sourceContext in metadata at render time.
-  const branchEventMessage = await createMessageForAuthor({
+  const turnInput = {
     nodeId: branchResult.branchNodeId,
-    authorUserId: currentUserId,
-    role: 'user',
-    content: input.sourceContext,
-    metadata: serializeBranchEventMetadata({
-      eventType: 'branch_event',
-      sourceNodeId: source.parentNodeId,
-      sourceMessageId: input.messageId,
-      sourceAnnotationId: branchResult.annotation.id,
-      sourceContext: input.sourceContext,
-      branchNodeId: branchResult.branchNodeId,
-    }),
-  })
-  if (!branchEventMessage) {
-    throw new Error('Failed to create branch event message in child node.')
+    text: input.text,
+    model: input.model,
+    idempotencyKey: `${input.idempotencyKey}:turn`,
   }
-
-  logger.debug('[annotations] branch-and-send-followup: branch event message created.', {
-    message_id: input.messageId,
-    author_user_id: currentUserId,
-    branch_node_id: branchResult.branchNodeId,
-    branch_event_message_id: branchEventMessage.id,
-  })
-
-  // Step 3: Trigger conversation turn pipeline with the follow-up text.
-  // Idempotency for this step is scoped to the ':turn' sub-key.
-  const turnResult = await runConversationTurnFlow({
-    input: {
-      nodeId: branchResult.branchNodeId,
-      text: input.text,
-      model: input.model,
-      idempotencyKey: `${input.idempotencyKey}:turn`,
-    },
+  const resolvedTurn = await resolveConversationTurnOrThrow({
+    input: turnInput,
     currentUserId,
-    awaitCompletion: false,
   })
 
-  logger.debug('[annotations] branch-and-send-followup: conversation turn started.', {
-    message_id: input.messageId,
-    author_user_id: currentUserId,
-    branch_node_id: branchResult.branchNodeId,
-    turn_id: turnResult.turnId,
-    status: turnResult.status,
+  startBranchFollowupInBackground({
+    input,
+    currentUserId,
+    sourceNodeId: source.parentNodeId,
+    branchNodeId: branchResult.branchNodeId,
+    branchAnnotationId: branchResult.annotation.id,
+    turnId: resolvedTurn.turn.id,
   })
 
   return {
     branchNodeId: branchResult.branchNodeId,
     annotationId: branchResult.annotation.id,
-    branchEventMessageId: branchEventMessage.id,
-    userFollowupMessageId: turnResult.userMessage.id,
-    turnId: turnResult.turnId,
-    status: turnResult.status,
+    branchEventMessageId: null,
+    userFollowupMessageId: null,
+    turnId: resolvedTurn.turn.id,
+    status: resolvedTurn.turn.status,
   }
 }

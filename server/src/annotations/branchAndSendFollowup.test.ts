@@ -3,7 +3,9 @@ import {
   getMessageBranchSourceContextForAuthor,
   createMessageForAuthor,
 } from '../db/queries/message.js'
+import { updateConversationTurnForAuthor } from '../db/index.js'
 import { runConversationTurnFlow } from '../chat/runConversationTurnFlow.js'
+import { resolveConversationTurnOrThrow } from '../chat/resolveConversationTurnOrThrow.js'
 import { branchMessageFromSelectionInTransaction } from './branchMessageFromSelection.js'
 import {
   branchAndSendFollowup,
@@ -15,8 +17,14 @@ jest.mock('../db/queries/message.js', () => ({
   getMessageBranchSourceContextForAuthor: jest.fn(),
   createMessageForAuthor: jest.fn(),
 }))
+jest.mock('../db/index.js', () => ({
+  updateConversationTurnForAuthor: jest.fn(),
+}))
 jest.mock('../chat/runConversationTurnFlow.js', () => ({
   runConversationTurnFlow: jest.fn(),
+}))
+jest.mock('../chat/resolveConversationTurnOrThrow.js', () => ({
+  resolveConversationTurnOrThrow: jest.fn(),
 }))
 jest.mock('./branchMessageFromSelection.js', () => ({
   branchMessageFromSelectionInTransaction: jest.fn(),
@@ -42,6 +50,12 @@ const createMessageForAuthorMock = createMessageForAuthor as jest.MockedFunction
 >
 const runTurnFlowMock = runConversationTurnFlow as jest.MockedFunction<
   typeof runConversationTurnFlow
+>
+const updateConversationTurnForAuthorMock = updateConversationTurnForAuthor as jest.MockedFunction<
+  typeof updateConversationTurnForAuthor
+>
+const resolveConversationTurnOrThrowMock = resolveConversationTurnOrThrow as jest.MockedFunction<
+  typeof resolveConversationTurnOrThrow
 >
 const branchInTransactionMock = branchMessageFromSelectionInTransaction as jest.MockedFunction<
   typeof branchMessageFromSelectionInTransaction
@@ -122,6 +136,27 @@ const turnResult = {
   error: null,
 }
 
+const resolvedTurn = {
+  turn: {
+    id: 't1',
+    nodeId: 'n-branch',
+    authorUserId: 'u1',
+    status: 'processing' as const,
+    model: 'claude-sonnet-4-6',
+    idempotencyKey: 'idem-1:turn',
+    error: null,
+    completedAt: null,
+    metadata: null,
+    createdAt: fixedNow,
+    updatedAt: fixedNow,
+  },
+  wasCreated: true,
+}
+
+const flushPromises = () => new Promise<void>((resolve) => {
+  setImmediate(() => resolve())
+})
+
 describe('branchAndSendFollowup', () => {
   beforeEach(() => {
     jest.resetAllMocks()
@@ -152,16 +187,18 @@ describe('branchAndSendFollowup', () => {
   test('returns combined result on full success path', async () => {
     getSourceContextMock.mockResolvedValueOnce(sourceContextRecord)
     branchInTransactionMock.mockResolvedValueOnce(branchResult)
+    resolveConversationTurnOrThrowMock.mockResolvedValueOnce(resolvedTurn as never)
     createMessageForAuthorMock.mockResolvedValueOnce(branchEventMessageRecord)
     runTurnFlowMock.mockResolvedValueOnce(turnResult)
 
     const result = await branchAndSendFollowup({ input: buildInput(), currentUserId: 'u1' })
+    await flushPromises()
 
     expect(result).toEqual({
       branchNodeId: 'n-branch',
       annotationId: 'a1',
-      branchEventMessageId: 'event-msg-1',
-      userFollowupMessageId: 'user-msg-1',
+      branchEventMessageId: null,
+      userFollowupMessageId: null,
       turnId: 't1',
       status: 'processing',
     })
@@ -170,10 +207,12 @@ describe('branchAndSendFollowup', () => {
   test('uses sourceContext as branch event message content', async () => {
     getSourceContextMock.mockResolvedValueOnce(sourceContextRecord)
     branchInTransactionMock.mockResolvedValueOnce(branchResult)
+    resolveConversationTurnOrThrowMock.mockResolvedValueOnce(resolvedTurn as never)
     createMessageForAuthorMock.mockResolvedValueOnce(branchEventMessageRecord)
     runTurnFlowMock.mockResolvedValueOnce(turnResult)
 
     await branchAndSendFollowup({ input: buildInput(), currentUserId: 'u1' })
+    await flushPromises()
 
     expect(createMessageForAuthorMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -187,10 +226,12 @@ describe('branchAndSendFollowup', () => {
   test('passes branch event message metadata with correct provenance fields', async () => {
     getSourceContextMock.mockResolvedValueOnce(sourceContextRecord)
     branchInTransactionMock.mockResolvedValueOnce(branchResult)
+    resolveConversationTurnOrThrowMock.mockResolvedValueOnce(resolvedTurn as never)
     createMessageForAuthorMock.mockResolvedValueOnce(branchEventMessageRecord)
     runTurnFlowMock.mockResolvedValueOnce(turnResult)
 
     await branchAndSendFollowup({ input: buildInput(), currentUserId: 'u1' })
+    await flushPromises()
 
     expect(createMessageForAuthorMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -209,10 +250,12 @@ describe('branchAndSendFollowup', () => {
   test('triggers turn pipeline with derived :turn idempotency key and follow-up text', async () => {
     getSourceContextMock.mockResolvedValueOnce(sourceContextRecord)
     branchInTransactionMock.mockResolvedValueOnce(branchResult)
+    resolveConversationTurnOrThrowMock.mockResolvedValueOnce(resolvedTurn as never)
     createMessageForAuthorMock.mockResolvedValueOnce(branchEventMessageRecord)
     runTurnFlowMock.mockResolvedValueOnce(turnResult)
 
     await branchAndSendFollowup({ input: buildInput(), currentUserId: 'u1' })
+    await flushPromises()
 
     expect(runTurnFlowMock).toHaveBeenCalledWith({
       input: expect.objectContaining({
@@ -229,6 +272,7 @@ describe('branchAndSendFollowup', () => {
   test('passes :branch sub-key to branch transaction', async () => {
     getSourceContextMock.mockResolvedValueOnce(sourceContextRecord)
     branchInTransactionMock.mockResolvedValueOnce(branchResult)
+    resolveConversationTurnOrThrowMock.mockResolvedValueOnce(resolvedTurn as never)
     createMessageForAuthorMock.mockResolvedValueOnce(branchEventMessageRecord)
     runTurnFlowMock.mockResolvedValueOnce(turnResult)
 
@@ -242,29 +286,64 @@ describe('branchAndSendFollowup', () => {
     )
   })
 
-  test('throws when branch event message creation returns null', async () => {
+  test('marks the turn failed when branch event message creation returns null', async () => {
     getSourceContextMock.mockResolvedValueOnce(sourceContextRecord)
     branchInTransactionMock.mockResolvedValueOnce(branchResult)
+    resolveConversationTurnOrThrowMock.mockResolvedValueOnce(resolvedTurn as never)
     createMessageForAuthorMock.mockResolvedValueOnce(null)
+
+    const result = await branchAndSendFollowup({ input: buildInput(), currentUserId: 'u1' })
+    await flushPromises()
+
+    expect(result).toMatchObject({ turnId: 't1', status: 'processing' })
+    expect(runTurnFlowMock).not.toHaveBeenCalled()
+    expect(updateConversationTurnForAuthorMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 't1',
+        status: 'failed',
+        error: 'Failed to create branch event message in child node.',
+      }),
+      'u1',
+    )
+  })
+
+  test('returns before awaiting background turn startup', async () => {
+    getSourceContextMock.mockResolvedValueOnce(sourceContextRecord)
+    branchInTransactionMock.mockResolvedValueOnce(branchResult)
+    resolveConversationTurnOrThrowMock.mockResolvedValueOnce(resolvedTurn as never)
+    createMessageForAuthorMock.mockResolvedValueOnce(branchEventMessageRecord)
+    runTurnFlowMock.mockImplementationOnce(
+      () => new Promise(() => undefined) as never,
+    )
 
     await expect(
       branchAndSendFollowup({ input: buildInput(), currentUserId: 'u1' }),
-    ).rejects.toThrow('Failed to create branch event message in child node.')
-
-    expect(runTurnFlowMock).not.toHaveBeenCalled()
+    ).resolves.toMatchObject({ turnId: 't1', status: 'processing' })
   })
 
-  test('always forwards annotationKind as branch to branch transaction', async () => {
+  test('forwards suggestion-branch provenance to branch transaction', async () => {
     getSourceContextMock.mockResolvedValueOnce(sourceContextRecord)
     branchInTransactionMock.mockResolvedValueOnce(branchResult)
+    resolveConversationTurnOrThrowMock.mockResolvedValueOnce(resolvedTurn as never)
     createMessageForAuthorMock.mockResolvedValueOnce(branchEventMessageRecord)
     runTurnFlowMock.mockResolvedValueOnce(turnResult)
 
-    await branchAndSendFollowup({ input: buildInput(), currentUserId: 'u1' })
+    await branchAndSendFollowup({
+      input: {
+        ...buildInput(),
+        annotationKind: 'suggestion-branch',
+        sourceAnnotationId: 'a-suggest-1',
+      },
+      currentUserId: 'u1',
+    })
+    await flushPromises()
 
     expect(branchInTransactionMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        input: expect.objectContaining({ annotationKind: 'branch' }),
+        input: expect.objectContaining({
+          annotationKind: 'suggestion-branch',
+          sourceAnnotationId: 'a-suggest-1',
+        }),
       }),
     )
   })

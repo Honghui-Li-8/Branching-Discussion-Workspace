@@ -2,6 +2,7 @@ import { describe, expect, test } from '@jest/globals'
 import {
   assistantAnnotationKindSchema,
   branchAndSendFollowupInputSchema,
+  branchFollowupStatusResultSchema,
   messageAnnotationSchema,
 } from './annotations.js'
 
@@ -46,22 +47,9 @@ describe('annotation schema contracts', () => {
       ).not.toThrow()
     })
 
-    test('accepts suggestion-branch annotationKind when sourceAnnotationId is present', () => {
+    test('rejects suggestion-branch annotationKind — unsupported by this mutation', () => {
       expect(() =>
-        branchAndSendFollowupInputSchema.parse({
-          ...baseInput,
-          annotationKind: 'suggestion-branch',
-          sourceAnnotationId: 'a1',
-        }),
-      ).not.toThrow()
-    })
-
-    test('rejects suggestion-branch annotationKind without sourceAnnotationId', () => {
-      expect(() =>
-        branchAndSendFollowupInputSchema.parse({
-          ...baseInput,
-          annotationKind: 'suggestion-branch',
-        }),
+        branchAndSendFollowupInputSchema.parse({ ...baseInput, annotationKind: 'suggestion-branch' }),
       ).toThrow()
     })
 
@@ -80,6 +68,19 @@ describe('annotation schema contracts', () => {
       expect(() =>
         branchAndSendFollowupInputSchema.parse({ ...baseInput, text: '' }),
       ).toThrow()
+    })
+  })
+
+  describe('branchFollowupStatusResultSchema', () => {
+    test('accepts pending or processing status with nullable user message id', () => {
+      expect(
+        branchFollowupStatusResultSchema.parse({
+          turnId: 't1',
+          status: 'processing',
+          userFollowupMessageId: null,
+          error: null,
+        }),
+      ).toMatchObject({ turnId: 't1', status: 'processing' })
     })
   })
 

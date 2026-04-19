@@ -107,33 +107,35 @@ export const messageBranchFromSelectionResultSchema = z.object({
   branchNodeId: z.string(),
 })
 
-export const branchAndSendFollowupInputSchema = z
-  .object({
-    messageId: z.string(),
-    sourceAnnotationId: z.string().optional(),
-    selection: annotationSelectionInputSchema,
-    annotationKind: z.enum(['branch', 'suggestion-branch']).optional(),
-    newNodeMeta: messageBranchNewNodeMetaSchema.optional(),
-    sourceContext: z.string().min(1),
-    text: z.string().min(1),
-    model: z.string().min(1),
-    idempotencyKey: z.string().min(1),
-  })
-  .refine(
-    (value) => value.annotationKind !== 'suggestion-branch' || Boolean(value.sourceAnnotationId),
-    {
-      message: 'sourceAnnotationId is required when annotationKind is suggestion-branch.',
-      path: ['sourceAnnotationId'],
-    },
-  )
+export const branchAndSendFollowupInputSchema = z.object({
+  messageId: z.string(),
+  selection: annotationSelectionInputSchema,
+  annotationKind: z.literal('branch').optional(),
+  newNodeMeta: messageBranchNewNodeMetaSchema.optional(),
+  sourceContext: z.string().min(1),
+  text: z.string().min(1),
+  model: z.string().min(1),
+  idempotencyKey: z.string().min(1),
+})
 
 export const branchAndSendFollowupResultSchema = z.object({
   branchNodeId: z.string(),
   annotationId: z.string(),
-  branchEventMessageId: z.string().nullable(),
-  userFollowupMessageId: z.string().nullable(),
+  branchEventMessageId: z.string(),
+  userFollowupMessageId: z.string(),
   turnId: z.string(),
   status: conversationTurnStatusSchema,
+})
+
+export const branchFollowupStatusInputSchema = z.object({
+  turnId: z.string().min(1),
+})
+
+export const branchFollowupStatusResultSchema = z.object({
+  turnId: z.string(),
+  status: conversationTurnStatusSchema,
+  userFollowupMessageId: z.string().nullable(),
+  error: z.string().nullable(),
 })
 
 export type MessageAnnotation = z.infer<typeof messageAnnotationSchema>
@@ -144,3 +146,5 @@ export type MessageBranchFromSelectionInput = z.infer<typeof messageBranchFromSe
 export type MessageBranchFromSelectionResult = z.infer<typeof messageBranchFromSelectionResultSchema>
 export type BranchAndSendFollowupInput = z.infer<typeof branchAndSendFollowupInputSchema>
 export type BranchAndSendFollowupResult = z.infer<typeof branchAndSendFollowupResultSchema>
+export type BranchFollowupStatusInput = z.infer<typeof branchFollowupStatusInputSchema>
+export type BranchFollowupStatusResult = z.infer<typeof branchFollowupStatusResultSchema>

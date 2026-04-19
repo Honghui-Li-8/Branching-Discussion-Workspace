@@ -15,6 +15,8 @@ import {
 import {
   branchAndSendFollowupInputSchema,
   branchAndSendFollowupResultSchema,
+  branchFollowupStatusInputSchema,
+  branchFollowupStatusResultSchema,
   messageAnnotationDeleteInputSchema,
   messageAnnotationDeleteResultSchema,
   messageAnnotationsByMessageInputSchema,
@@ -108,6 +110,10 @@ export const appRouter = t.router({
     .input(branchAndSendFollowupInputSchema)
     .output(branchAndSendFollowupResultSchema)
     .mutation(({ ctx, input }) => ctx.branchAndSendFollowup(input)),
+  branchFollowupStatus: protectedProcedure
+    .input(branchFollowupStatusInputSchema)
+    .output(branchFollowupStatusResultSchema.nullable())
+    .query(({ ctx, input }) => ctx.branchFollowupStatus(input)),
 
   conversationSend: protectedProcedure
     .input(conversationSendInputSchema)

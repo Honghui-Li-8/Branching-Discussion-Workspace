@@ -93,6 +93,7 @@ const makeContext = (): AppRouterContext => ({
   branchAndSendFollowup: jest.fn(async () => {
     throw new Error('Not implemented in public API test context')
   }),
+  branchFollowupStatus: jest.fn(async () => null),
   conversationSend: jest.fn(async () => ({
     turnId: 't1',
     status: 'completed' as const,

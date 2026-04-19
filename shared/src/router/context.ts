@@ -15,6 +15,8 @@ import type {
 import type {
   BranchAndSendFollowupInput,
   BranchAndSendFollowupResult,
+  BranchFollowupStatusInput,
+  BranchFollowupStatusResult,
   MessageAnnotation,
   MessageAnnotationDeleteInput,
   MessageAnnotationDeleteResult,
@@ -79,6 +81,9 @@ export type AppRouterContext = {
   branchAndSendFollowup: (
     input: BranchAndSendFollowupInput,
   ) => Promise<BranchAndSendFollowupResult>
+  branchFollowupStatus: (
+    input: BranchFollowupStatusInput,
+  ) => Promise<BranchFollowupStatusResult | null>
   conversationSend: (
     input: ConversationSendInput,
   ) => Promise<ConversationSendResult>
