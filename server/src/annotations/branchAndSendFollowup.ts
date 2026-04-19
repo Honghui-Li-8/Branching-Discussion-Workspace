@@ -1,12 +1,13 @@
 import type { AppRouterContext } from '@branching/shared'
-import { serializeBranchEventMetadata } from '@branching/shared'
+import { TRPCError } from '@trpc/server'
 import {
-  createMessageForAuthor,
+  createOrGetBranchEventMessageForAuthor,
+  getBranchEventMetadataFromRecord,
   getMessageBranchSourceContextForAuthor,
+  listMessagesByTurn,
 } from '../db/queries/message.js'
-import { updateConversationTurnForAuthor } from '../db/index.js'
+import { getConversationTurnByIdempotencyKeyForAuthor } from '../db/index.js'
 import { runConversationTurnFlow } from '../chat/runConversationTurnFlow.js'
-import { resolveConversationTurnOrThrow } from '../chat/resolveConversationTurnOrThrow.js'
 import { createLogger } from '../logging/logger.js'
 import {
   branchMessageFromSelectionInTransaction,
@@ -26,103 +27,59 @@ type BranchAndSendFollowupParams = {
 
 const logger = createLogger('annotations')
 
-const markBackgroundTurnFailed = async ({
-  turnId,
-  currentUserId,
-  error,
-}: {
-  turnId: string
-  currentUserId: string
-  error: unknown
-}) => {
-  const errorMessage = error instanceof Error ? error.message : 'Branch follow-up failed.'
-  await updateConversationTurnForAuthor(
-    {
-      id: turnId,
-      status: 'failed',
-      error: errorMessage,
-    },
-    currentUserId,
+const getFollowupUserMessage = async (turnId: string) => {
+  const turnMessages = await listMessagesByTurn(turnId)
+  return (
+    turnMessages.find(
+      (message) => message.role === 'user' && getBranchEventMetadataFromRecord(message) === null,
+    ) ?? null
   )
 }
 
-const startBranchFollowupInBackground = ({
+const recoverExistingTurnResultOrThrow = async ({
   input,
   currentUserId,
-  sourceNodeId,
   branchNodeId,
   branchAnnotationId,
-  turnId,
+  branchEventMessageId,
+  cause,
 }: {
   input: BranchAndSendFollowupInput
   currentUserId: string
-  sourceNodeId: string
   branchNodeId: string
   branchAnnotationId: string
-  turnId: string
-}) => {
-  const turnInput = {
-    nodeId: branchNodeId,
-    text: input.text,
-    model: input.model,
-    idempotencyKey: `${input.idempotencyKey}:turn`,
+  branchEventMessageId: string
+  cause: TRPCError
+}): Promise<BranchAndSendFollowupResult> => {
+  const existingTurn = await getConversationTurnByIdempotencyKeyForAuthor(
+    branchNodeId,
+    currentUserId,
+    `${input.idempotencyKey}:turn`,
+  )
+
+  if (!existingTurn) {
+    throw cause
   }
 
-  void (async () => {
-    try {
-      const branchEventMessage = await createMessageForAuthor({
-        nodeId: branchNodeId,
-        authorUserId: currentUserId,
-        role: 'user',
-        content: input.sourceContext,
-        metadata: serializeBranchEventMetadata({
-          eventType: 'branch_event',
-          sourceNodeId,
-          sourceMessageId: input.messageId,
-          sourceAnnotationId: input.sourceAnnotationId ?? branchAnnotationId,
-          sourceContext: input.sourceContext,
-          branchNodeId,
-        }),
-      })
-      if (!branchEventMessage) {
-        throw new Error('Failed to create branch event message in child node.')
-      }
+  const userFollowupMessage = await getFollowupUserMessage(existingTurn.id)
 
-      logger.debug('[annotations] branch-and-send-followup: branch event message created.', {
-        message_id: input.messageId,
-        author_user_id: currentUserId,
-        branch_node_id: branchNodeId,
-        branch_event_message_id: branchEventMessage.id,
-      })
+  logger.info('[annotations] branch-and-send-followup recovered existing turn after idempotent replay.', {
+    message_id: input.messageId,
+    author_user_id: currentUserId,
+    branch_node_id: branchNodeId,
+    turn_id: existingTurn.id,
+    user_followup_message_id: userFollowupMessage?.id ?? null,
+    status: existingTurn.status,
+  })
 
-      const turnResult = await runConversationTurnFlow({
-        input: turnInput,
-        currentUserId,
-        awaitCompletion: false,
-      })
-
-      logger.debug('[annotations] branch-and-send-followup: conversation turn started.', {
-        message_id: input.messageId,
-        author_user_id: currentUserId,
-        branch_node_id: branchNodeId,
-        turn_id: turnResult.turnId,
-        status: turnResult.status,
-      })
-    } catch (error) {
-      await markBackgroundTurnFailed({
-        turnId,
-        currentUserId,
-        error,
-      })
-      logger.error('[annotations] branch-and-send-followup background work failed.', {
-        message_id: input.messageId,
-        author_user_id: currentUserId,
-        branch_node_id: branchNodeId,
-        turn_id: turnId,
-        error,
-      })
-    }
-  })()
+  return {
+    branchNodeId,
+    annotationId: branchAnnotationId,
+    branchEventMessageId,
+    userFollowupMessageId: userFollowupMessage?.id ?? null,
+    turnId: existingTurn.id,
+    status: existingTurn.status,
+  }
 }
 
 export const branchAndSendFollowup = async ({
@@ -141,9 +98,7 @@ export const branchAndSendFollowup = async ({
     return null
   }
 
-  // Step 1: Create branch node + annotation in a transaction.
-  // Idempotency for this step is scoped to the ':branch' sub-key.
-  // Full retry-safety across all steps is added in the later idempotency-hardening commit.
+  // Step 1: Create or recover the branch node + annotation using the ':branch' sub-key.
   const branchResult = await branchMessageFromSelectionInTransaction({
     input: {
       messageId: input.messageId,
@@ -166,32 +121,73 @@ export const branchAndSendFollowup = async ({
     annotation_id: branchResult.annotation.id,
   })
 
+  const branchEventMessage = await createOrGetBranchEventMessageForAuthor({
+    nodeId: branchResult.branchNodeId,
+    authorUserId: currentUserId,
+    content: input.sourceContext,
+    metadata: {
+      eventType: 'branch_event',
+      sourceNodeId: source.parentNodeId,
+      sourceMessageId: input.messageId,
+      sourceAnnotationId: input.sourceAnnotationId ?? branchResult.annotation.id,
+      sourceContext: input.sourceContext,
+      branchNodeId: branchResult.branchNodeId,
+    },
+  })
+  if (!branchEventMessage) {
+    throw new Error('Failed to create branch event message in child node.')
+  }
+
+  logger.debug('[annotations] branch-and-send-followup: branch event message created.', {
+    message_id: input.messageId,
+    author_user_id: currentUserId,
+    branch_node_id: branchResult.branchNodeId,
+    branch_event_message_id: branchEventMessage.id,
+  })
+
   const turnInput = {
     nodeId: branchResult.branchNodeId,
     text: input.text,
     model: input.model,
     idempotencyKey: `${input.idempotencyKey}:turn`,
   }
-  const resolvedTurn = await resolveConversationTurnOrThrow({
-    input: turnInput,
-    currentUserId,
-  })
 
-  startBranchFollowupInBackground({
-    input,
-    currentUserId,
-    sourceNodeId: source.parentNodeId,
-    branchNodeId: branchResult.branchNodeId,
-    branchAnnotationId: branchResult.annotation.id,
-    turnId: resolvedTurn.turn.id,
-  })
+  try {
+    const turnResult = await runConversationTurnFlow({
+      input: turnInput,
+      currentUserId,
+      awaitCompletion: false,
+    })
 
-  return {
-    branchNodeId: branchResult.branchNodeId,
-    annotationId: branchResult.annotation.id,
-    branchEventMessageId: null,
-    userFollowupMessageId: null,
-    turnId: resolvedTurn.turn.id,
-    status: resolvedTurn.turn.status,
+    logger.debug('[annotations] branch-and-send-followup: conversation turn started.', {
+      message_id: input.messageId,
+      author_user_id: currentUserId,
+      branch_node_id: branchResult.branchNodeId,
+      turn_id: turnResult.turnId,
+      user_followup_message_id: turnResult.userMessage.id,
+      status: turnResult.status,
+    })
+
+    return {
+      branchNodeId: branchResult.branchNodeId,
+      annotationId: branchResult.annotation.id,
+      branchEventMessageId: branchEventMessage.id,
+      userFollowupMessageId: turnResult.userMessage.id,
+      turnId: turnResult.turnId,
+      status: turnResult.status,
+    }
+  } catch (error) {
+    if (error instanceof TRPCError && error.code === 'CONFLICT') {
+      return recoverExistingTurnResultOrThrow({
+        input,
+        currentUserId,
+        branchNodeId: branchResult.branchNodeId,
+        branchAnnotationId: branchResult.annotation.id,
+        branchEventMessageId: branchEventMessage.id,
+        cause: error,
+      })
+    }
+
+    throw error
   }
 }

@@ -1,6 +1,7 @@
 import {
   parseMessageMetadata,
   parseBranchEventMetadata,
+  serializeBranchEventMetadata,
   serializeMessageMetadata,
   type BranchEventMetadata,
 } from '@branching/shared'
@@ -375,6 +376,56 @@ export const createMessageForAuthor = async (input: CreateMessageInput): Promise
       input.turnId ?? null,
       metadata,
     ],
+  )
+
+  if (result.rows.length === 0) {
+    return null
+  }
+
+  return mapMessageRow(result.rows[0])
+}
+
+export const createOrGetBranchEventMessageForAuthor = async ({
+  nodeId,
+  authorUserId,
+  content,
+  metadata,
+}: {
+  nodeId: string
+  authorUserId: string
+  content: string
+  metadata: BranchEventMetadata
+}): Promise<MessageRecord | null> => {
+  const serializedMetadata = JSON.stringify(serializeBranchEventMetadata(metadata))
+  const result = await query<MessageRow>(
+    `
+    WITH owned_node AS (
+      SELECT n.id
+      FROM nodes n
+      JOIN workspaces w ON w.id = n.workspace_id
+      WHERE n.id = $1
+        AND w.author_user_id = $2
+    )
+    INSERT INTO messages (node_id, author_user_id, role, content, turn_id, metadata)
+    SELECT
+      owned_node.id,
+      $2,
+      'user',
+      $3,
+      NULL,
+      $4::jsonb
+    FROM owned_node
+    ON CONFLICT (node_id)
+    WHERE turn_id IS NULL
+      AND role = 'user'
+      AND (metadata->>'eventType') = 'branch_event'
+    DO UPDATE
+    SET
+      content = messages.content,
+      metadata = messages.metadata
+    RETURNING id, node_id, author_user_id, turn_id, role, content, metadata, created_at
+    `,
+    [nodeId, authorUserId, content, serializedMetadata],
   )
 
   if (result.rows.length === 0) {

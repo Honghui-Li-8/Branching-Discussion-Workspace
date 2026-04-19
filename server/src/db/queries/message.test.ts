@@ -3,6 +3,7 @@ import { query } from '../client.js'
 import {
   createMessage,
   createMessageForAuthor,
+  createOrGetBranchEventMessageForAuthor,
   deleteMessageForAuthor,
   deleteMessage,
   getBranchEventMetadataFromRecord,
@@ -138,6 +139,65 @@ describe('message queries', () => {
       expect.stringContaining('AND w.author_user_id = $2'),
       ['n1', 'u2', 'user', 'hello', false, null, '{}'],
     )
+  })
+
+  test('createOrGetBranchEventMessageForAuthor uses branch-event conflict recovery', async () => {
+    queryMock.mockResolvedValueOnce({
+      rows: [
+        {
+          ...messageRow,
+          turn_id: null,
+          metadata: {
+            eventType: 'branch_event',
+            sourceNodeId: 'n-parent',
+            sourceMessageId: 'm-source',
+            sourceAnnotationId: 'a1',
+            sourceContext: 'surrounding context',
+            branchNodeId: 'n1',
+          },
+        },
+      ],
+    } as never)
+
+    const result = await createOrGetBranchEventMessageForAuthor({
+      nodeId: 'n1',
+      authorUserId: 'u1',
+      content: 'surrounding context',
+      metadata: {
+        eventType: 'branch_event',
+        sourceNodeId: 'n-parent',
+        sourceMessageId: 'm-source',
+        sourceAnnotationId: 'a1',
+        sourceContext: 'surrounding context',
+        branchNodeId: 'n1',
+      },
+    })
+
+    expect(result?.metadata).toEqual({
+      eventType: 'branch_event',
+      sourceNodeId: 'n-parent',
+      sourceMessageId: 'm-source',
+      sourceAnnotationId: 'a1',
+      sourceContext: 'surrounding context',
+      branchNodeId: 'n1',
+    })
+    expect(queryMock).toHaveBeenCalledWith(
+      expect.stringContaining('ON CONFLICT (node_id)'),
+      [
+        'n1',
+        'u1',
+        'surrounding context',
+        JSON.stringify({
+          eventType: 'branch_event',
+          sourceNodeId: 'n-parent',
+          sourceMessageId: 'm-source',
+          sourceAnnotationId: 'a1',
+          sourceContext: 'surrounding context',
+          branchNodeId: 'n1',
+        }),
+      ],
+    )
+    expect(queryMock.mock.calls[0]?.[0]).toContain("(metadata->>'eventType') = 'branch_event'")
   })
 
   test('getMessageById returns null when not found', async () => {
