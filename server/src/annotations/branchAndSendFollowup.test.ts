@@ -413,3 +413,189 @@ describe('branchAndSendFollowup', () => {
     })
   })
 })
+
+describe('branchAndSendFollowup — idempotency and partial-write recovery', () => {
+  beforeEach(() => {
+    jest.resetAllMocks()
+    getBranchEventMetadataFromRecordMock.mockImplementation(
+      (record) =>
+        record.metadata?.eventType === 'branch_event' ? (record.metadata as never) : null,
+    )
+  })
+
+  const existingTurnRecord = {
+    id: 't1',
+    nodeId: 'n-branch',
+    authorUserId: 'u1',
+    status: 'processing' as const,
+    model: 'claude-sonnet-4-6',
+    idempotencyKey: 'idem-1:turn',
+    error: null,
+    completedAt: null,
+    metadata: {},
+    createdAt: fixedNow,
+    updatedAt: fixedNow,
+  }
+
+  test('full same-key retry: branch and event idempotent, turn CONFLICT recovered, returns stable ids', async () => {
+    // Simulates a full retry where every idempotency tier fires:
+    // branchInTransaction returns existing result (idempotent via :branch key),
+    // createOrGetBranchEventMessageForAuthor upserts and returns existing event row,
+    // runConversationTurnFlow throws CONFLICT (turn already exists via :turn key),
+    // recovery lookup finds existing turn + user message.
+    getSourceContextMock.mockResolvedValueOnce(sourceContextRecord)
+    branchInTransactionMock.mockResolvedValueOnce(branchResult)
+    createOrGetBranchEventMessageForAuthorMock.mockResolvedValueOnce(branchEventMessageRecord)
+    runTurnFlowMock.mockRejectedValueOnce(
+      new TRPCError({ code: 'CONFLICT', message: 'A turn already exists for this idempotency key.' }),
+    )
+    getConversationTurnByIdempotencyKeyForAuthorMock.mockResolvedValueOnce(existingTurnRecord)
+    listMessagesByTurnMock.mockResolvedValueOnce([turnResult.userMessage])
+
+    const result = await branchAndSendFollowup({ input: buildInput(), currentUserId: 'u1' })
+
+    expect(result).toEqual({
+      branchNodeId: 'n-branch',
+      annotationId: 'a1',
+      branchEventMessageId: 'event-msg-1',
+      userFollowupMessageId: 'user-msg-1',
+      turnId: 't1',
+      status: 'processing',
+    })
+    // Verify sub-key routing so each tier's idempotency guard targets the right key.
+    expect(branchInTransactionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        input: expect.objectContaining({ idempotencyKey: 'idem-1:branch' }),
+      }),
+    )
+    expect(runTurnFlowMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        input: expect.objectContaining({ idempotencyKey: 'idem-1:turn' }),
+      }),
+    )
+    expect(getConversationTurnByIdempotencyKeyForAuthorMock).toHaveBeenCalledWith(
+      expect.objectContaining({ idempotencyKey: 'idem-1:turn' }),
+    )
+  })
+
+  test('retry after branch event already persisted: event upserted, turn fires fresh, recovery not invoked', async () => {
+    // Simulates a retry where the first attempt persisted the branch event but did not
+    // reach the turn step. The event upsert (ON CONFLICT DO UPDATE) returns the same
+    // existing row; the turn pipeline succeeds fresh — no CONFLICT, no recovery lookup.
+    getSourceContextMock.mockResolvedValueOnce(sourceContextRecord)
+    branchInTransactionMock.mockResolvedValueOnce(branchResult)
+    // createOrGetBranchEventMessageForAuthor returns the existing event row via upsert.
+    createOrGetBranchEventMessageForAuthorMock.mockResolvedValueOnce(branchEventMessageRecord)
+    // Turn fires fresh this time — no CONFLICT.
+    runTurnFlowMock.mockResolvedValueOnce(turnResult)
+
+    const result = await branchAndSendFollowup({ input: buildInput(), currentUserId: 'u1' })
+
+    expect(result).toMatchObject({
+      branchEventMessageId: 'event-msg-1',
+      userFollowupMessageId: 'user-msg-1',
+      turnId: 't1',
+    })
+    expect(getConversationTurnByIdempotencyKeyForAuthorMock).not.toHaveBeenCalled()
+    expect(listMessagesByTurnMock).not.toHaveBeenCalled()
+  })
+
+  test('different idempotency key creates an independent branch with its own turn and messages', async () => {
+    const altBranchResult = {
+      annotation: {
+        ...branchResult.annotation,
+        id: 'a2',
+        leadsToNodeId: 'n-branch-2',
+      },
+      branchNodeId: 'n-branch-2',
+    }
+    const altEventMessage = {
+      ...branchEventMessageRecord,
+      id: 'event-msg-2',
+      nodeId: 'n-branch-2',
+      metadata: { ...branchEventMessageRecord.metadata, branchNodeId: 'n-branch-2' },
+    }
+    const altTurnResult = {
+      turnId: 't2',
+      status: 'processing' as const,
+      userMessage: {
+        ...turnResult.userMessage,
+        id: 'user-msg-2',
+        nodeId: 'n-branch-2',
+        turnId: 't2',
+      },
+      assistantMessage: null,
+      error: null,
+    }
+
+    getSourceContextMock.mockResolvedValueOnce(sourceContextRecord)
+    branchInTransactionMock.mockResolvedValueOnce(altBranchResult)
+    createOrGetBranchEventMessageForAuthorMock.mockResolvedValueOnce(altEventMessage)
+    runTurnFlowMock.mockResolvedValueOnce(altTurnResult)
+
+    const result = await branchAndSendFollowup({
+      input: { ...buildInput(), idempotencyKey: 'idem-2' },
+      currentUserId: 'u1',
+    })
+
+    expect(result).toMatchObject({
+      branchNodeId: 'n-branch-2',
+      annotationId: 'a2',
+      branchEventMessageId: 'event-msg-2',
+      userFollowupMessageId: 'user-msg-2',
+      turnId: 't2',
+    })
+    // Sub-keys must use the new base key — not the 'idem-1' key from the other fixture.
+    expect(branchInTransactionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        input: expect.objectContaining({ idempotencyKey: 'idem-2:branch' }),
+      }),
+    )
+    expect(runTurnFlowMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        input: expect.objectContaining({ idempotencyKey: 'idem-2:turn' }),
+      }),
+    )
+    expect(getConversationTurnByIdempotencyKeyForAuthorMock).not.toHaveBeenCalled()
+  })
+
+  test('non-CONFLICT turn error propagates and does not attempt recovery', async () => {
+    getSourceContextMock.mockResolvedValueOnce(sourceContextRecord)
+    branchInTransactionMock.mockResolvedValueOnce(branchResult)
+    createOrGetBranchEventMessageForAuthorMock.mockResolvedValueOnce(branchEventMessageRecord)
+    runTurnFlowMock.mockRejectedValueOnce(
+      new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB connection failure.' }),
+    )
+
+    await expect(
+      branchAndSendFollowup({ input: buildInput(), currentUserId: 'u1' }),
+    ).rejects.toThrow('DB connection failure.')
+
+    expect(getConversationTurnByIdempotencyKeyForAuthorMock).not.toHaveBeenCalled()
+    expect(listMessagesByTurnMock).not.toHaveBeenCalled()
+  })
+
+  test('CONFLICT recovery re-throws original error when existing turn cannot be found', async () => {
+    // If the CONFLICT error fires but the idempotency-key lookup returns null, the turn
+    // is genuinely unrecoverable — the original CONFLICT error must be re-thrown rather
+    // than swallowed or replaced.
+    const conflictError = new TRPCError({
+      code: 'CONFLICT',
+      message: 'A turn already exists for this idempotency key.',
+    })
+
+    getSourceContextMock.mockResolvedValueOnce(sourceContextRecord)
+    branchInTransactionMock.mockResolvedValueOnce(branchResult)
+    createOrGetBranchEventMessageForAuthorMock.mockResolvedValueOnce(branchEventMessageRecord)
+    runTurnFlowMock.mockRejectedValueOnce(conflictError)
+    getConversationTurnByIdempotencyKeyForAuthorMock.mockResolvedValueOnce(null)
+
+    await expect(
+      branchAndSendFollowup({ input: buildInput(), currentUserId: 'u1' }),
+    ).rejects.toThrow('A turn already exists for this idempotency key.')
+
+    expect(getConversationTurnByIdempotencyKeyForAuthorMock).toHaveBeenCalledTimes(1)
+    // listMessagesByTurn must not be reached — there is no turn record to query against.
+    expect(listMessagesByTurnMock).not.toHaveBeenCalled()
+  })
+})
