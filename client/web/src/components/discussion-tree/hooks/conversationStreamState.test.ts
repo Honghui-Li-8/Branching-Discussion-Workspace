@@ -489,3 +489,111 @@ describe('conversationStreamState', () => {
     ).toBeNull()
   })
 })
+
+describe('regression: normal conversationSend flow unaffected by branch follow-up additions', () => {
+  test('complete normal send cycle produces correct phase transitions without branch-specific contamination', async () => {
+    // The conversationSend stream state lifecycle (sendRequested → turnBound → events →
+    // message.completed) must remain exactly as it was before branch follow-up was added.
+    // Branch follow-up reuses the same actions (sendRequested + turnBound) but those must
+    // not change what happens for a standard send.
+    let state = conversationStreamReducer(initialConversationStreamState, { type: 'sendRequested' })
+
+    expect(state.phase).toBe('sending')
+    expect(state.stage).toBe('loading_context')
+    expect(state.errorMessage).toBeNull()
+
+    state = conversationStreamReducer(state, { type: 'turnBound', turnId: 'normal-turn-1' })
+    expect(state.turnId).toBe('normal-turn-1')
+
+    state = conversationStreamReducer(state, {
+      type: 'eventReceived',
+      event: {
+        type: 'turn.started',
+        turnId: 'normal-turn-1',
+        seq: 1,
+        ts: '2026-04-01T00:00:00.000Z',
+        payload: { status: 'loading_context' },
+      },
+    })
+    expect(state.phase).toBe('generating')
+
+    state = conversationStreamReducer(state, {
+      type: 'eventReceived',
+      event: {
+        type: 'token.delta',
+        turnId: 'normal-turn-1',
+        seq: 2,
+        ts: '2026-04-01T00:00:01.000Z',
+        payload: { delta: 'Normal ' },
+      },
+    })
+    state = conversationStreamReducer(state, {
+      type: 'eventReceived',
+      event: {
+        type: 'token.delta',
+        turnId: 'normal-turn-1',
+        seq: 3,
+        ts: '2026-04-01T00:00:02.000Z',
+        payload: { delta: 'response.' },
+      },
+    })
+    expect(state.assistantDraft).toBe('Normal response.')
+
+    state = conversationStreamReducer(state, {
+      type: 'eventReceived',
+      event: {
+        type: 'message.completed',
+        turnId: 'normal-turn-1',
+        seq: 4,
+        ts: '2026-04-01T00:00:03.000Z',
+        payload: { messageId: 'msg-normal', content: 'Normal response.' },
+      },
+    })
+    expect(state.phase).toBe('done')
+    expect(state.assistantDraft).toBe('')
+    expect(state.errorMessage).toBeNull()
+    expect(state.turnId).toBe('normal-turn-1')
+  })
+
+  test('state resets fully between conversations when nodeId changes, regardless of prior turn type', async () => {
+    // useNodeConversation dispatches { type: 'reset' } when nodeId changes. The reducer
+    // must return exactly initialConversationStreamState with no residue — whether the
+    // previous session was a normal send, a branch follow-up, or a failed attempt.
+    const scenarios: Array<[string, () => typeof initialConversationStreamState]> = [
+      [
+        'mid-stream normal send',
+        () => {
+          let s = conversationStreamReducer(initialConversationStreamState, { type: 'sendRequested' })
+          s = conversationStreamReducer(s, { type: 'turnBound', turnId: 'old-turn' })
+          return conversationStreamReducer(s, {
+            type: 'eventReceived',
+            event: {
+              type: 'token.delta',
+              turnId: 'old-turn',
+              seq: 1,
+              ts: '2026-04-01T00:00:00.000Z',
+              payload: { delta: 'partial' },
+            },
+          })
+        },
+      ],
+      [
+        'failed branch follow-up',
+        () => {
+          let s = conversationStreamReducer(initialConversationStreamState, { type: 'sendRequested' })
+          s = conversationStreamReducer(s, { type: 'turnBound', turnId: 'branch-turn' })
+          return conversationStreamReducer(s, {
+            type: 'sendFailed',
+            errorMessage: 'Follow-up generation failed.',
+          })
+        },
+      ],
+    ]
+
+    for (const [label, buildPriorState] of scenarios) {
+      const stateBeforeReset = buildPriorState()
+      const stateAfterReset = conversationStreamReducer(stateBeforeReset, { type: 'reset' })
+      expect(stateAfterReset, `reset from ${label}`).toEqual(initialConversationStreamState)
+    }
+  })
+})

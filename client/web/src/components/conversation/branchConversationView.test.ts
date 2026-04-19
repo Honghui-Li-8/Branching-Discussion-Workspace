@@ -279,3 +279,59 @@ describe('branchConversationView — branch follow-up UI flow', () => {
     expect(result.childMessages).toEqual([grandchildFollowup])
   })
 })
+
+describe('regression: non-branch conversation paths unaffected by follow-up additions', () => {
+  test('regular node with no branch event passes all local messages through as childMessages unchanged', () => {
+    // buildBranchConversationSegments must leave the message list completely unchanged
+    // for nodes that have no branch event — the standard conversationSend path must
+    // not be affected by the branch follow-up additions.
+    const messages: TreeMessage[] = [
+      { id: 'm1', role: 'user', content: 'Hello, can you help me?' },
+      { id: 'm2', role: 'assistant', content: 'Of course! What do you need?' },
+      { id: 'm3', role: 'user', content: 'Tell me more about X.' },
+      { id: 'm4', role: 'assistant', content: 'X is a concept that...' },
+    ]
+
+    const result = buildBranchConversationSegments({
+      inheritedMessages: [],
+      localMessages: messages,
+    })
+
+    expect(result.inheritedMessages).toEqual([])
+    expect(result.branchEventMessage).toBeNull()
+    expect(result.branchEventMetadata).toBeNull()
+    expect(result.branchSummaryLabel).toBeNull()
+    // All messages are passed through; none are moved or filtered.
+    expect(result.childMessages).toEqual(messages)
+    expect(result.childMessages).toHaveLength(4)
+  })
+
+  test('getBranchSummaryLabelForMessage returns null for all non-branch-event messages', () => {
+    // Regular user and assistant messages must never trigger divider rendering.
+    // This ensures the branch divider only appears on nodes that were actually branched.
+    const regularMessages: TreeMessage[] = [
+      { id: 'u1', role: 'user', content: 'User question' },
+      { id: 'a1', role: 'assistant', content: 'Assistant answer' },
+      // User message with metadata that is NOT a branch_event
+      { id: 'u2', role: 'user', content: 'Another message', metadata: { someKey: 'someValue' } },
+      // User message with partial metadata (no eventType)
+      { id: 'u3', role: 'user', content: 'Yet another', metadata: { eventType: 'something_else' } },
+    ]
+
+    for (const message of regularMessages) {
+      expect(getBranchSummaryLabelForMessage(message)).toBeNull()
+    }
+  })
+
+  test('summarizeBranchSourceContext handles edge-case whitespace without corrupting non-branch content', () => {
+    // Whitespace normalization must not silently transform content in unexpected ways.
+    expect(summarizeBranchSourceContext('  single word  ')).toBe('single word')
+    expect(summarizeBranchSourceContext('line one\nline two')).toBe('line one line two')
+    // Exactly twenty words must NOT be truncated (boundary condition).
+    const exactlyTwenty = 'one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty'
+    expect(summarizeBranchSourceContext(exactlyTwenty)).toBe(exactlyTwenty)
+    // Twenty-one words must be truncated (one past the boundary).
+    const twentyOne = exactlyTwenty + ' twentyone'
+    expect(summarizeBranchSourceContext(twentyOne)).toContain('…')
+  })
+})

@@ -108,3 +108,43 @@ describe('assistantAnnotationLogic', () => {
     ).toBe(true)
   })
 })
+
+describe('regression: pre-existing annotation kinds unaffected by branch-origin addition', () => {
+  test('suggestion and branch kinds: isDisplayOnlyAnnotationKind remains false', () => {
+    // Adding branch-origin as a display-only kind must not change the false result for
+    // all pre-existing annotation kinds. Any regressions here would break annotation
+    // editing in the standard branch-from-selection and suggestion flows.
+    expect(isDisplayOnlyAnnotationKind('suggestion')).toBe(false)
+    expect(isDisplayOnlyAnnotationKind('branch')).toBe(false)
+    expect(isDisplayOnlyAnnotationKind('suggestion-branch')).toBe(false)
+    expect(isDisplayOnlyAnnotationKind('branch-origin')).toBe(true) // only this one
+  })
+
+  test('getBranchActionKind still upgrades suggestion→suggestion-branch and suggestion-branch→branch unchanged', () => {
+    // The Commit 7 addition of branch-origin handling must not disturb the existing
+    // kind upgrade chain used in the branch-from-selection and suggestion flows.
+    expect(getBranchActionKind('suggestion')).toBe('suggestion-branch')
+    expect(getBranchActionKind('suggestion-branch')).toBe('branch')
+    expect(getBranchActionKind('branch')).toBe('branch')
+    // branch-origin specifically downgrades to plain branch (not suggestion-branch).
+    expect(getBranchActionKind('branch-origin')).toBe('branch')
+  })
+
+  test('dismiss-deletion lifecycle is correct for all annotation kinds including branch-origin', () => {
+    // shouldDeleteAnnotationOnDismiss logic must be unchanged for pre-existing kinds
+    // and must apply consistently to the new branch-origin kind.
+    const transient = new Set(['a-suggestion', 'a-branch-origin'])
+    const persisted = new Set(['a-branch', 'a-suggestion-branch'])
+
+    // Pre-existing lifecycle: transient is deleted, persisted is kept.
+    expect(shouldDeleteAnnotationOnDismiss('a-suggestion', transient, persisted)).toBe(true)
+    expect(shouldDeleteAnnotationOnDismiss('a-branch', transient, persisted)).toBe(false)
+    expect(shouldDeleteAnnotationOnDismiss('a-suggestion-branch', transient, persisted)).toBe(false)
+
+    // New branch-origin kind follows the same transient/persisted rule.
+    expect(shouldDeleteAnnotationOnDismiss('a-branch-origin', transient, persisted)).toBe(true)
+
+    // Unknown ID still defaults to delete (pre-existing behaviour unchanged).
+    expect(shouldDeleteAnnotationOnDismiss('completely-unknown', transient, persisted)).toBe(true)
+  })
+})
