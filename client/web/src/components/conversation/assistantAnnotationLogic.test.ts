@@ -71,6 +71,28 @@ describe('assistantAnnotationLogic', () => {
     expect(getAnnotationInteractionMode({ kind: 'branch', readOnly: true })).toBe('none')
   })
 
+  test('inherited parent rows: all annotation kinds return none regardless of kind', () => {
+    // When readOnly=true the row is an inherited parent message — the user must not
+    // be able to create, edit, or select annotations on it. This is the core guardrail
+    // that prevents annotation affordances from appearing on inherited content.
+    const allKinds = ['branch', 'suggestion', 'suggestion-branch', 'branch-origin'] as const
+    for (const kind of allKinds) {
+      expect(getAnnotationInteractionMode({ kind, readOnly: true })).toBe('none')
+    }
+  })
+
+  test('non-read-only rows: branch-origin is the only kind that returns select', () => {
+    // In child-local rows (readOnly=false), branch-origin annotations are display-only
+    // (they mark where the branch came from) so they return 'select'. All other kinds
+    // that are editable return 'edit'. This ensures no edit affordance appears on
+    // branch-origin annotations even when the row is fully interactive.
+    expect(getAnnotationInteractionMode({ kind: 'branch-origin', readOnly: false })).toBe('select')
+    const editableKinds = ['branch', 'suggestion', 'suggestion-branch'] as const
+    for (const kind of editableKinds) {
+      expect(getAnnotationInteractionMode({ kind, readOnly: false })).toBe('edit')
+    }
+  })
+
   test('dismiss deletion rules: transient deletes, persisted keeps', () => {
     const transient = new Set<string>(['a-transient'])
     const persisted = new Set<string>(['a-persisted'])

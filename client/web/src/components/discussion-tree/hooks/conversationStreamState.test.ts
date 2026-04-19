@@ -372,6 +372,65 @@ describe('conversationStreamState', () => {
     expect(errorWithLateComplete).toEqual(errorState)
   })
 
+  test('branch follow-up bootstrap injects initial generating state without stream events', () => {
+    // When navigating to a branch child node immediately after submit, the bootstrap
+    // from branchAndSendFollowup seeds the stream state: sendRequested → turnBound.
+    // No stream events have arrived yet. The state must reflect that generation is
+    // underway so the UI shows a pending follow-up message.
+    let state = conversationStreamReducer(initialConversationStreamState, {
+      type: 'sendRequested',
+    })
+
+    expect(state.phase).toBe('sending')
+    expect(state.stage).toBe('loading_context')
+    expect(state.turnId).toBeNull()
+    expect(state.assistantDraft).toBe('')
+
+    state = conversationStreamReducer(state, {
+      type: 'turnBound',
+      turnId: 'branch-turn-1',
+    })
+
+    expect(state.phase).toBe('sending')
+    expect(state.turnId).toBe('branch-turn-1')
+    // Not yet generating — no stream events have arrived.
+    expect(state.assistantDraft).toBe('')
+    expect(state.errorMessage).toBeNull()
+  })
+
+  test('same-session generation failure shows error state and retry resets to clean sending', () => {
+    // When branchFollowupStatus resolves to "failed", the UI dispatches sendFailed
+    // (via useNodeConversation's status-transition effect) to show the failed message
+    // in the child node. Retrying the follow-up must reset state to allow a new turn.
+    let state = conversationStreamReducer(initialConversationStreamState, {
+      type: 'sendRequested',
+    })
+    state = conversationStreamReducer(state, {
+      type: 'turnBound',
+      turnId: 'branch-turn-1',
+    })
+    state = conversationStreamReducer(state, {
+      type: 'sendFailed',
+      errorMessage: 'Follow-up generation failed.',
+    })
+
+    expect(state.phase).toBe('error')
+    expect(state.errorMessage).toBe('Follow-up generation failed.')
+    expect(state.turnId).toBe('branch-turn-1')
+    expect(state.assistantDraft).toBe('')
+
+    // Retry: UI resets state and initiates a new send for the same text.
+    state = conversationStreamReducer(state, { type: 'reset' })
+    expect(state).toEqual(initialConversationStreamState)
+
+    state = conversationStreamReducer(state, { type: 'sendRequested' })
+    state = conversationStreamReducer(state, { type: 'turnBound', turnId: 'branch-turn-2' })
+
+    expect(state.phase).toBe('sending')
+    expect(state.turnId).toBe('branch-turn-2')
+    expect(state.errorMessage).toBeNull()
+  })
+
   test('parses summary lifecycle payloads safely', () => {
     expect(
       parseConversationStreamEvent(
