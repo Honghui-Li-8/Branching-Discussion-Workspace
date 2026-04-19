@@ -31,7 +31,6 @@ describe('annotation schema contracts', () => {
         quote: 'hello',
         selectorJson: { selector: [{ quote: 'hello', start: 0, end: 5 }] },
       },
-      sourceContext: 'surrounding text',
       text: 'follow-up question',
       model: 'claude-sonnet-4-6',
       idempotencyKey: 'key-1',
@@ -63,17 +62,6 @@ describe('annotation schema contracts', () => {
           ...baseInput,
           annotationKind: 'suggestion-branch',
         }),
-      ).toThrow()
-    })
-
-    test('rejects missing sourceContext', () => {
-      const { sourceContext: _omit, ...withoutContext } = baseInput
-      expect(() => branchAndSendFollowupInputSchema.parse(withoutContext)).toThrow()
-    })
-
-    test('rejects empty sourceContext', () => {
-      expect(() =>
-        branchAndSendFollowupInputSchema.parse({ ...baseInput, sourceContext: '' }),
       ).toThrow()
     })
 

@@ -114,7 +114,6 @@ export const branchAndSendFollowupInputSchema = z
     selection: annotationSelectionInputSchema,
     annotationKind: z.enum(['branch', 'suggestion-branch']).optional(),
     newNodeMeta: messageBranchNewNodeMetaSchema.optional(),
-    sourceContext: z.string().min(1),
     text: z.string().min(1),
     model: z.string().min(1),
     idempotencyKey: z.string().min(1),

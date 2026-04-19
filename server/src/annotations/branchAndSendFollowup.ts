@@ -27,6 +27,22 @@ type BranchAndSendFollowupParams = {
 
 const logger = createLogger('annotations')
 
+const buildBranchSourceContext = (
+  selection: BranchAndSendFollowupInput['selection'],
+): string => {
+  const normalizedQuote = selection.quote.replace(/\s+/g, ' ').trim()
+  if (normalizedQuote.length > 0) {
+    return normalizedQuote
+  }
+
+  const selectorsQuote = selection.selectorJson.selector
+    .map((item) => item.quote.replace(/\s+/g, ' ').trim())
+    .filter((item) => item.length > 0)
+    .join(' ')
+    .trim()
+  return selectorsQuote
+}
+
 const getFollowupUserMessage = async (turnId: string) => {
   const turnMessages = await listMessagesByTurn(turnId)
   return (
@@ -120,17 +136,18 @@ export const branchAndSendFollowup = async ({
     branch_node_id: branchResult.branchNodeId,
     annotation_id: branchResult.annotation.id,
   })
+  const sourceContext = buildBranchSourceContext(input.selection)
 
   const branchEventMessage = await createOrGetBranchEventMessageForAuthor({
     nodeId: branchResult.branchNodeId,
     authorUserId: currentUserId,
-    content: input.sourceContext,
+    content: sourceContext,
     metadata: {
       eventType: 'branch_event',
       sourceNodeId: source.parentNodeId,
       sourceMessageId: input.messageId,
       sourceAnnotationId: input.sourceAnnotationId ?? branchResult.annotation.id,
-      sourceContext: input.sourceContext,
+      sourceContext,
       branchNodeId: branchResult.branchNodeId,
     },
   })

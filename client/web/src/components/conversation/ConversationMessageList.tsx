@@ -32,7 +32,6 @@ type MessageRowProps = {
   isFailed?: boolean
   readOnly?: boolean
   conversationModel: string
-  sourceText?: string
   onRetryFailedMessage: (messageId: string) => void
   onDismissFailedMessage: (messageId: string) => void
   onBranchFollowupCreated: (
@@ -47,7 +46,6 @@ const renderMessageRow = ({
   isFailed = false,
   readOnly = false,
   conversationModel,
-  sourceText,
   onRetryFailedMessage,
   onDismissFailedMessage,
   onBranchFollowupCreated,
@@ -76,7 +74,6 @@ const renderMessageRow = ({
       message={message}
       readOnly={readOnly}
       conversationModel={conversationModel}
-      sourceText={sourceText}
       onBranchFollowupCreated={onBranchFollowupCreated}
     />
   )
@@ -225,7 +222,6 @@ export const ConversationMessageList = ({
                 isPending: pendingMessageIds.has(message.id),
                 isFailed: failedMessageIds.has(message.id),
                 conversationModel,
-                sourceText: message.content,
                 onRetryFailedMessage,
                 onDismissFailedMessage,
                 onBranchFollowupCreated,

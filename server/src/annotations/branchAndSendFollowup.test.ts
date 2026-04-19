@@ -79,7 +79,6 @@ const buildInput = () => ({
     startOffset: 0 as const,
     endOffset: 11 as const,
   },
-  sourceContext: 'some surrounding context text',
   text: 'What do you mean by this?',
   model: 'claude-sonnet-4-6',
   idempotencyKey: 'idem-1',
@@ -115,13 +114,13 @@ const branchEventMessageRecord = {
   authorUserId: 'u1',
   turnId: null,
   role: 'user' as const,
-  content: 'some surrounding context text',
+  content: 'hello world',
   metadata: {
     eventType: 'branch_event' as const,
     sourceNodeId: 'n-parent',
     sourceMessageId: 'm1',
     sourceAnnotationId: 'a1',
-    sourceContext: 'some surrounding context text',
+    sourceContext: 'hello world',
     branchNodeId: 'n-branch',
   },
   createdAt: fixedNow,
@@ -203,7 +202,7 @@ describe('branchAndSendFollowup', () => {
 
     expect(createOrGetBranchEventMessageForAuthorMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        content: 'some surrounding context text',
+        content: 'hello world',
         metadata: expect.objectContaining({ eventType: 'branch_event' }),
       }),
     )
@@ -474,7 +473,9 @@ describe('branchAndSendFollowup — idempotency and partial-write recovery', () 
       }),
     )
     expect(getConversationTurnByIdempotencyKeyForAuthorMock).toHaveBeenCalledWith(
-      expect.objectContaining({ idempotencyKey: 'idem-1:turn' }),
+      'n-branch',
+      'u1',
+      'idem-1:turn',
     )
   })
 
@@ -673,7 +674,7 @@ describe('branchAndSendFollowup — first child turn ordering', () => {
         nodeId: branchResult.branchNodeId,
         // content carries the raw sourceContext text so the event doubles as the
         // inherited-history summary for the child node's context window.
-        content: buildInput().sourceContext,
+        content: buildInput().selection.quote,
         metadata: expect.objectContaining({
           eventType: 'branch_event',
           sourceNodeId: sourceContextRecord.parentNodeId,

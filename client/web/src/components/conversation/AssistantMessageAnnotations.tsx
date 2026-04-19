@@ -23,7 +23,6 @@ import {
   buildBranchSelectionPayload,
   canSubmitBranchRequest,
 } from './assistantBranchRequest'
-import { buildSourceContextWindow } from './sourceContextWindow'
 import {
   ASSISTANT_ANNOTATION_KIND_PREFIX,
   getAnnotationInteractionMode,
@@ -39,7 +38,6 @@ import { findAnnotationIdFromClick } from './assistantAnnotationHitTest'
 type AssistantMessageAnnotationWrapperProps = {
   messageId: string
   conversationModel?: string
-  sourceText?: string
   readOnly?: boolean
   onBranchFollowupCreated?: (
     nodeId: string,
@@ -316,7 +314,6 @@ const AssistantAnnotationHydration = ({
 type AssistantAnnotationPopupProps = {
   messageId: string
   conversationModel: string
-  sourceText: string
   initiallyPersistedAnnotationIds: string[]
   readOnly: boolean
   onBranchPendingStateChange: (pending: boolean) => void
@@ -327,7 +324,6 @@ type AssistantAnnotationPopupProps = {
 const AssistantAnnotationPopup = ({
   messageId,
   conversationModel,
-  sourceText,
   initiallyPersistedAnnotationIds,
   readOnly,
   onBranchPendingStateChange,
@@ -509,12 +505,6 @@ const AssistantAnnotationPopup = ({
             annotationKind: branchActionKind,
             idempotencyKey: createIdempotencyKey(),
             selection,
-            sourceContext:
-              buildSourceContextWindow({
-                sourceText: annotator.element.textContent ?? sourceText,
-                startOffset: selection.startOffset,
-                endOffset: selection.endOffset,
-              }) || selectedText.trim(),
             text: trimmedInputText,
             model: conversationModel,
           }
@@ -829,7 +819,6 @@ const AssistantAnnotationLoadAnimator = ({
 export const AssistantMessageAnnotationWrapper = ({
   messageId,
   conversationModel = 'gpt-5',
-  sourceText = '',
   readOnly = false,
   onBranchFollowupCreated,
   children,
@@ -926,7 +915,6 @@ export const AssistantMessageAnnotationWrapper = ({
         <AssistantAnnotationPopup
           messageId={messageId}
           conversationModel={conversationModel}
-          sourceText={sourceText}
           initiallyPersistedAnnotationIds={initialPersistedAnnotationIds}
           readOnly={readOnly}
           onBranchPendingStateChange={setIsBranchPending}

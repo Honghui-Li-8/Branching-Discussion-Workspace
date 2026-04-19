@@ -10,7 +10,6 @@ import { ModelMarkdown } from './ModelMarkdown'
 type AssistantConversationMessageProps = {
   message: TreeMessage
   conversationModel: string
-  sourceText?: string
   readOnly?: boolean
   onBranchFollowupCreated?: (
     nodeId: string,
@@ -21,7 +20,6 @@ type AssistantConversationMessageProps = {
 export const AssistantConversationMessage = ({
   message,
   conversationModel,
-  sourceText,
   readOnly = false,
   onBranchFollowupCreated,
 }: AssistantConversationMessageProps) => {
@@ -37,7 +35,6 @@ export const AssistantConversationMessage = ({
           <AssistantMessageAnnotationWrapper
             messageId={message.id}
             conversationModel={conversationModel}
-            sourceText={sourceText ?? message.content}
             readOnly={readOnly}
             onBranchFollowupCreated={onBranchFollowupCreated}
           >
