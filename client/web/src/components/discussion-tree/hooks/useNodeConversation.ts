@@ -133,6 +133,7 @@ export const useNodeConversation = ({
   const streamTurnIdRef = useRef<string | null>(null)
   const streamAuthorUserIdRef = useRef<string | null>(null)
   const streamPendingMessageIdRef = useRef<string | null>(null)
+  const streamPersistedMessageIdRef = useRef<string | null>(null)
   const appliedBranchBootstrapKeyRef = useRef<string | null>(null)
   const fallbackTimerRef = useRef<number | null>(null)
   const postprocessWindowTimerRef = useRef<number | null>(null)
@@ -141,22 +142,60 @@ export const useNodeConversation = ({
     { nodeId: nodeId ?? '' },
     { enabled: Boolean(nodeId) },
   )
+  const branchFollowupStatusQuery = trpc.branchFollowupStatus.useQuery(
+    { turnId: branchFollowupBootstrap?.turnId ?? '' },
+    {
+      enabled: Boolean(branchFollowupBootstrap?.turnId),
+      refetchInterval: (query) => {
+        const data = query.state.data
+        if (!branchFollowupBootstrap) {
+          return false
+        }
+
+        return !data || data.status === 'pending' || data.status === 'processing'
+          ? 1000
+          : false
+      },
+      refetchOnWindowFocus: false,
+    },
+  )
 
   const invalidateNodeMessages = useCallback(async (targetNodeId: string) => {
     await invalidateMessagesByNode(utils.messagesByNode.invalidate, targetNodeId)
   }, [utils.messagesByNode.invalidate])
 
+  const syncHiddenPersistedMessageId = useCallback((nextPersistedMessageId: string | null) => {
+    const previousPersistedMessageId = streamPersistedMessageIdRef.current
+    streamPersistedMessageIdRef.current = nextPersistedMessageId
+
+    setHiddenPersistedMessageIds((current) => {
+      let next = current
+
+      if (
+        previousPersistedMessageId
+        && previousPersistedMessageId !== nextPersistedMessageId
+        && current.includes(previousPersistedMessageId)
+      ) {
+        next = next.filter((hiddenMessageId) => hiddenMessageId !== previousPersistedMessageId)
+      }
+
+      if (nextPersistedMessageId && !next.includes(nextPersistedMessageId)) {
+        next = [...next, nextPersistedMessageId]
+      }
+
+      return next
+    })
+  }, [])
+
   const clearStreamPendingMessage = useCallback((messageId: string) => {
     setPendingMessages((current) =>
       current.filter((message) => message.id !== messageId),
     )
-    setHiddenPersistedMessageIds((current) =>
-      current.filter((hiddenMessageId) => hiddenMessageId !== messageId),
-    )
+    syncHiddenPersistedMessageId(null)
     if (streamPendingMessageIdRef.current === messageId) {
       streamPendingMessageIdRef.current = null
     }
-  }, [])
+  }, [syncHiddenPersistedMessageId])
 
   const markStreamPendingMessageFailed = useCallback((messageId: string) => {
     setPendingMessages((current) =>
@@ -307,6 +346,7 @@ export const useNodeConversation = ({
     setHiddenPersistedMessageIds([])
     streamAuthorUserIdRef.current = null
     streamPendingMessageIdRef.current = null
+    streamPersistedMessageIdRef.current = null
     appliedBranchBootstrapKeyRef.current = null
     closeTurnStream()
   }, [closeTurnStream, nodeId])
@@ -318,46 +358,74 @@ export const useNodeConversation = ({
     [closeTurnStream],
   )
 
+  const resolvedBranchFollowupBootstrap = useMemo(() => {
+    if (!branchFollowupBootstrap) {
+      return null
+    }
+
+    return {
+      ...branchFollowupBootstrap,
+      status: branchFollowupStatusQuery.data?.status ?? branchFollowupBootstrap.status,
+      userFollowupMessageId:
+        branchFollowupStatusQuery.data?.userFollowupMessageId
+        ?? branchFollowupBootstrap.userFollowupMessageId,
+    }
+  }, [branchFollowupBootstrap, branchFollowupStatusQuery.data])
+  const branchFollowupOverlayMessageId = useMemo(
+    () =>
+      resolvedBranchFollowupBootstrap
+        ? `branch-followup:${resolvedBranchFollowupBootstrap.turnId}`
+        : null,
+    [resolvedBranchFollowupBootstrap],
+  )
+
   useEffect(() => {
-    if (!nodeId || !branchFollowupBootstrap) {
+    if (!nodeId || !resolvedBranchFollowupBootstrap || !branchFollowupOverlayMessageId) {
+      return
+    }
+
+    syncHiddenPersistedMessageId(resolvedBranchFollowupBootstrap.userFollowupMessageId ?? null)
+  }, [
+    branchFollowupOverlayMessageId,
+    nodeId,
+    resolvedBranchFollowupBootstrap,
+    syncHiddenPersistedMessageId,
+  ])
+
+  useEffect(() => {
+    if (!nodeId || !resolvedBranchFollowupBootstrap || !branchFollowupOverlayMessageId) {
       return
     }
 
     const bootstrapKey = [
       nodeId,
-      branchFollowupBootstrap.turnId,
-      branchFollowupBootstrap.userFollowupMessageId,
+      resolvedBranchFollowupBootstrap.turnId,
     ].join(':')
     if (appliedBranchBootstrapKeyRef.current === bootstrapKey) {
       return
     }
     appliedBranchBootstrapKeyRef.current = bootstrapKey
 
-    if (branchFollowupBootstrap.status === 'failed') {
+    if (resolvedBranchFollowupBootstrap.status === 'failed') {
       dispatchStreamAction({
         type: 'sendFailed',
-        errorMessage: 'Follow-up generation failed.',
+        errorMessage:
+          branchFollowupStatusQuery.data?.error ?? 'Follow-up generation failed.',
       })
       setPendingMessages((current) => [
-        ...current.filter(
-          (message) => message.id !== branchFollowupBootstrap.userFollowupMessageId,
-        ),
+        ...current.filter((message) => message.id !== branchFollowupOverlayMessageId),
         {
-          id: branchFollowupBootstrap.userFollowupMessageId,
+          id: branchFollowupOverlayMessageId,
           role: 'user',
-          content: branchFollowupBootstrap.text,
+          content: resolvedBranchFollowupBootstrap.text,
           status: 'failed',
         },
       ])
-      setHiddenPersistedMessageIds((current) =>
-        current.includes(branchFollowupBootstrap.userFollowupMessageId)
-          ? current
-          : [...current, branchFollowupBootstrap.userFollowupMessageId],
-      )
       return
     }
 
-    if (branchFollowupBootstrap.status === 'completed') {
+    if (resolvedBranchFollowupBootstrap.status === 'completed') {
+      clearStreamPendingMessage(branchFollowupOverlayMessageId)
       void invalidateNodeMessages(nodeId)
       return
     }
@@ -365,28 +433,81 @@ export const useNodeConversation = ({
     dispatchStreamAction({ type: 'sendRequested' })
     dispatchStreamAction({
       type: 'turnBound',
-      turnId: branchFollowupBootstrap.turnId,
+      turnId: resolvedBranchFollowupBootstrap.turnId,
     })
     setPendingMessages((current) => [
-      ...current.filter(
-        (message) => message.id !== branchFollowupBootstrap.userFollowupMessageId,
-      ),
+      ...current.filter((message) => message.id !== branchFollowupOverlayMessageId),
       {
-        id: branchFollowupBootstrap.userFollowupMessageId,
+        id: branchFollowupOverlayMessageId,
         role: 'user',
-        content: branchFollowupBootstrap.text,
+        content: resolvedBranchFollowupBootstrap.text,
         status: 'pending',
       },
     ])
-    setHiddenPersistedMessageIds((current) =>
-      current.includes(branchFollowupBootstrap.userFollowupMessageId)
-        ? current
-        : [...current, branchFollowupBootstrap.userFollowupMessageId],
-    )
-    streamPendingMessageIdRef.current = branchFollowupBootstrap.userFollowupMessageId
-    connectTurnStream(branchFollowupBootstrap.turnId)
+    streamPendingMessageIdRef.current = branchFollowupOverlayMessageId
+    connectTurnStream(resolvedBranchFollowupBootstrap.turnId)
     void invalidateNodeMessages(nodeId)
-  }, [branchFollowupBootstrap, connectTurnStream, invalidateNodeMessages, nodeId])
+  }, [
+    branchFollowupOverlayMessageId,
+    branchFollowupStatusQuery.data?.error,
+    clearStreamPendingMessage,
+    connectTurnStream,
+    invalidateNodeMessages,
+    nodeId,
+    resolvedBranchFollowupBootstrap,
+    syncHiddenPersistedMessageId,
+  ])
+
+  useEffect(() => {
+    if (!nodeId || !resolvedBranchFollowupBootstrap || !branchFollowupOverlayMessageId) {
+      return
+    }
+
+    if (resolvedBranchFollowupBootstrap.status === 'failed') {
+      closeTurnStream()
+      dispatchStreamAction({
+        type: 'sendFailed',
+        errorMessage:
+          branchFollowupStatusQuery.data?.error ?? 'Follow-up generation failed.',
+      })
+      setPendingMessages((current) => [
+        ...current.filter((message) => message.id !== branchFollowupOverlayMessageId),
+        {
+          id: branchFollowupOverlayMessageId,
+          role: 'user',
+          content: resolvedBranchFollowupBootstrap.text,
+          status: 'failed',
+        },
+      ])
+      streamPendingMessageIdRef.current = null
+      return
+    }
+
+    if (resolvedBranchFollowupBootstrap.status === 'completed') {
+      clearStreamPendingMessage(branchFollowupOverlayMessageId)
+      void invalidateNodeMessages(nodeId)
+      return
+    }
+
+    setPendingMessages((current) => [
+      ...current.filter((message) => message.id !== branchFollowupOverlayMessageId),
+      {
+        id: branchFollowupOverlayMessageId,
+        role: 'user',
+        content: resolvedBranchFollowupBootstrap.text,
+        status: 'pending',
+      },
+    ])
+    streamPendingMessageIdRef.current = branchFollowupOverlayMessageId
+  }, [
+    branchFollowupOverlayMessageId,
+    branchFollowupStatusQuery.data?.error,
+    clearStreamPendingMessage,
+    closeTurnStream,
+    invalidateNodeMessages,
+    nodeId,
+    resolvedBranchFollowupBootstrap,
+  ])
 
   const conversationSendMutation = trpc.conversationSend.useMutation()
 

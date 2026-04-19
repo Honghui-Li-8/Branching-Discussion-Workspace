@@ -4,7 +4,7 @@ const MIN_PANEL_WIDTH = 300
 
 export type BranchFollowupBootstrap = {
   turnId: string
-  userFollowupMessageId: string
+  userFollowupMessageId: string | null
   text: string
   status: 'pending' | 'processing' | 'completed' | 'failed'
 }

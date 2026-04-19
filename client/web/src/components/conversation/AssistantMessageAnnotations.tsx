@@ -26,6 +26,7 @@ import {
 import { buildSourceContextWindow } from './sourceContextWindow'
 import {
   ASSISTANT_ANNOTATION_KIND_PREFIX,
+  getBranchActionKind,
   parseAnnotationKindTag,
   resolveAnnotationKind,
   type AssistantAnnotationKind,
@@ -42,7 +43,7 @@ type AssistantMessageAnnotationWrapperProps = {
     nodeId: string,
     branchFollowupBootstrap: {
       turnId: string
-      userFollowupMessageId: string
+      userFollowupMessageId: string | null
       text: string
       status: RouterOutputs['branchAndSendFollowup']['status']
     },
@@ -446,9 +447,22 @@ const AssistantAnnotationPopup = ({
             annotator.cancelSelected()
             return
           }
+          const currentKind = getAnnotationKind(annotation)
+          const nextBranchKind = getBranchActionKind(currentKind)
+          const sourceAnnotationId =
+            nextBranchKind === 'suggestion-branch' && persistedAnnotationIdSet.has(annotation.id)
+              ? annotation.id
+              : undefined
+          const branchActionKind: BranchAndSendFollowupInput['annotationKind'] =
+            nextBranchKind === 'suggestion-branch' && !sourceAnnotationId
+              ? 'branch'
+              : nextBranchKind === 'suggestion-branch'
+                ? 'suggestion-branch'
+                : 'branch'
           const branchInput: BranchAndSendFollowupInput = {
             messageId,
-            annotationKind: 'branch',
+            sourceAnnotationId,
+            annotationKind: branchActionKind,
             idempotencyKey: createIdempotencyKey(),
             selection,
             sourceContext:
@@ -460,14 +474,14 @@ const AssistantAnnotationPopup = ({
             text: trimmedInputText,
             model: conversationModel,
           }
-          setAnnotationKind(annotator, annotation, 'branch')
+          setAnnotationKind(annotator, annotation, branchActionKind)
 
           markAnnotationPersisted(annotation.id)
           clearPendingDismissState()
           onBranchPendingStateChange(true)
           console.log('[assistant-selection] selected text', {
             messageId,
-            kind: 'branch',
+            kind: branchActionKind,
             text: selectedText,
             inputText: trimmedInputText,
             annotationId: annotation.id,
