@@ -1,5 +1,6 @@
 import { describe, expect, jest, test } from '@jest/globals'
-import { appRouter, type AppRouterContext } from '../index'
+import { appRouter } from './router.js'
+import type { AppRouterContext } from '@branching/shared'
 
 const fixedNow = '2026-03-17T00:00:00.000Z'
 
