@@ -26,7 +26,9 @@ import {
 import { buildSourceContextWindow } from './sourceContextWindow'
 import {
   ASSISTANT_ANNOTATION_KIND_PREFIX,
+  getAnnotationInteractionMode,
   getBranchActionKind,
+  isDisplayOnlyAnnotationKind,
   parseAnnotationKindTag,
   resolveAnnotationKind,
   type AssistantAnnotationKind,
@@ -124,10 +126,20 @@ const getAnnotationTextLength = (annotation: TextAnnotation): number =>
     0,
   )
 
-const getKindBody = (annotation: TextAnnotation) =>
-  annotation.bodies.find((body) => parseAnnotationKindTag(body.value) !== null)
+const getKindBody = (annotation: TextAnnotation | W3CTextAnnotation) => {
+  const bodies =
+    'bodies' in annotation
+      ? annotation.bodies
+      : Array.isArray(annotation.body)
+        ? annotation.body
+        : [annotation.body]
 
-const getAnnotationKind = (annotation: TextAnnotation): AssistantAnnotationKind => {
+  return bodies.find((body: { value?: string }) => parseAnnotationKindTag(body.value) !== null)
+}
+
+const getAnnotationKind = (
+  annotation: TextAnnotation | W3CTextAnnotation,
+): AssistantAnnotationKind => {
   return resolveAnnotationKind({
     propertiesKind: annotation.properties?.kind,
     legacyTagValue: getKindBody(annotation)?.value,
@@ -306,6 +318,7 @@ type AssistantAnnotationPopupProps = {
   conversationModel: string
   sourceText: string
   initiallyPersistedAnnotationIds: string[]
+  readOnly: boolean
   onBranchPendingStateChange: (pending: boolean) => void
   onBranchFollowupCreated?: AssistantMessageAnnotationWrapperProps['onBranchFollowupCreated']
   isBranchPending: boolean
@@ -316,6 +329,7 @@ const AssistantAnnotationPopup = ({
   conversationModel,
   sourceText,
   initiallyPersistedAnnotationIds,
+  readOnly,
   onBranchPendingStateChange,
   onBranchFollowupCreated,
   isBranchPending,
@@ -363,7 +377,12 @@ const AssistantAnnotationPopup = ({
         removeAnnotationTracking(annotationId)
       }}
       popup={({ annotation }) => {
+        if (readOnly) {
+          return null
+        }
+
         const selectedText = getSelectedTextFromAnnotation(annotation)
+        const annotationKind = getAnnotationKind(annotation)
         setPendingDismissAnnotation(annotation.id)
 
         // Dismiss — closes the popup without deleting the annotation.
@@ -384,6 +403,31 @@ const AssistantAnnotationPopup = ({
           }
 
           annotator.cancelSelected()
+        }
+
+        if (isDisplayOnlyAnnotationKind(annotationKind)) {
+          return (
+            <div className="max-w-[320px] rounded-[18px] border border-[#b5d8e6] bg-[#f4fbfd] p-4 text-[#2a6378] shadow-[0_18px_48px_rgba(27,79,101,0.18)] backdrop-blur-[10px]">
+              <p className="m-0 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#4d8194]">
+                Branch origin
+              </p>
+              <p className="mt-2 mb-0 text-sm leading-relaxed">
+                {selectedText || 'Selected branch source'}
+              </p>
+              <p className="mt-3 mb-0 text-[12px] leading-snug text-[#5d8291]">
+                Provenance highlight only. This annotation cannot be edited, converted, or deleted.
+              </p>
+              <div className="mt-4 flex justify-end">
+                <button
+                  type="button"
+                  className="rounded-full border border-[#bddae5] bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.06em] text-[#35667a]"
+                  onClick={handleDismiss}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          )
         }
 
         // Delete — removes the annotation locally and from the backend if persisted.
@@ -624,28 +668,48 @@ const AssistantWholeWordSelectionEnforcer = () => {
   return null
 }
 
-const AssistantExistingAnnotationClickHandler = () => {
+type AssistantExistingAnnotationClickHandlerProps = {
+  readOnly: boolean
+}
+
+const AssistantExistingAnnotationClickHandler = ({
+  readOnly,
+}: AssistantExistingAnnotationClickHandlerProps) => {
   const annotator = useAnnotator<
     RecogitoTextAnnotator<TextAnnotation, W3CTextAnnotation> | undefined
   >()
 
   useEffect(() => {
-    if (!annotator) {
+    if (!annotator || readOnly) {
       return
     }
 
     const handleClick = (event: MouseEvent) => {
+      const annotations = annotator.state.store.all()
       const annotationId = findAnnotationIdFromClick({
         target: event.target,
         clientX: event.clientX,
         clientY: event.clientY,
         doc: document,
         annotatorElement: annotator.element,
-        annotations: annotator.state.store.all(),
+        annotations,
       })
 
       if (annotationId) {
-        annotator.setSelected(annotationId, true)
+        const annotation = annotations.find((candidate) => candidate.id === annotationId)
+        if (!annotation) {
+          return
+        }
+
+        const interactionMode = getAnnotationInteractionMode({
+          kind: getAnnotationKind(annotation),
+          readOnly,
+        })
+        if (interactionMode === 'none') {
+          return
+        }
+
+        annotator.setSelected(annotationId, interactionMode === 'edit')
       }
     }
 
@@ -653,7 +717,7 @@ const AssistantExistingAnnotationClickHandler = () => {
     return () => {
       annotator.element.removeEventListener('click', handleClick)
     }
-  }, [annotator])
+  }, [annotator, readOnly])
 
   return null
 }
@@ -772,7 +836,7 @@ export const AssistantMessageAnnotationWrapper = ({
 }: AssistantMessageAnnotationWrapperProps) => {
   const [isBranchPending, setIsBranchPending] = useState(false)
   const isPersistedMessageId = useMemo(() => isUuid(messageId), [messageId])
-  const shouldEnableAnnotations = isPersistedMessageId && !readOnly
+  const shouldEnableAnnotations = isPersistedMessageId
 
   useEffect(() => {
     setIsBranchPending(false)
@@ -805,7 +869,23 @@ export const AssistantMessageAnnotationWrapper = ({
         className="assistant-annotation-scope"
         adapter={(container) => W3CTextFormat(annotationSource, container)}
         user={LOCAL_ANNOTATION_USER}
-        userSelectAction={UserSelectAction.EDIT}
+        annotatingEnabled={!readOnly}
+        userSelectAction={(annotation) => {
+          const interactionMode = getAnnotationInteractionMode({
+            kind: getAnnotationKind(annotation),
+            readOnly,
+          })
+
+          switch (interactionMode) {
+            case 'none':
+              return UserSelectAction.NONE
+            case 'select':
+              return UserSelectAction.SELECT
+            case 'edit':
+            default:
+              return UserSelectAction.EDIT
+          }
+        }}
         style={(annotation) => {
           const kind = getAnnotationKind(annotation)
 
@@ -813,6 +893,17 @@ export const AssistantMessageAnnotationWrapper = ({
             return {
               fill: '#f9d97a',
               fillOpacity: 0.18,
+            }
+          }
+
+          if (kind === 'branch-origin') {
+            return {
+              fill: '#72bed0',
+              fillOpacity: 0.18,
+              underlineStyle: 'dashed',
+              underlineColor: '#3389a2',
+              underlineThickness: 2,
+              underlineOffset: 2,
             }
           }
 
@@ -830,13 +921,14 @@ export const AssistantMessageAnnotationWrapper = ({
         <AssistantAnnotationLoadAnimator
           shouldAnimateOnLoad={initialAnnotations.length > 0}
         />
-        <AssistantExistingAnnotationClickHandler />
-        <AssistantWholeWordSelectionEnforcer />
+        <AssistantExistingAnnotationClickHandler readOnly={readOnly} />
+        {!readOnly ? <AssistantWholeWordSelectionEnforcer /> : null}
         <AssistantAnnotationPopup
           messageId={messageId}
           conversationModel={conversationModel}
           sourceText={sourceText}
           initiallyPersistedAnnotationIds={initialPersistedAnnotationIds}
+          readOnly={readOnly}
           onBranchPendingStateChange={setIsBranchPending}
           onBranchFollowupCreated={onBranchFollowupCreated}
           isBranchPending={isBranchPending}
