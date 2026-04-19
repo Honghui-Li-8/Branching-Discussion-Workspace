@@ -314,3 +314,245 @@ describe('buildConversationContext', () => {
     })
   })
 })
+
+describe('buildConversationContext — branch-node context assembly', () => {
+  // Shared fixtures for a branch child node and its canonical message sequence.
+  const childNodeRecord = {
+    ...nodeRecord,
+    id: 'n-child',
+    parentNodeId: 'n-parent',
+    depth: 1,
+    title: 'Branch Child',
+    summary: 'Child summary',
+  }
+
+  const branchEventMessage = {
+    id: 'm-branch-event',
+    authorUserId: 'u1',
+    nodeId: 'n-child',
+    turnId: null,
+    role: 'user' as const,
+    content: 'surrounding branch context',
+    metadata: {
+      eventType: 'branch_event' as const,
+      sourceNodeId: 'n-parent',
+      sourceMessageId: 'm-parent-source',
+      sourceAnnotationId: 'a1',
+      sourceContext: 'surrounding branch context',
+      branchNodeId: 'n-child',
+    },
+    createdAt: '2026-04-01T00:00:00.000Z',
+  }
+
+  const followupUserMessage = {
+    id: 'm-followup',
+    authorUserId: 'u1',
+    nodeId: 'n-child',
+    turnId: 't-child-1',
+    role: 'user' as const,
+    content: 'What do you mean by this?',
+    metadata: {},
+    createdAt: '2026-04-01T00:01:00.000Z',
+  }
+
+  const assistantMessage = {
+    id: 'm-assistant',
+    authorUserId: 'u1',
+    nodeId: 'n-child',
+    turnId: 't-child-1',
+    role: 'assistant' as const,
+    content: 'I meant the following…',
+    metadata: {},
+    createdAt: '2026-04-01T00:02:00.000Z',
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+  })
+
+  test('includes branch event as first entry in the ordered message sequence: event → follow-up → assistant', async () => {
+    // The branch event (turnId=null) is persisted before the turn pipeline runs, so it must
+    // always be the first message in the child node's message list. Context assembly must
+    // pass through the full ordered sequence without reordering or filtering any rows.
+    getNodeByIdForAuthorMock.mockResolvedValueOnce(childNodeRecord)
+    listMessagesForNodeForAuthorMock.mockResolvedValueOnce([
+      branchEventMessage,
+      followupUserMessage,
+      assistantMessage,
+    ])
+
+    const result = await buildConversationContext({
+      nodeId: 'n-child',
+      currentUserId: 'u1',
+      userInput: 'next question',
+    })
+
+    expect(result.recentMessages).toEqual([
+      {
+        id: 'm-branch-event',
+        role: 'user',
+        content: 'surrounding branch context',
+        createdAt: '2026-04-01T00:00:00.000Z',
+      },
+      {
+        id: 'm-followup',
+        role: 'user',
+        content: 'What do you mean by this?',
+        createdAt: '2026-04-01T00:01:00.000Z',
+      },
+      {
+        id: 'm-assistant',
+        role: 'assistant',
+        content: 'I meant the following…',
+        createdAt: '2026-04-01T00:02:00.000Z',
+      },
+    ])
+    expect(result.memoryPlaceholder).toBeNull()
+    expect(result.node.parentNodeId).toBe('n-parent')
+  })
+
+  test('retains branch event when currentTurnId filters the current turn's messages', async () => {
+    // When building context for the first child turn, currentTurnId is set to exclude
+    // in-flight messages. The branch event has turnId=null so it is never filtered out —
+    // it must remain in the context as the sole carrier of parent-node history.
+    getNodeByIdForAuthorMock.mockResolvedValueOnce(childNodeRecord)
+    listMessagesForNodeForAuthorMock.mockResolvedValueOnce([
+      branchEventMessage,
+      followupUserMessage, // part of t-child-1 — should be excluded
+    ])
+
+    const result = await buildConversationContext({
+      nodeId: 'n-child',
+      currentUserId: 'u1',
+      userInput: 'next question',
+      currentTurnId: 't-child-1',
+    })
+
+    expect(result.recentMessages).toEqual([
+      {
+        id: 'm-branch-event',
+        role: 'user',
+        content: 'surrounding branch context',
+        createdAt: '2026-04-01T00:00:00.000Z',
+      },
+    ])
+    // Only branch event remains — it has no turnId so the filter leaves it intact.
+    expect(result.memoryPlaceholder).toBeNull()
+  })
+
+  test('counts branch event toward olderMessageCount when the context window trims it', async () => {
+    // A tight recentMessageLimit can trim the branch event along with earlier turn messages.
+    // The memory placeholder must account for it — the model must know history was truncated.
+    const secondFollowup = {
+      id: 'm-followup-2',
+      authorUserId: 'u1',
+      nodeId: 'n-child',
+      turnId: 't-child-2',
+      role: 'user' as const,
+      content: 'A second follow-up.',
+      metadata: {},
+      createdAt: '2026-04-01T00:03:00.000Z',
+    }
+
+    getNodeByIdForAuthorMock.mockResolvedValueOnce(childNodeRecord)
+    listMessagesForNodeForAuthorMock.mockResolvedValueOnce([
+      branchEventMessage,   // trimmed
+      followupUserMessage,  // trimmed
+      assistantMessage,     // retained
+      secondFollowup,       // retained
+    ])
+
+    const result = await buildConversationContext({
+      nodeId: 'n-child',
+      currentUserId: 'u1',
+      userInput: 'next question',
+      recentMessageLimit: 2,
+    })
+
+    expect(result.recentMessages).toHaveLength(2)
+    expect(result.recentMessages[0]?.id).toBe('m-assistant')
+    expect(result.recentMessages[1]?.id).toBe('m-followup-2')
+    expect(result.memoryPlaceholder).toEqual({
+      status: 'pending',
+      olderMessageCount: 2, // branch event + first follow-up trimmed
+      retainedMessageCount: 2,
+    })
+  })
+
+  test('nested branch node loads only grandchild messages without issuing additional ancestor queries', async () => {
+    // Each branch level is self-contained: the grandchild node holds its own branch event
+    // (pointing at the child node as parent) plus its own turns. Context assembly must
+    // query only the grandchild node — not the child or root — matching the MVP design
+    // where inherited history is embedded in the branch event message content.
+    const grandchildNodeRecord = {
+      ...nodeRecord,
+      id: 'n-grandchild',
+      parentNodeId: 'n-child',
+      depth: 2,
+      title: 'Grandchild Branch',
+      summary: 'Grandchild summary',
+    }
+    const grandchildBranchEvent = {
+      id: 'm-gc-event',
+      authorUserId: 'u1',
+      nodeId: 'n-grandchild',
+      turnId: null,
+      role: 'user' as const,
+      content: 'grandchild branch context',
+      metadata: {
+        eventType: 'branch_event' as const,
+        sourceNodeId: 'n-child',
+        sourceMessageId: 'm-child-source',
+        sourceAnnotationId: 'a2',
+        sourceContext: 'grandchild branch context',
+        branchNodeId: 'n-grandchild',
+      },
+      createdAt: '2026-04-01T00:10:00.000Z',
+    }
+    const grandchildFollowup = {
+      id: 'm-gc-followup',
+      authorUserId: 'u1',
+      nodeId: 'n-grandchild',
+      turnId: 't-gc-1',
+      role: 'user' as const,
+      content: 'grandchild question',
+      metadata: {},
+      createdAt: '2026-04-01T00:11:00.000Z',
+    }
+
+    getNodeByIdForAuthorMock.mockResolvedValueOnce(grandchildNodeRecord)
+    listMessagesForNodeForAuthorMock.mockResolvedValueOnce([
+      grandchildBranchEvent,
+      grandchildFollowup,
+    ])
+
+    const result = await buildConversationContext({
+      nodeId: 'n-grandchild',
+      currentUserId: 'u1',
+      userInput: 'grandchild next turn',
+    })
+
+    // Only one node lookup and one message list query — no ancestor traversal.
+    expect(getNodeByIdForAuthorMock).toHaveBeenCalledTimes(1)
+    expect(getNodeByIdForAuthorMock).toHaveBeenCalledWith('n-grandchild', 'u1')
+    expect(listMessagesForNodeForAuthorMock).toHaveBeenCalledTimes(1)
+    expect(listMessagesForNodeForAuthorMock).toHaveBeenCalledWith('n-grandchild', 'u1')
+
+    expect(result.recentMessages).toEqual([
+      {
+        id: 'm-gc-event',
+        role: 'user',
+        content: 'grandchild branch context',
+        createdAt: '2026-04-01T00:10:00.000Z',
+      },
+      {
+        id: 'm-gc-followup',
+        role: 'user',
+        content: 'grandchild question',
+        createdAt: '2026-04-01T00:11:00.000Z',
+      },
+    ])
+    expect(result.node.parentNodeId).toBe('n-child')
+    expect(result.memoryPlaceholder).toBeNull()
+  })
+})

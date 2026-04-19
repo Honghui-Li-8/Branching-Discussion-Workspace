@@ -599,3 +599,89 @@ describe('branchAndSendFollowup — idempotency and partial-write recovery', () 
     expect(listMessagesByTurnMock).not.toHaveBeenCalled()
   })
 })
+
+describe('branchAndSendFollowup — first child turn ordering', () => {
+  beforeEach(() => {
+    jest.resetAllMocks()
+    getBranchEventMetadataFromRecordMock.mockImplementation(
+      (record) =>
+        record.metadata?.eventType === 'branch_event' ? (record.metadata as never) : null,
+    )
+  })
+
+  test('branch event creation always precedes turn pipeline launch', async () => {
+    // Verify the three-step execution order: branch transaction → event upsert → turn pipeline.
+    // If any step were reordered the child node could receive turn messages before its branch
+    // event row exists, breaking the ordered message sequence the context builder relies on.
+    const callOrder: string[] = []
+
+    getSourceContextMock.mockResolvedValueOnce(sourceContextRecord)
+    branchInTransactionMock.mockImplementationOnce(async () => {
+      callOrder.push('branch')
+      return branchResult
+    })
+    createOrGetBranchEventMessageForAuthorMock.mockImplementationOnce(async () => {
+      callOrder.push('event')
+      return branchEventMessageRecord
+    })
+    runTurnFlowMock.mockImplementationOnce(async () => {
+      callOrder.push('turn')
+      return turnResult
+    })
+
+    await branchAndSendFollowup({ input: buildInput(), currentUserId: 'u1' })
+
+    expect(callOrder).toEqual(['branch', 'event', 'turn'])
+  })
+
+  test('returned IDs reflect correct persistence roles: branch event has no turnId, follow-up is turn-bound', async () => {
+    // The branch event message is persisted with turn_id = null (it predates and outlives any turn).
+    // The follow-up user message is turn-bound (turn_id = t1).
+    // branchAndSendFollowup must map both IDs correctly so callers can distinguish the two rows.
+    getSourceContextMock.mockResolvedValueOnce(sourceContextRecord)
+    branchInTransactionMock.mockResolvedValueOnce(branchResult)
+    createOrGetBranchEventMessageForAuthorMock.mockResolvedValueOnce(branchEventMessageRecord)
+    runTurnFlowMock.mockResolvedValueOnce(turnResult)
+
+    const result = await branchAndSendFollowup({ input: buildInput(), currentUserId: 'u1' })
+
+    // branchEventMessageId must come from the branch event record (turnId: null in fixture).
+    expect(result?.branchEventMessageId).toBe(branchEventMessageRecord.id)
+    expect(branchEventMessageRecord.turnId).toBeNull()
+
+    // userFollowupMessageId must come from the turn result's user message (turnId: t1 in fixture).
+    expect(result?.userFollowupMessageId).toBe(turnResult.userMessage.id)
+    expect(turnResult.userMessage.turnId).toBe(turnResult.turnId)
+
+    // The two IDs must be distinct rows.
+    expect(result?.branchEventMessageId).not.toBe(result?.userFollowupMessageId)
+  })
+
+  test('branch event metadata encodes parent provenance so context builder can recover parent history', async () => {
+    // The branch event message is the sole carrier of parent-node context in the MVP.
+    // Its metadata must contain sourceNodeId, sourceMessageId, and sourceContext so that
+    // downstream context assembly (buildConversationContext) can present the branch point.
+    getSourceContextMock.mockResolvedValueOnce(sourceContextRecord)
+    branchInTransactionMock.mockResolvedValueOnce(branchResult)
+    createOrGetBranchEventMessageForAuthorMock.mockResolvedValueOnce(branchEventMessageRecord)
+    runTurnFlowMock.mockResolvedValueOnce(turnResult)
+
+    await branchAndSendFollowup({ input: buildInput(), currentUserId: 'u1' })
+
+    expect(createOrGetBranchEventMessageForAuthorMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        nodeId: branchResult.branchNodeId,
+        // content carries the raw sourceContext text so the event doubles as the
+        // inherited-history summary for the child node's context window.
+        content: buildInput().sourceContext,
+        metadata: expect.objectContaining({
+          eventType: 'branch_event',
+          sourceNodeId: sourceContextRecord.parentNodeId,
+          sourceMessageId: sourceContextRecord.messageId,
+          sourceAnnotationId: branchResult.annotation.id,
+          branchNodeId: branchResult.branchNodeId,
+        }),
+      }),
+    )
+  })
+})
