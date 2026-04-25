@@ -12,13 +12,20 @@ import type { TreeMessage, TreeNode } from '../types/tree'
 import { useAppSelector } from '../store/hooks'
 import { selectAuthUser } from '../store/slices/authSlice'
 import { useNodeConversation } from './discussion-tree/hooks/useNodeConversation'
+import { useBranchConversationView } from './discussion-tree/hooks/useBranchConversationView'
 import type { TurnStage } from './discussion-tree/hooks/conversationStreamState'
+import type { BranchFollowupBootstrap } from './discussion-tree/hooks/useDiscussionTreeUiState'
 import { ConversationComposer, CHAT_INPUT_MAX_HEIGHT, CHAT_INPUT_MIN_HEIGHT, CHAT_MODELS } from './conversation/ConversationComposer'
 import { ConversationMessageList } from './conversation/ConversationMessageList'
 import { ConversationPanelHeader } from './conversation/ConversationPanelHeader'
 
 type NodeConversationPanelProps = {
   node: TreeNode
+  branchFollowupBootstrap: BranchFollowupBootstrap | null
+  onOpenBranchConversation: (
+    nodeId: string,
+    branchFollowupBootstrap: BranchFollowupBootstrap,
+  ) => void
   width: number
   isFullscreen: boolean
   onClose: () => void
@@ -94,6 +101,8 @@ const formatStageDuration = (durationMs: number): string => {
  */
 export const NodeConversationPanel = ({
   node,
+  branchFollowupBootstrap,
+  onOpenBranchConversation,
   width,
   isFullscreen,
   onClose,
@@ -106,6 +115,11 @@ export const NodeConversationPanel = ({
     nodeId: node.id,
     canSendMessages: Boolean(authUser?.id),
     conversationModel,
+    branchFollowupBootstrap,
+  })
+  const conversationView = useBranchConversationView({
+    nodeId: node.id,
+    localMessages: conversation.messages,
   })
   const [conversationInputText, setConversationInputText] = useState('')
   const [isResizing, setIsResizing] = useState(false)
@@ -124,7 +138,7 @@ export const NodeConversationPanel = ({
   const [statusTimerNowMs, setStatusTimerNowMs] = useState(0)
   const [stageDurationsMs, setStageDurationsMs] = useState<Partial<Record<TurnStage, number>>>({})
 
-  const messages = conversation.messages
+  const messages = conversationView.messages
   const lastMessageContent = messages[messages.length - 1]?.content ?? ''
   const hasFailedMessages = conversation.failedMessageIds.size > 0
   const streamStatusLabel = conversation.streamStatusLabel
@@ -427,12 +441,18 @@ export const NodeConversationPanel = ({
       />
       <ConversationMessageList
         messages={messages}
+        inheritedMessages={conversationView.inheritedMessages}
+        branchEventMessage={conversationView.branchEventMessage}
+        branchSummaryLabel={conversationView.branchSummaryLabel}
+        conversationModel={conversationModel}
         isLoading={conversation.isLoadingMessages}
         errorMessage={conversation.messagesLoadError}
+        inheritedErrorMessage={conversationView.inheritedMessagesLoadError}
         pendingMessageIds={conversation.pendingMessageIds}
         failedMessageIds={conversation.failedMessageIds}
         onRetryFailedMessage={conversation.retryFailedMessage}
         onDismissFailedMessage={conversation.dismissFailedMessage}
+        onBranchFollowupCreated={onOpenBranchConversation}
         conversationScrollRef={conversationScrollRef}
         bottomAnchorRef={conversationBottomAnchorRef}
       />

@@ -1,9 +1,10 @@
-export type AssistantAnnotationKind = 'suggestion' | 'branch' | 'suggestion-branch'
+export type AssistantAnnotationKind = 'suggestion' | 'branch' | 'suggestion-branch' | 'branch-origin'
+export type AnnotationInteractionMode = 'edit' | 'select' | 'none'
 
 export const ASSISTANT_ANNOTATION_KIND_PREFIX = 'assistant-kind:'
 
 export const isAnnotationKind = (kind: string): kind is AssistantAnnotationKind =>
-  kind === 'suggestion' || kind === 'branch' || kind === 'suggestion-branch'
+  kind === 'suggestion' || kind === 'branch' || kind === 'suggestion-branch' || kind === 'branch-origin'
 
 export const parseAnnotationKindTag = (
   value?: string,
@@ -35,6 +36,25 @@ export const getBranchActionKind = (
   currentKind: AssistantAnnotationKind,
 ): AssistantAnnotationKind =>
   currentKind === 'suggestion' ? 'suggestion-branch' : 'branch'
+
+export const isDisplayOnlyAnnotationKind = (
+  kind: AssistantAnnotationKind,
+): boolean =>
+  kind === 'branch-origin'
+
+export const getAnnotationInteractionMode = ({
+  kind,
+  readOnly,
+}: {
+  kind: AssistantAnnotationKind
+  readOnly: boolean
+}): AnnotationInteractionMode => {
+  if (readOnly) {
+    return 'none'
+  }
+
+  return isDisplayOnlyAnnotationKind(kind) ? 'select' : 'edit'
+}
 
 export const shouldDeleteAnnotationOnDismiss = (
   annotationId: string,

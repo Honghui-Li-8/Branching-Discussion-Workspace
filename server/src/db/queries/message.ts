@@ -1,6 +1,9 @@
 import {
   parseMessageMetadata,
+  parseBranchEventMetadata,
+  serializeBranchEventMetadata,
   serializeMessageMetadata,
+  type BranchEventMetadata,
 } from '@branching/shared'
 import type {
   CreateMessageInput,
@@ -116,6 +119,66 @@ export const listMessagesForNode = async (nodeId: string): Promise<MessageRecord
     ORDER BY created_at ASC
     `,
     [nodeId],
+  )
+
+  return result.rows.map(mapMessageRow)
+}
+
+export const listParentMessagesUpToSource = async (
+  sourceNodeId: string,
+  sourceMessageId: string,
+): Promise<MessageRecord[]> => {
+  const result = await query<MessageRow>(
+    `
+    WITH source AS (
+      SELECT created_at, id
+      FROM messages
+      WHERE id = $2
+        AND node_id = $1
+    )
+    SELECT m.id, m.node_id, m.author_user_id, m.turn_id, m.role, m.content, m.metadata, m.created_at
+    FROM messages m
+    JOIN source ON TRUE
+    WHERE m.node_id = $1
+      AND (
+        m.created_at < source.created_at
+        OR (m.created_at = source.created_at AND m.id <= source.id)
+      )
+    ORDER BY m.created_at ASC, m.id ASC
+    `,
+    [sourceNodeId, sourceMessageId],
+  )
+
+  return result.rows.map(mapMessageRow)
+}
+
+export const listParentMessagesUpToSourceForAuthor = async (
+  sourceNodeId: string,
+  sourceMessageId: string,
+  authorUserId: string,
+): Promise<MessageRecord[]> => {
+  const result = await query<MessageRow>(
+    `
+    WITH source AS (
+      SELECT created_at, id
+      FROM messages
+      WHERE id = $2
+        AND node_id = $1
+    )
+    SELECT m.id, m.node_id, m.author_user_id, m.turn_id, m.role, m.content, m.metadata, m.created_at
+    FROM messages m
+    JOIN nodes n ON n.id = m.node_id
+    JOIN workspaces w ON w.id = n.workspace_id
+    JOIN source ON TRUE
+    WHERE m.node_id = $1
+      AND w.author_user_id = $3
+      AND (
+        m.created_at < source.created_at
+        OR (m.created_at = source.created_at AND m.id <= source.id)
+      )
+    ORDER BY m.created_at ASC, m.id ASC
+    `,
+    [sourceNodeId, sourceMessageId, authorUserId],
   )
 
   return result.rows.map(mapMessageRow)
@@ -322,6 +385,56 @@ export const createMessageForAuthor = async (input: CreateMessageInput): Promise
   return mapMessageRow(result.rows[0])
 }
 
+export const createOrGetBranchEventMessageForAuthor = async ({
+  nodeId,
+  authorUserId,
+  content,
+  metadata,
+}: {
+  nodeId: string
+  authorUserId: string
+  content: string
+  metadata: BranchEventMetadata
+}): Promise<MessageRecord | null> => {
+  const serializedMetadata = JSON.stringify(serializeBranchEventMetadata(metadata))
+  const result = await query<MessageRow>(
+    `
+    WITH owned_node AS (
+      SELECT n.id
+      FROM nodes n
+      JOIN workspaces w ON w.id = n.workspace_id
+      WHERE n.id = $1
+        AND w.author_user_id = $2
+    )
+    INSERT INTO messages (node_id, author_user_id, role, content, turn_id, metadata)
+    SELECT
+      owned_node.id,
+      $2,
+      'user',
+      $3,
+      NULL,
+      $4::jsonb
+    FROM owned_node
+    ON CONFLICT (node_id)
+    WHERE turn_id IS NULL
+      AND role = 'user'
+      AND (metadata->>'eventType') = 'branch_event'
+    DO UPDATE
+    SET
+      content = messages.content,
+      metadata = messages.metadata
+    RETURNING id, node_id, author_user_id, turn_id, role, content, metadata, created_at
+    `,
+    [nodeId, authorUserId, content, serializedMetadata],
+  )
+
+  if (result.rows.length === 0) {
+    return null
+  }
+
+  return mapMessageRow(result.rows[0])
+}
+
 export const updateMessage = async (input: UpdateMessageInput): Promise<MessageRecord | null> => {
   const hasMetadata = input.metadata !== undefined
   const metadata = hasMetadata
@@ -395,6 +508,10 @@ export const updateMessageForAuthor = async (
 
   return mapMessageRow(result.rows[0])
 }
+
+export const getBranchEventMetadataFromRecord = (
+  record: MessageRecord,
+): BranchEventMetadata | null => parseBranchEventMetadata(record.metadata)
 
 type DeletedMessageRow = {
   id: string

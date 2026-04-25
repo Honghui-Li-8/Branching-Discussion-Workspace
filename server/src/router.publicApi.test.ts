@@ -1,5 +1,6 @@
 import { describe, expect, jest, test } from '@jest/globals'
-import { appRouter, type AppRouterContext } from '../index'
+import { appRouter } from './router.js'
+import type { AppRouterContext } from '@branching/shared'
 
 const fixedNow = '2026-03-17T00:00:00.000Z'
 
@@ -41,6 +42,8 @@ const makeContext = (): AppRouterContext => ({
   updateNode: jest.fn(async () => null),
   deleteNode: jest.fn(async () => null),
   listMessagesForNode: jest.fn(async () => []),
+  listParentMessagesUpToSource: jest.fn(async () => []),
+  listInheritedMessagesForNode: jest.fn(async () => []),
   createMessage: jest.fn(async () => ({
     id: 'm1',
     authorUserId: 'u1',
@@ -88,6 +91,10 @@ const makeContext = (): AppRouterContext => ({
     },
     branchNodeId: 'n2',
   })),
+  branchAndSendFollowup: jest.fn(async () => {
+    throw new Error('Not implemented in public API test context')
+  }),
+  branchFollowupStatus: jest.fn(async () => null),
   conversationSend: jest.fn(async () => ({
     turnId: 't1',
     status: 'completed' as const,
@@ -112,6 +119,9 @@ describe('shared public API router surface', () => {
     expect(typeof caller.messageSuggestFromSelection).toBe('function')
     expect(typeof caller.messageAnnotationDelete).toBe('function')
     expect(typeof caller.messageBranchFromSelection).toBe('function')
+    expect(typeof caller.branchAndSendFollowup).toBe('function')
+    expect(typeof caller.parentMessagesUpToSource).toBe('function')
+    expect(typeof caller.inheritedMessagesByNode).toBe('function')
     expect(typeof caller.conversationSend).toBe('function')
   })
 })

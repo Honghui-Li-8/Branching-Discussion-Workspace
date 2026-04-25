@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { conversationTurnStatusSchema } from './conversation.js'
 
 const nonEmptyTrimmedStringSchema = z
   .string()
@@ -13,7 +14,12 @@ export type SelectorJson = {
   selector: SelectorRange[]
 }
 
-export const assistantAnnotationKindSchema = z.enum(['suggestion', 'branch', 'suggestion-branch'])
+export const assistantAnnotationKindSchema = z.enum([
+  'suggestion',
+  'branch',
+  'suggestion-branch',
+  'branch-origin',
+])
 
 const selectorRangeSchema = z
   .object({
@@ -101,9 +107,52 @@ export const messageBranchFromSelectionResultSchema = z.object({
   branchNodeId: z.string(),
 })
 
+export const branchAndSendFollowupInputSchema = z
+  .object({
+    messageId: z.string(),
+    sourceAnnotationId: z.string().optional(),
+    selection: annotationSelectionInputSchema,
+    annotationKind: z.enum(['branch', 'suggestion-branch']).optional(),
+    newNodeMeta: messageBranchNewNodeMetaSchema.optional(),
+    text: z.string().min(1),
+    model: z.string().min(1),
+    idempotencyKey: z.string().min(1),
+  })
+  .refine(
+    (value) => value.annotationKind !== 'suggestion-branch' || Boolean(value.sourceAnnotationId),
+    {
+      message: 'sourceAnnotationId is required when annotationKind is suggestion-branch.',
+      path: ['sourceAnnotationId'],
+    },
+  )
+
+export const branchAndSendFollowupResultSchema = z.object({
+  branchNodeId: z.string(),
+  annotationId: z.string(),
+  branchEventMessageId: z.string().nullable(),
+  userFollowupMessageId: z.string().nullable(),
+  turnId: z.string(),
+  status: conversationTurnStatusSchema,
+})
+
+export const branchFollowupStatusInputSchema = z.object({
+  turnId: z.string().min(1),
+})
+
+export const branchFollowupStatusResultSchema = z.object({
+  turnId: z.string(),
+  status: conversationTurnStatusSchema,
+  userFollowupMessageId: z.string().nullable(),
+  error: z.string().nullable(),
+})
+
 export type MessageAnnotation = z.infer<typeof messageAnnotationSchema>
 export type MessageAnnotationDeleteInput = z.infer<typeof messageAnnotationDeleteInputSchema>
 export type MessageAnnotationDeleteResult = z.infer<typeof messageAnnotationDeleteResultSchema>
 export type MessageSuggestFromSelectionInput = z.infer<typeof messageSuggestFromSelectionInputSchema>
 export type MessageBranchFromSelectionInput = z.infer<typeof messageBranchFromSelectionInputSchema>
 export type MessageBranchFromSelectionResult = z.infer<typeof messageBranchFromSelectionResultSchema>
+export type BranchAndSendFollowupInput = z.infer<typeof branchAndSendFollowupInputSchema>
+export type BranchAndSendFollowupResult = z.infer<typeof branchAndSendFollowupResultSchema>
+export type BranchFollowupStatusInput = z.infer<typeof branchFollowupStatusInputSchema>
+export type BranchFollowupStatusResult = z.infer<typeof branchFollowupStatusResultSchema>

@@ -2,8 +2,10 @@ import type {
   CreateMessageInput,
   CreateNodeInput,
   CreateWorkspaceInput,
+  InheritedMessagesByNodeInput,
   Message,
   Node,
+  ParentMessagesUpToSourceInput,
   UpdateMessageInput,
   UpdateNodeInput,
   UpdateWorkspaceInput,
@@ -11,6 +13,10 @@ import type {
   Workspace,
 } from './schemas/core.js'
 import type {
+  BranchAndSendFollowupInput,
+  BranchAndSendFollowupResult,
+  BranchFollowupStatusInput,
+  BranchFollowupStatusResult,
   MessageAnnotation,
   MessageAnnotationDeleteInput,
   MessageAnnotationDeleteResult,
@@ -53,6 +59,12 @@ export type AppRouterContext = {
     deletedMessageCount: number
   } | null>
   listMessagesForNode: (nodeId: string) => Promise<Message[]>
+  listParentMessagesUpToSource: (
+    input: ParentMessagesUpToSourceInput,
+  ) => Promise<Message[]>
+  listInheritedMessagesForNode: (
+    input: InheritedMessagesByNodeInput,
+  ) => Promise<Message[]>
   createMessage: (input: CreateMessageInput) => Promise<Message>
   updateMessage: (input: UpdateMessageInput) => Promise<Message | null>
   deleteMessage: (id: string) => Promise<{ id: string } | null>
@@ -66,6 +78,12 @@ export type AppRouterContext = {
   messageBranchFromSelection: (
     input: MessageBranchFromSelectionInput,
   ) => Promise<MessageBranchFromSelectionResult>
+  branchAndSendFollowup: (
+    input: BranchAndSendFollowupInput,
+  ) => Promise<BranchAndSendFollowupResult>
+  branchFollowupStatus: (
+    input: BranchFollowupStatusInput,
+  ) => Promise<BranchFollowupStatusResult | null>
   conversationSend: (
     input: ConversationSendInput,
   ) => Promise<ConversationSendResult>

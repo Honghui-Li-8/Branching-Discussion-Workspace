@@ -1,4 +1,5 @@
 import type { TreeMessage } from '../../types/tree'
+import type { BranchFollowupBootstrap } from '../discussion-tree/hooks/useDiscussionTreeUiState'
 import {
   formatCitationLabel,
   getRenderableCitations,
@@ -8,10 +9,19 @@ import { ModelMarkdown } from './ModelMarkdown'
 
 type AssistantConversationMessageProps = {
   message: TreeMessage
+  conversationModel: string
+  readOnly?: boolean
+  onBranchFollowupCreated?: (
+    nodeId: string,
+    branchFollowupBootstrap: BranchFollowupBootstrap,
+  ) => void
 }
 
 export const AssistantConversationMessage = ({
   message,
+  conversationModel,
+  readOnly = false,
+  onBranchFollowupCreated,
 }: AssistantConversationMessageProps) => {
   const citations = getRenderableCitations(message)
 
@@ -22,7 +32,12 @@ export const AssistantConversationMessage = ({
           className="w-full rounded-[14px] border border-[#9fc4d8]/85 bg-white/55 px-5 py-4 text-sm leading-relaxed text-[#1f4f68] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] backdrop-blur-[2px]"
           style={{ overflowWrap: 'anywhere' }}
         >
-          <AssistantMessageAnnotationWrapper messageId={message.id}>
+          <AssistantMessageAnnotationWrapper
+            messageId={message.id}
+            conversationModel={conversationModel}
+            readOnly={readOnly}
+            onBranchFollowupCreated={onBranchFollowupCreated}
+          >
             <ModelMarkdown content={message.content} />
           </AssistantMessageAnnotationWrapper>
         </div>

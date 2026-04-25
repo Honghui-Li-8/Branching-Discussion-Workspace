@@ -11,6 +11,7 @@ import {
   deleteMessageForAuthor,
   deleteNodeForAuthor,
   deleteWorkspaceForAuthor,
+  getBranchEventMetadataFromRecord,
   getMessageAnnotationByIdForAuthor,
   getMessageByIdForAuthor,
   getNodeByIdForAuthor,
@@ -18,6 +19,7 @@ import {
   getWorkspaceByIdForAuthor,
   listMessageAnnotationsByMessageForAuthor,
   listMessagesForNodeForAuthor,
+  listParentMessagesUpToSourceForAuthor,
   listNodesByWorkspaceForAuthor,
   listWorkspacesByAuthor,
   softDeleteMessageAnnotationForAuthor,
@@ -51,6 +53,7 @@ jest.mock('./db/index.js', () => ({
   deleteMessageForAuthor: jest.fn(),
   deleteNodeForAuthor: jest.fn(),
   deleteWorkspaceForAuthor: jest.fn(),
+  getBranchEventMetadataFromRecord: jest.fn(),
   getMessageAnnotationByIdForAuthor: jest.fn(),
   getMessageByIdForAuthor: jest.fn(),
   getNodeByIdForAuthor: jest.fn(),
@@ -58,6 +61,7 @@ jest.mock('./db/index.js', () => ({
   getWorkspaceByIdForAuthor: jest.fn(),
   listMessageAnnotationsByMessageForAuthor: jest.fn(),
   listMessagesForNodeForAuthor: jest.fn(),
+  listParentMessagesUpToSourceForAuthor: jest.fn(),
   listNodesByWorkspaceForAuthor: jest.fn(),
   listWorkspacesByAuthor: jest.fn(),
   softDeleteMessageAnnotationForAuthor: jest.fn(),
@@ -143,6 +147,10 @@ const nodeExistsMock = nodeExists as jest.MockedFunction<typeof nodeExists>
 const listMessagesForNodeForAuthorMock = listMessagesForNodeForAuthor as jest.MockedFunction<
   typeof listMessagesForNodeForAuthor
 >
+const listParentMessagesUpToSourceForAuthorMock =
+  listParentMessagesUpToSourceForAuthor as jest.MockedFunction<
+    typeof listParentMessagesUpToSourceForAuthor
+  >
 const listMessageAnnotationsByMessageForAuthorMock =
   listMessageAnnotationsByMessageForAuthor as jest.MockedFunction<
     typeof listMessageAnnotationsByMessageForAuthor
@@ -193,6 +201,10 @@ const deleteNodeForAuthorMock = deleteNodeForAuthor as jest.MockedFunction<typeo
 const deleteMessageForAuthorMock = deleteMessageForAuthor as jest.MockedFunction<
   typeof deleteMessageForAuthor
 >
+const getBranchEventMetadataFromRecordMock =
+  getBranchEventMetadataFromRecord as jest.MockedFunction<
+    typeof getBranchEventMetadataFromRecord
+  >
 
 const selfSessionUser: SessionUser = {
   id: '00000000-0000-4000-8000-000000000001',
@@ -478,8 +490,10 @@ describe('tRPC ownership integration', () => {
     )
     transitionMessageAnnotationToSuggestionForAuthorMock.mockResolvedValue(null)
     branchMessageFromSelectionInTransactionMock.mockResolvedValue(ownedMessageBranchResult)
+    getBranchEventMetadataFromRecordMock.mockReturnValue(null)
     messageAnnotationExistsMock.mockResolvedValue(false)
     messageExistsMock.mockResolvedValue(false)
+    listParentMessagesUpToSourceForAuthorMock.mockResolvedValue([])
 
     createWorkspaceForAuthorMock.mockResolvedValue(ownedWorkspaceRecord)
     createNodeForAuthorMock.mockResolvedValue(ownedNodeRecord)
@@ -1601,5 +1615,119 @@ describe('tRPC ownership integration', () => {
 
     await expect(caller.messagesByNode({ nodeId: 'missing-node' })).resolves.toEqual([])
     expect(listMessagesForNodeForAuthorMock).not.toHaveBeenCalled()
+  })
+
+  test('parentMessagesUpToSource delegates to the scoped parent-history query for owned nodes', async () => {
+    const caller = makeCaller(selfSessionUser)
+    getNodeByIdForAuthorMock.mockResolvedValueOnce(ownedNodeRecord)
+    listParentMessagesUpToSourceForAuthorMock.mockResolvedValueOnce([ownedMessageRecord])
+
+    await expect(
+      caller.parentMessagesUpToSource({
+        sourceNodeId: ownedNodeRecord.id,
+        sourceMessageId: ownedMessageRecord.id,
+      }),
+    ).resolves.toEqual([ownedMessageRecord])
+
+    expect(listParentMessagesUpToSourceForAuthorMock).toHaveBeenCalledWith(
+      ownedNodeRecord.id,
+      ownedMessageRecord.id,
+      selfSessionUser.id,
+    )
+  })
+
+  test('parentMessagesUpToSource returns empty list for missing node and skips parent-history query', async () => {
+    const caller = makeCaller(selfSessionUser)
+    getNodeByIdForAuthorMock.mockResolvedValueOnce(null)
+    nodeExistsMock.mockResolvedValueOnce(false)
+
+    await expect(
+      caller.parentMessagesUpToSource({
+        sourceNodeId: 'missing-node',
+        sourceMessageId: ownedMessageRecord.id,
+      }),
+    ).resolves.toEqual([])
+    expect(listParentMessagesUpToSourceForAuthorMock).not.toHaveBeenCalled()
+  })
+
+  test('inheritedMessagesByNode returns the full ancestor chain for nested branches', async () => {
+    const caller = makeCaller(selfSessionUser)
+    const branchEventMessageRecord = {
+      ...ownedMessageRecord,
+      id: 'branch-event-message',
+      nodeId: ownedBranchNodeRecord.id,
+      content: 'branch event',
+    }
+    const immediateParentMessages = [
+      {
+        ...ownedMessageRecord,
+        id: 'parent-branch-event',
+        nodeId: ownedNodeRecord.id,
+      },
+      {
+        ...ownedAssistantMessageRecord,
+        id: 'parent-source-message',
+        nodeId: ownedNodeRecord.id,
+      },
+    ]
+    const rootMessages = [
+      {
+        ...ownedMessageRecord,
+        id: 'root-source-message',
+        nodeId: 'root-node',
+      },
+    ]
+
+    listMessagesForNodeForAuthorMock.mockResolvedValueOnce([branchEventMessageRecord])
+    getBranchEventMetadataFromRecordMock
+      .mockReturnValueOnce({
+        eventType: 'branch_event',
+        sourceNodeId: ownedNodeRecord.id,
+        sourceMessageId: 'parent-source-message',
+        branchNodeId: ownedBranchNodeRecord.id,
+      })
+      .mockReturnValueOnce({
+        eventType: 'branch_event',
+        sourceNodeId: ownedNodeRecord.id,
+        sourceMessageId: 'parent-source-message',
+        branchNodeId: ownedBranchNodeRecord.id,
+      })
+      .mockReturnValueOnce({
+        eventType: 'branch_event',
+        sourceNodeId: 'root-node',
+        sourceMessageId: 'root-source-message',
+        branchNodeId: ownedNodeRecord.id,
+      })
+      .mockReturnValueOnce({
+        eventType: 'branch_event',
+        sourceNodeId: 'root-node',
+        sourceMessageId: 'root-source-message',
+        branchNodeId: ownedNodeRecord.id,
+      })
+      .mockReturnValueOnce(null)
+    listParentMessagesUpToSourceForAuthorMock
+      .mockResolvedValueOnce(immediateParentMessages)
+      .mockResolvedValueOnce(rootMessages)
+
+    await expect(
+      caller.inheritedMessagesByNode({ nodeId: ownedBranchNodeRecord.id }),
+    ).resolves.toEqual([...rootMessages, ...immediateParentMessages])
+
+    expect(listMessagesForNodeForAuthorMock).toHaveBeenCalledWith(
+      ownedBranchNodeRecord.id,
+      selfSessionUser.id,
+    )
+    expect(listParentMessagesUpToSourceForAuthorMock).toHaveBeenNthCalledWith(
+      1,
+      ownedNodeRecord.id,
+      'parent-source-message',
+      selfSessionUser.id,
+    )
+    expect(listParentMessagesUpToSourceForAuthorMock).toHaveBeenNthCalledWith(
+      2,
+      'root-node',
+      'root-source-message',
+      selfSessionUser.id,
+    )
   })
 })

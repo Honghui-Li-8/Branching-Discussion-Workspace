@@ -50,8 +50,23 @@ export const contextSnapshotSchema = z.looseObject({
   createdAt: z.iso.datetime().optional(),
 })
 
+export const branchEventMetadataSchema = z.looseObject({
+  eventType: z.literal('branch_event'),
+  sourceNodeId: z.string().min(1),
+  sourceMessageId: z.string().min(1),
+  sourceAnnotationId: z.string().min(1).optional(),
+  sourceContext: z.string().optional(),
+  branchNodeId: z.string().min(1),
+})
+
 export const messageMetadataSchema = z.looseObject({
   citations: z.array(citationSchema).optional(),
+  eventType: z.literal('branch_event').optional(),
+  sourceNodeId: z.string().min(1).optional(),
+  sourceMessageId: z.string().min(1).optional(),
+  sourceAnnotationId: z.string().min(1).optional(),
+  sourceContext: z.string().optional(),
+  branchNodeId: z.string().min(1).optional(),
 })
 
 export const conversationTurnMetadataSchema = z.looseObject({
@@ -66,6 +81,7 @@ export type RetrievedChunk = z.infer<typeof retrievedChunkSchema>
 export type RetrieverDiagnostics = z.infer<typeof retrieverDiagnosticsSchema>
 export type RetrieverResult = z.infer<typeof retrieverResultSchema>
 export type ContextSnapshot = z.infer<typeof contextSnapshotSchema>
+export type BranchEventMetadata = z.infer<typeof branchEventMetadataSchema>
 export type MessageMetadata = z.infer<typeof messageMetadataSchema>
 export type ConversationTurnMetadata = z.infer<typeof conversationTurnMetadataSchema>
 
@@ -76,6 +92,14 @@ export const parseMessageMetadata = (value: unknown): MessageMetadata => {
   const parsed = messageMetadataSchema.safeParse(normalizeMessageMetadataInput(value))
   return parsed.success ? parsed.data : {}
 }
+
+export const parseBranchEventMetadata = (value: unknown): BranchEventMetadata | null => {
+  const parsed = branchEventMetadataSchema.safeParse(normalizeMessageMetadataInput(value))
+  return parsed.success ? parsed.data : null
+}
+
+export const serializeBranchEventMetadata = (value: BranchEventMetadata): BranchEventMetadata =>
+  branchEventMetadataSchema.parse(value)
 
 export const serializeMessageMetadata = (
   value: MessageMetadata | undefined,

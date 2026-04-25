@@ -1,5 +1,5 @@
 import { TRPCError, initTRPC } from '@trpc/server'
-import type { AppRouterContext } from './context.js'
+import type { AppRouterContext } from '@branching/shared'
 
 export const t = initTRPC.context<AppRouterContext>().create()
 

@@ -17,8 +17,10 @@ export {
 export {
   createMessageForAuthor,
   deleteMessageForAuthor,
+  getBranchEventMetadataFromRecord,
   getMessageByIdForAuthor,
   listMessagesForNodeForAuthor,
+  listParentMessagesUpToSourceForAuthor,
   updateMessageForAuthor,
 } from './message.js'
 

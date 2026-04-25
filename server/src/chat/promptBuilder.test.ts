@@ -118,4 +118,51 @@ describe('buildAssistantPrompt', () => {
       },
     ])
   })
+
+  test('passes branch event messages through in conversation history', () => {
+    const prompt = buildAssistantPrompt({
+      node: {
+        id: 'n-child',
+        workspaceId: 'w1',
+        title: 'Child Branch',
+        summary: 'child summary',
+        status: 'open',
+        confidence: 'medium',
+        conclusion: null,
+        rationale: null,
+        depth: 1,
+        parentNodeId: 'n-parent',
+      },
+      recentMessages: [
+        {
+          id: 'm-branch-event',
+          role: 'user',
+          content: 'surrounding branch context',
+          createdAt: '2026-03-30T00:03:00.000Z',
+        },
+        {
+          id: 'm-child-followup',
+          role: 'user',
+          content: 'follow-up question',
+          createdAt: '2026-03-30T00:04:00.000Z',
+        },
+      ],
+      userInput: 'next child turn',
+    })
+
+    expect(prompt.conversation).toEqual([
+      {
+        id: 'm-branch-event',
+        role: 'user',
+        content: 'surrounding branch context',
+        createdAt: '2026-03-30T00:03:00.000Z',
+      },
+      {
+        id: 'm-child-followup',
+        role: 'user',
+        content: 'follow-up question',
+        createdAt: '2026-03-30T00:04:00.000Z',
+      },
+    ])
+  })
 })
