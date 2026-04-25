@@ -12,7 +12,7 @@ import type {
 import { createLogger } from '../logging/logger.js'
 
 const logger = createLogger('chat-turn')
-const TEMP_ECHO_ASSISTANT_INPUT = true // debug use echo history
+const TEMP_ECHO_ASSISTANT_INPUT = false // debug use echo history
 const TEMP_ECHO_CONTEXT_TAIL_COUNT = 10
 const TEMP_ECHO_MESSAGE_MAX_CHARS = 600
 
