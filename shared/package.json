@@ -40,6 +40,11 @@
       "types": "./src/router/schemas/conversation.ts",
       "import": "./src/router/schemas/conversation.ts",
       "default": "./src/router/schemas/conversation.ts"
+    },
+    "./router/schemas/merge": {
+      "types": "./src/router/schemas/merge.ts",
+      "import": "./src/router/schemas/merge.ts",
+      "default": "./src/router/schemas/merge.ts"
     }
   },
   "devDependencies": {
