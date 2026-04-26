@@ -100,7 +100,30 @@ const createBaseDeps = () => ({
   mergeModel: 'test-model',
 }) as any
 
+const rootNode: NodeRecord = { ...branchNode, id: 'node-root', parentNodeId: 'node-root' }
+const mergedNode: NodeRecord = { ...branchNode, status: 'merged' }
+
 describe('mergeNodeToParent service', () => {
+  test('initiateNodeMerge rejects root node with INVALID_PROPOSAL', async () => {
+    const deps = createBaseDeps()
+    deps.getNodeByIdForAuthor.mockResolvedValueOnce(rootNode)
+    const service = createMergeNodeToParentService(deps)
+
+    await expect(
+      service.initiateNodeMerge({ input: { nodeId: 'node-root' }, currentUserId: 'user-1' }),
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'INVALID_PROPOSAL' })
+  })
+
+  test('initiateNodeMerge rejects already-merged node with NODE_IS_MERGED', async () => {
+    const deps = createBaseDeps()
+    deps.getNodeByIdForAuthor.mockResolvedValueOnce(mergedNode)
+    const service = createMergeNodeToParentService(deps)
+
+    await expect(
+      service.initiateNodeMerge({ input: { nodeId: 'node-child' }, currentUserId: 'user-1' }),
+    ).rejects.toMatchObject({ code: 'CONFLICT', message: 'NODE_IS_MERGED' })
+  })
+
   test('initiateNodeMerge returns existing pending proposal on retry', async () => {
     const deps = createBaseDeps()
     deps.getPendingMergeProposalForAuthor.mockResolvedValueOnce(pendingProposal)
@@ -248,6 +271,79 @@ describe('mergeNodeToParent service', () => {
     expect(deps.getClient).not.toHaveBeenCalled()
   })
 
+  test('reviseMergeProposal reject mode runs AI and creates new proposal', async () => {
+    const deps = createBaseDeps()
+    const revisedProposal: MessageRecord = {
+      ...pendingProposal,
+      id: 'message-proposal-rejected',
+      content: 'Use REST with server-sent events.',
+      metadata: {
+        ...pendingMetadata,
+        proposalId: 'proposal-next',
+        proposedConclusion: 'Use REST with server-sent events.',
+        revisionRound: 2,
+      },
+    }
+    deps.selectProvider.mockReturnValueOnce({
+      id: 'test-provider',
+      generate: jest.fn(async () => ({
+        content: '{ "conclusion": "Use REST with server-sent events." }',
+        finishReason: 'stop' as const,
+        providerResponseId: null,
+      })),
+    })
+    const query = jest.fn(async (..._args: unknown[]) => ({ rows: [] as unknown[] }))
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [messageRow(pendingProposal)] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [messageRow(revisedProposal)] })
+      .mockResolvedValueOnce({ rows: [] })
+    deps.getClient.mockResolvedValueOnce({ query, release: jest.fn() })
+    const service = createMergeNodeToParentService(deps)
+
+    const result = await service.reviseMergeProposal({
+      input: {
+        nodeId: 'node-child',
+        proposalMessageId: 'message-proposal',
+        revision: { mode: 'reject', revisionInstruction: 'Be more specific.' },
+      },
+      currentUserId: 'user-1',
+    })
+
+    expect(result).toEqual({
+      proposalMessageId: 'message-proposal-rejected',
+      proposedConclusion: 'Use REST with server-sent events.',
+    })
+    expect(deps.selectProvider).toHaveBeenCalled()
+    expect(query).toHaveBeenLastCalledWith('COMMIT')
+  })
+
+  test('reviseMergeProposal throws INVALID_PROPOSAL when locked proposal is no longer pending', async () => {
+    const deps = createBaseDeps()
+    const supersededProposal: MessageRecord = {
+      ...pendingProposal,
+      metadata: { ...pendingMetadata, mergeStatus: 'superseded' as const },
+    }
+    const query = jest.fn(async (..._args: unknown[]) => ({ rows: [] as unknown[] }))
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [messageRow(supersededProposal)] })
+      .mockResolvedValueOnce({ rows: [] })
+    deps.getClient.mockResolvedValueOnce({ query, release: jest.fn() })
+    const service = createMergeNodeToParentService(deps)
+
+    await expect(
+      service.reviseMergeProposal({
+        input: {
+          nodeId: 'node-child',
+          proposalMessageId: 'message-proposal',
+          revision: { mode: 'edit', editedText: 'Updated conclusion.' },
+        },
+        currentUserId: 'user-1',
+      }),
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'INVALID_PROPOSAL' })
+    expect(query).toHaveBeenLastCalledWith('ROLLBACK')
+  })
+
   test('cancelMerge cancels only the pending proposal', async () => {
     const deps = createBaseDeps()
     const query = jest.fn(async (..._args: unknown[]) => ({ rows: [] as unknown[] }))
@@ -271,6 +367,102 @@ describe('mergeNodeToParent service', () => {
     ).resolves.toEqual({ cancelledCount: 1 })
     expect(query.mock.calls[1]?.[0]).toContain("(m.metadata->>'mergeStatus') = 'pending'")
     expect(query).toHaveBeenLastCalledWith('COMMIT')
+  })
+
+  test('cancelMerge returns cancelledCount 0 when no pending proposal exists', async () => {
+    const deps = createBaseDeps()
+    const query = jest.fn(async (..._args: unknown[]) => ({ rows: [] as unknown[] }))
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+    deps.getClient.mockResolvedValueOnce({ query, release: jest.fn() })
+    const service = createMergeNodeToParentService(deps)
+
+    await expect(
+      service.cancelMerge({ input: { nodeId: 'node-child' }, currentUserId: 'user-1' }),
+    ).resolves.toEqual({ cancelledCount: 0 })
+  })
+
+  test('cancelMerge rejects root node with INVALID_PROPOSAL', async () => {
+    const deps = createBaseDeps()
+    deps.getNodeByIdForAuthor.mockResolvedValueOnce(rootNode)
+    const service = createMergeNodeToParentService(deps)
+
+    await expect(
+      service.cancelMerge({ input: { nodeId: 'node-root' }, currentUserId: 'user-1' }),
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'INVALID_PROPOSAL' })
+  })
+
+  test('cancelMerge rejects already-merged node with NODE_IS_MERGED', async () => {
+    const deps = createBaseDeps()
+    deps.getNodeByIdForAuthor.mockResolvedValueOnce(mergedNode)
+    const service = createMergeNodeToParentService(deps)
+
+    await expect(
+      service.cancelMerge({ input: { nodeId: 'node-child' }, currentUserId: 'user-1' }),
+    ).rejects.toMatchObject({ code: 'CONFLICT', message: 'NODE_IS_MERGED' })
+  })
+
+  test('approveMerge rejects root node with INVALID_PROPOSAL', async () => {
+    const deps = createBaseDeps()
+    deps.getNodeByIdForAuthor.mockResolvedValueOnce(rootNode)
+    const service = createMergeNodeToParentService(deps)
+
+    await expect(
+      service.approveMerge({
+        input: { nodeId: 'node-root', proposalMessageId: 'message-proposal' },
+        currentUserId: 'user-1',
+      }),
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'INVALID_PROPOSAL' })
+  })
+
+  test('approveMerge rejects already-merged node with NODE_IS_MERGED', async () => {
+    const deps = createBaseDeps()
+    deps.getNodeByIdForAuthor.mockResolvedValueOnce(mergedNode)
+    const service = createMergeNodeToParentService(deps)
+
+    await expect(
+      service.approveMerge({
+        input: { nodeId: 'node-child', proposalMessageId: 'message-proposal' },
+        currentUserId: 'user-1',
+      }),
+    ).rejects.toMatchObject({ code: 'CONFLICT', message: 'NODE_IS_MERGED' })
+  })
+
+  test('approveMerge throws INVALID_PROPOSAL when branch origin is missing', async () => {
+    const deps = createBaseDeps()
+    deps.getBranchOriginMetadataForNodeForAuthor.mockResolvedValueOnce(null)
+    const service = createMergeNodeToParentService(deps)
+
+    await expect(
+      service.approveMerge({
+        input: { nodeId: 'node-child', proposalMessageId: 'message-proposal' },
+        currentUserId: 'user-1',
+      }),
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'INVALID_PROPOSAL' })
+    expect(deps.getClient).not.toHaveBeenCalled()
+  })
+
+  test('approveMerge throws INVALID_PROPOSAL when locked proposal is no longer pending', async () => {
+    const deps = createBaseDeps()
+    const approvedProposal: MessageRecord = {
+      ...pendingProposal,
+      metadata: { ...pendingMetadata, mergeStatus: 'approved' as const },
+    }
+    const query = jest.fn(async (..._args: unknown[]) => ({ rows: [] as unknown[] }))
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [messageRow(approvedProposal)] })
+      .mockResolvedValueOnce({ rows: [] })
+    deps.getClient.mockResolvedValueOnce({ query, release: jest.fn() })
+    const service = createMergeNodeToParentService(deps)
+
+    await expect(
+      service.approveMerge({
+        input: { nodeId: 'node-child', proposalMessageId: 'message-proposal' },
+        currentUserId: 'user-1',
+      }),
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'INVALID_PROPOSAL' })
+    expect(query).toHaveBeenLastCalledWith('ROLLBACK')
   })
 
   test('approveMerge marks child merged and creates parent merge event', async () => {
