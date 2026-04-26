@@ -516,6 +516,47 @@ export const createMergeProposalMessageForAuthorInTransaction = async (
     input,
   )
 
+export const createPendingMergeProposalMessageForAuthorIdempotent = async (input: {
+  nodeId: string
+  authorUserId: string
+  content: string
+  metadata: MergeProposalMetadata & { mergeStatus: 'pending' }
+}): Promise<MessageRecord | null> => {
+  const serializedMetadata = JSON.stringify(serializeMergeProposalMetadata(input.metadata))
+  const result = await query<MessageRow>(
+    `
+    WITH owned_node AS (
+      SELECT n.id
+      FROM nodes n
+      JOIN workspaces w ON w.id = n.workspace_id
+      WHERE n.id = $1
+        AND w.author_user_id = $2
+    )
+    INSERT INTO messages (node_id, author_user_id, role, content, turn_id, metadata)
+    SELECT
+      owned_node.id,
+      $2,
+      'assistant',
+      $3,
+      NULL,
+      $4::jsonb
+    FROM owned_node
+    ON CONFLICT (node_id)
+    WHERE (metadata->>'eventType') = 'merge_proposal'
+      AND (metadata->>'mergeStatus') = 'pending'
+    DO NOTHING
+    RETURNING id, node_id, author_user_id, turn_id, role, content, metadata, created_at
+    `,
+    [input.nodeId, input.authorUserId, input.content, serializedMetadata],
+  )
+
+  if (result.rows.length === 0) {
+    return getPendingMergeProposalForAuthor(input.nodeId, input.authorUserId)
+  }
+
+  return mapMessageRow(result.rows[0])
+}
+
 export const getPendingMergeProposalForAuthor = async (
   nodeId: string,
   authorUserId: string,
@@ -540,6 +581,44 @@ export const getPendingMergeProposalForAuthor = async (
       AND (m.metadata->>'mergeStatus') = 'pending'
     ORDER BY m.created_at DESC
     LIMIT 1
+    `,
+    [nodeId, authorUserId],
+  )
+
+  if (result.rows.length === 0) {
+    return null
+  }
+
+  return mapMessageRow(result.rows[0])
+}
+
+export const getPendingMergeProposalForAuthorInTransaction = async (
+  client: Pick<PoolClient, 'query'>,
+  nodeId: string,
+  authorUserId: string,
+  options: { lock?: boolean } = {},
+): Promise<MessageRecord | null> => {
+  const result = await client.query<MessageRow>(
+    `
+    SELECT
+      m.id,
+      m.node_id,
+      m.author_user_id,
+      m.turn_id,
+      m.role,
+      m.content,
+      m.metadata,
+      m.created_at
+    FROM messages m
+    JOIN nodes n ON n.id = m.node_id
+    JOIN workspaces w ON w.id = n.workspace_id
+    WHERE m.node_id = $1
+      AND w.author_user_id = $2
+      AND (m.metadata->>'eventType') = 'merge_proposal'
+      AND (m.metadata->>'mergeStatus') = 'pending'
+    ORDER BY m.created_at DESC
+    LIMIT 1
+    ${options.lock ? 'FOR UPDATE OF m' : ''}
     `,
     [nodeId, authorUserId],
   )
@@ -586,6 +665,44 @@ export const getMergeProposalMessageForNodeForAuthor = async (
   return mapMessageRow(result.rows[0])
 }
 
+export const getMergeProposalMessageForNodeForAuthorInTransaction = async (
+  client: Pick<PoolClient, 'query'>,
+  nodeId: string,
+  proposalMessageId: string,
+  authorUserId: string,
+  options: { lock?: boolean } = {},
+): Promise<MessageRecord | null> => {
+  const result = await client.query<MessageRow>(
+    `
+    SELECT
+      m.id,
+      m.node_id,
+      m.author_user_id,
+      m.turn_id,
+      m.role,
+      m.content,
+      m.metadata,
+      m.created_at
+    FROM messages m
+    JOIN nodes n ON n.id = m.node_id
+    JOIN workspaces w ON w.id = n.workspace_id
+    WHERE m.id = $1
+      AND m.node_id = $2
+      AND w.author_user_id = $3
+      AND (m.metadata->>'eventType') = 'merge_proposal'
+    LIMIT 1
+    ${options.lock ? 'FOR UPDATE OF m' : ''}
+    `,
+    [proposalMessageId, nodeId, authorUserId],
+  )
+
+  if (result.rows.length === 0) {
+    return null
+  }
+
+  return mapMessageRow(result.rows[0])
+}
+
 export const updateMergeProposalStatusForAuthor = async ({
   nodeId,
   proposalMessageId,
@@ -598,6 +715,43 @@ export const updateMergeProposalStatusForAuthor = async ({
   mergeStatus: MergeProposalMetadata['mergeStatus']
 }): Promise<MessageRecord | null> => {
   const result = await query<MessageRow>(
+    `
+    UPDATE messages m
+    SET metadata = jsonb_set(m.metadata, '{mergeStatus}', to_jsonb($4::text), false)
+    FROM nodes n
+    JOIN workspaces w ON w.id = n.workspace_id
+    WHERE m.id = $1
+      AND m.node_id = $2
+      AND n.id = m.node_id
+      AND w.author_user_id = $3
+      AND (m.metadata->>'eventType') = 'merge_proposal'
+    RETURNING m.id, m.node_id, m.author_user_id, m.turn_id, m.role, m.content, m.metadata, m.created_at
+    `,
+    [proposalMessageId, nodeId, authorUserId, mergeStatus],
+  )
+
+  if (result.rows.length === 0) {
+    return null
+  }
+
+  return mapMessageRow(result.rows[0])
+}
+
+export const updateMergeProposalStatusForAuthorInTransaction = async (
+  client: Pick<PoolClient, 'query'>,
+  {
+    nodeId,
+    proposalMessageId,
+    authorUserId,
+    mergeStatus,
+  }: {
+    nodeId: string
+    proposalMessageId: string
+    authorUserId: string
+    mergeStatus: MergeProposalMetadata['mergeStatus']
+  },
+): Promise<MessageRecord | null> => {
+  const result = await client.query<MessageRow>(
     `
     UPDATE messages m
     SET metadata = jsonb_set(m.metadata, '{mergeStatus}', to_jsonb($4::text), false)
@@ -633,6 +787,51 @@ export const createMergeEventMessageForAuthor = async ({
 }): Promise<MessageRecord | null> => {
   const serializedMetadata = JSON.stringify(serializeMergeEventMetadata(metadata))
   const result = await query<MessageRow>(
+    `
+    WITH owned_node AS (
+      SELECT n.id
+      FROM nodes n
+      JOIN workspaces w ON w.id = n.workspace_id
+      WHERE n.id = $1
+        AND w.author_user_id = $2
+    )
+    INSERT INTO messages (node_id, author_user_id, role, content, turn_id, metadata)
+    SELECT
+      owned_node.id,
+      $2,
+      'user',
+      $3,
+      NULL,
+      $4::jsonb
+    FROM owned_node
+    RETURNING id, node_id, author_user_id, turn_id, role, content, metadata, created_at
+    `,
+    [parentNodeId, authorUserId, content, serializedMetadata],
+  )
+
+  if (result.rows.length === 0) {
+    return null
+  }
+
+  return mapMessageRow(result.rows[0])
+}
+
+export const createMergeEventMessageForAuthorInTransaction = async (
+  client: Pick<PoolClient, 'query'>,
+  {
+    parentNodeId,
+    authorUserId,
+    content,
+    metadata,
+  }: {
+    parentNodeId: string
+    authorUserId: string
+    content: string
+    metadata: MergeEventMetadata
+  },
+): Promise<MessageRecord | null> => {
+  const serializedMetadata = JSON.stringify(serializeMergeEventMetadata(metadata))
+  const result = await client.query<MessageRow>(
     `
     WITH owned_node AS (
       SELECT n.id

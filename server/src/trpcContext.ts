@@ -13,6 +13,7 @@ import {
 } from './db/queries/internal.js'
 import { createAnnotationHandlers } from './context/annotations.js'
 import { createConversationHandlers } from './context/conversation.js'
+import { createMergeHandlers } from './context/merge.js'
 import { createMessageHandlers } from './context/messages.js'
 import { createNodeHandlers } from './context/nodes.js'
 import type { ExistsById } from './context/types.js'
@@ -129,6 +130,9 @@ export const createAppRouterContext = (req: ContextRequest): AppRouterContext =>
     ...createConversationHandlers({
       requireSessionUserId,
       resolveOwnedRecordOrNotFound,
+    }),
+    ...createMergeHandlers({
+      requireSessionUserId,
     }),
   }
 }

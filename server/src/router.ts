@@ -25,6 +25,16 @@ import {
   messageSuggestFromSelectionInputSchema,
 } from '@branching/shared/router/schemas/annotations'
 import { conversationSendInputSchema } from '@branching/shared/router/schemas/conversation'
+import {
+  approveMergeInputSchema,
+  approveMergeOutputSchema,
+  cancelMergeInputSchema,
+  cancelMergeOutputSchema,
+  initiateNodeMergeInputSchema,
+  initiateNodeMergeOutputSchema,
+  reviseMergeProposalInputSchema,
+  reviseMergeProposalOutputSchema,
+} from '@branching/shared/router/schemas/merge'
 import { protectedProcedure, t } from './trpc.js'
 
 export const appRouter = t.router({
@@ -114,6 +124,23 @@ export const appRouter = t.router({
     .input(branchFollowupStatusInputSchema)
     .output(branchFollowupStatusResultSchema.nullable())
     .query(({ ctx, input }) => ctx.branchFollowupStatus(input)),
+
+  initiateNodeMerge: protectedProcedure
+    .input(initiateNodeMergeInputSchema)
+    .output(initiateNodeMergeOutputSchema)
+    .mutation(({ ctx, input }) => ctx.initiateNodeMerge(input)),
+  reviseMergeProposal: protectedProcedure
+    .input(reviseMergeProposalInputSchema)
+    .output(reviseMergeProposalOutputSchema)
+    .mutation(({ ctx, input }) => ctx.reviseMergeProposal(input)),
+  cancelMerge: protectedProcedure
+    .input(cancelMergeInputSchema)
+    .output(cancelMergeOutputSchema)
+    .mutation(({ ctx, input }) => ctx.cancelMerge(input)),
+  approveMerge: protectedProcedure
+    .input(approveMergeInputSchema)
+    .output(approveMergeOutputSchema)
+    .mutation(({ ctx, input }) => ctx.approveMerge(input)),
 
   conversationSend: protectedProcedure
     .input(conversationSendInputSchema)
