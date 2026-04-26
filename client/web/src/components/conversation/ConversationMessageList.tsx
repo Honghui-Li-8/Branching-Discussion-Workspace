@@ -5,6 +5,7 @@ import { UserConversationMessage } from './UserConversationMessage'
 import { AssistantConversationMessage } from './AssistantConversationMessage'
 import { getBranchSummaryLabelForMessage } from './branchConversationView'
 import { MergeProposalCard } from '../merge/MergeProposalCard'
+import { MergeEventMessage } from '../merge/MergeEventMessage'
 
 type ConversationMessageListProps = {
   nodeId: string
@@ -71,6 +72,10 @@ const renderMessageRow = ({
         onNodeIsMerged={onNodeIsMerged}
       />
     )
+  }
+
+  if (message.metadata?.eventType === 'merge_event') {
+    return <MergeEventMessage key={message.id} message={message} />
   }
 
   if (message.role === 'user') {
