@@ -3,19 +3,28 @@ import { query } from '../client.js'
 import {
   createMessage,
   createMessageForAuthor,
+  createMergeEventMessageForAuthor,
+  createMergeProposalMessageForAuthor,
+  createMergeProposalMessageForAuthorInTransaction,
   createOrGetBranchEventMessageForAuthor,
   deleteMessageForAuthor,
   deleteMessage,
+  getBranchOriginMetadataForNodeForAuthor,
   getBranchEventMetadataFromRecord,
+  getMergeEventMetadataFromRecord,
+  getMergeProposalMessageForNodeForAuthor,
+  getMergeProposalMetadataFromRecord,
   getMessageBranchSourceContextForAuthor,
   getMessageBranchSourceContextForAuthorInTransaction,
   getMessageByIdForAuthor,
   getMessageById,
+  getPendingMergeProposalForAuthor,
   listMessagesByTurn,
   listMessagesForNodeForAuthor,
   listMessagesForNode,
   listParentMessagesUpToSource,
   listParentMessagesUpToSourceForAuthor,
+  updateMergeProposalStatusForAuthor,
   updateMessageForAuthor,
   updateMessage,
 } from './message'
@@ -198,6 +207,242 @@ describe('message queries', () => {
       ],
     )
     expect(queryMock.mock.calls[0]?.[0]).toContain("(metadata->>'eventType') = 'branch_event'")
+  })
+
+  test('createMergeProposalMessageForAuthor inserts assistant proposal metadata for owner', async () => {
+    queryMock.mockResolvedValueOnce({
+      rows: [
+        {
+          ...messageRow,
+          role: 'assistant',
+          metadata: {
+            eventType: 'merge_proposal',
+            proposalId: 'proposal-1',
+            proposedConclusion: 'Use GraphQL for realtime data.',
+            mergeStatus: 'pending',
+            revisionRound: 1,
+          },
+        },
+      ],
+    } as never)
+
+    const result = await createMergeProposalMessageForAuthor({
+      nodeId: 'n1',
+      authorUserId: 'u1',
+      content: 'Use GraphQL for realtime data.',
+      metadata: {
+        eventType: 'merge_proposal',
+        proposalId: 'proposal-1',
+        proposedConclusion: 'Use GraphQL for realtime data.',
+        mergeStatus: 'pending',
+        revisionRound: 1,
+      },
+    })
+
+    expect(result?.role).toBe('assistant')
+    expect(result?.metadata).toMatchObject({
+      eventType: 'merge_proposal',
+      mergeStatus: 'pending',
+    })
+    expect(queryMock).toHaveBeenCalledWith(
+      expect.stringContaining("'assistant'"),
+      [
+        'n1',
+        'u1',
+        'Use GraphQL for realtime data.',
+        JSON.stringify({
+          eventType: 'merge_proposal',
+          proposalId: 'proposal-1',
+          proposedConclusion: 'Use GraphQL for realtime data.',
+          mergeStatus: 'pending',
+          revisionRound: 1,
+        }),
+      ],
+    )
+  })
+
+  test('createMergeProposalMessageForAuthorInTransaction uses provided query executor', async () => {
+    const transactionQueryMock = jest.fn(async (_sql: string, _params: unknown[]) => ({
+      rows: [
+        {
+          ...messageRow,
+          role: 'assistant' as const,
+          metadata: {
+            eventType: 'merge_proposal',
+            proposalId: 'proposal-1',
+            proposedConclusion: 'Use GraphQL for realtime data.',
+            mergeStatus: 'pending',
+            revisionRound: 1,
+          },
+        },
+      ],
+    }))
+
+    const result = await createMergeProposalMessageForAuthorInTransaction(
+      { query: transactionQueryMock } as never,
+      {
+        nodeId: 'n1',
+        authorUserId: 'u1',
+        content: 'Use GraphQL for realtime data.',
+        metadata: {
+          eventType: 'merge_proposal',
+          proposalId: 'proposal-1',
+          proposedConclusion: 'Use GraphQL for realtime data.',
+          mergeStatus: 'pending',
+          revisionRound: 1,
+        },
+      },
+    )
+
+    expect(result?.metadata).toMatchObject({ eventType: 'merge_proposal' })
+    expect(transactionQueryMock).toHaveBeenCalledTimes(1)
+    expect(queryMock).not.toHaveBeenCalled()
+  })
+
+  test('getPendingMergeProposalForAuthor returns active pending proposal for owner', async () => {
+    queryMock.mockResolvedValueOnce({
+      rows: [
+        {
+          ...messageRow,
+          role: 'assistant',
+          metadata: {
+            eventType: 'merge_proposal',
+            proposalId: 'proposal-1',
+            proposedConclusion: 'Use GraphQL for realtime data.',
+            mergeStatus: 'pending',
+            revisionRound: 1,
+          },
+        },
+      ],
+    } as never)
+
+    const result = await getPendingMergeProposalForAuthor('n1', 'u1')
+
+    expect(result?.metadata).toMatchObject({ mergeStatus: 'pending' })
+    expect(queryMock).toHaveBeenCalledWith(
+      expect.stringContaining("(m.metadata->>'mergeStatus') = 'pending'"),
+      ['n1', 'u1'],
+    )
+  })
+
+  test('getMergeProposalMessageForNodeForAuthor scopes proposal to node and owner', async () => {
+    queryMock.mockResolvedValueOnce({ rows: [messageRow] } as never)
+
+    const result = await getMergeProposalMessageForNodeForAuthor('n1', 'm1', 'u1')
+
+    expect(result?.id).toBe('m1')
+    expect(queryMock).toHaveBeenCalledWith(
+      expect.stringContaining("AND (m.metadata->>'eventType') = 'merge_proposal'"),
+      ['m1', 'n1', 'u1'],
+    )
+  })
+
+  test('updateMergeProposalStatusForAuthor updates only merge proposal status', async () => {
+    queryMock.mockResolvedValueOnce({
+      rows: [
+        {
+          ...messageRow,
+          metadata: {
+            eventType: 'merge_proposal',
+            proposalId: 'proposal-1',
+            proposedConclusion: 'Use GraphQL for realtime data.',
+            mergeStatus: 'superseded',
+            revisionRound: 1,
+          },
+        },
+      ],
+    } as never)
+
+    const result = await updateMergeProposalStatusForAuthor({
+      nodeId: 'n1',
+      proposalMessageId: 'm1',
+      authorUserId: 'u1',
+      mergeStatus: 'superseded',
+    })
+
+    expect(result?.metadata).toMatchObject({ mergeStatus: 'superseded' })
+    expect(queryMock).toHaveBeenCalledWith(
+      expect.stringContaining("jsonb_set(m.metadata, '{mergeStatus}'"),
+      ['m1', 'n1', 'u1', 'superseded'],
+    )
+  })
+
+  test('createMergeEventMessageForAuthor inserts parent merge event as user message', async () => {
+    queryMock.mockResolvedValueOnce({
+      rows: [
+        {
+          ...messageRow,
+          role: 'user',
+          node_id: 'parent-node',
+          metadata: {
+            eventType: 'merge_event',
+            sourceNodeId: 'n1',
+            sourceBranchTitle: 'Realtime API choice',
+            sourceBranchOriginMessageId: 'source-message-1',
+            conclusion: 'Use GraphQL for realtime data.',
+            mergedAt: '2026-04-26T00:00:00.000Z',
+          },
+        },
+      ],
+    } as never)
+
+    const result = await createMergeEventMessageForAuthor({
+      parentNodeId: 'parent-node',
+      authorUserId: 'u1',
+      content: 'Merged from Realtime API choice: Use GraphQL for realtime data.',
+      metadata: {
+        eventType: 'merge_event',
+        sourceNodeId: 'n1',
+        sourceBranchTitle: 'Realtime API choice',
+        sourceBranchOriginMessageId: 'source-message-1',
+        conclusion: 'Use GraphQL for realtime data.',
+        mergedAt: '2026-04-26T00:00:00.000Z',
+      },
+    })
+
+    expect(result?.role).toBe('user')
+    expect(result?.metadata).toMatchObject({ eventType: 'merge_event' })
+    expect(queryMock).toHaveBeenCalledWith(
+      expect.stringContaining("'user'"),
+      [
+        'parent-node',
+        'u1',
+        'Merged from Realtime API choice: Use GraphQL for realtime data.',
+        JSON.stringify({
+          eventType: 'merge_event',
+          sourceNodeId: 'n1',
+          sourceBranchTitle: 'Realtime API choice',
+          sourceBranchOriginMessageId: 'source-message-1',
+          conclusion: 'Use GraphQL for realtime data.',
+          mergedAt: '2026-04-26T00:00:00.000Z',
+        }),
+      ],
+    )
+  })
+
+  test('getBranchOriginMetadataForNodeForAuthor reads source message id from child branch event', async () => {
+    queryMock.mockResolvedValueOnce({
+      rows: [
+        {
+          ...messageRow,
+          turn_id: null,
+          metadata: {
+            eventType: 'branch_event',
+            sourceNodeId: 'parent-node',
+            sourceMessageId: 'source-message-1',
+            branchNodeId: 'n1',
+          },
+        },
+      ],
+    } as never)
+
+    const result = await getBranchOriginMetadataForNodeForAuthor('n1', 'u1')
+
+    expect(result?.sourceMessageId).toBe('source-message-1')
+    expect(queryMock).toHaveBeenCalledWith(
+      expect.stringContaining("(m.metadata->>'eventType') = 'branch_event'"),
+      ['n1', 'u1'],
+    )
   })
 
   test('getMessageById returns null when not found', async () => {
@@ -532,6 +777,54 @@ describe('message queries', () => {
       const record = { ...baseRecord, role: 'assistant' as const, metadata: {} }
 
       expect(getBranchEventMetadataFromRecord(record)).toBeNull()
+    })
+
+    test('returns merge proposal metadata from proposal records', () => {
+      const record = {
+        ...baseRecord,
+        role: 'assistant' as const,
+        metadata: {
+          eventType: 'merge_proposal' as const,
+          proposalId: 'proposal-1',
+          proposedConclusion: 'Use GraphQL for realtime data.',
+          mergeStatus: 'pending' as const,
+          revisionRound: 1,
+        },
+      }
+
+      expect(getMergeProposalMetadataFromRecord(record)).toEqual({
+        eventType: 'merge_proposal',
+        proposalId: 'proposal-1',
+        proposedConclusion: 'Use GraphQL for realtime data.',
+        mergeStatus: 'pending',
+        revisionRound: 1,
+      })
+      expect(getMergeEventMetadataFromRecord(record)).toBeNull()
+    })
+
+    test('returns merge event metadata from event records', () => {
+      const record = {
+        ...baseRecord,
+        role: 'user' as const,
+        metadata: {
+          eventType: 'merge_event' as const,
+          sourceNodeId: 'branch-node-1',
+          sourceBranchTitle: 'Realtime API choice',
+          sourceBranchOriginMessageId: 'source-message-1',
+          conclusion: 'Use GraphQL for realtime data.',
+          mergedAt: '2026-04-26T00:00:00.000Z',
+        },
+      }
+
+      expect(getMergeEventMetadataFromRecord(record)).toEqual({
+        eventType: 'merge_event',
+        sourceNodeId: 'branch-node-1',
+        sourceBranchTitle: 'Realtime API choice',
+        sourceBranchOriginMessageId: 'source-message-1',
+        conclusion: 'Use GraphQL for realtime data.',
+        mergedAt: '2026-04-26T00:00:00.000Z',
+      })
+      expect(getMergeProposalMetadataFromRecord(record)).toBeNull()
     })
   })
 })

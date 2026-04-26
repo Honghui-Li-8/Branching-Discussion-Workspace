@@ -451,6 +451,52 @@ export const updateNodeForAuthor = async (
   return mapNodeRow(result.rows[0])
 }
 
+export const markNodeMergedForAuthor = async ({
+  nodeId,
+  authorUserId,
+  conclusion,
+}: {
+  nodeId: string
+  authorUserId: string
+  conclusion: string
+}): Promise<NodeRecord | null> => {
+  const result = await query<NodeRow>(
+    `
+    UPDATE nodes n
+    SET
+      status = 'merged',
+      conclusion = $3,
+      merged_at = NOW()
+    FROM workspaces w
+    WHERE n.id = $1
+      AND w.id = n.workspace_id
+      AND w.author_user_id = $2
+    RETURNING
+      n.id,
+      n.workspace_id,
+      n.author_user_id,
+      n.parent_node_id,
+      n.depth,
+      n.type,
+      n.title,
+      n.status,
+      n.confidence,
+      n.summary,
+      n.conclusion,
+      n.rationale,
+      n.created_at,
+      n.updated_at
+    `,
+    [nodeId, authorUserId, conclusion],
+  )
+
+  if (result.rows.length === 0) {
+    return null
+  }
+
+  return mapNodeRow(result.rows[0])
+}
+
 type NodeDeleteTargetRow = {
   id: string
   workspace_id: string
