@@ -30,7 +30,7 @@ export const useDiscussionTreeUiState = ({
   const [conversationTarget, setConversationTarget] = useState<ConversationTarget | null>(null)
   const [conversationPanelWidth, setConversationPanelWidth] = useState(DEFAULT_PANEL_WIDTH)
   const [conversationPanelFullscreen, setConversationPanelFullscreen] = useState(false)
-  const [foldedNodeIds, setFoldedNodeIds] = useState<Record<string, true>>({})
+  const [foldedNodeIds, setFoldedNodeIds] = useState<Record<string, boolean>>({})
 
   const clampPanelWidth = (candidate: number) => {
     if (!containerWidth) {
@@ -59,13 +59,11 @@ export const useDiscussionTreeUiState = ({
 
   const unfoldNode = (nodeId: string) => {
     setFoldedNodeIds((current) => {
-      if (!current[nodeId]) {
+      if (current[nodeId] === false) {
         return current
       }
 
-      const next = { ...current }
-      delete next[nodeId]
-      return next
+      return { ...current, [nodeId]: false }
     })
   }
 

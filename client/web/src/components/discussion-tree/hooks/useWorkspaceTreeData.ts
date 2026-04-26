@@ -6,7 +6,7 @@ import type { TreeNode } from '../../../types/tree'
 import { buildTreeLayout, type TreeLayout } from '../../tree/treeUtils'
 import { buildTreeFromWorkspaceNodes } from '../../tree/treeHydration'
 
-export type FoldedNodeIds = Record<string, true>
+export type FoldedNodeIds = Record<string, boolean>
 
 type WorkspaceTreeData = {
   tree: TreeNode | null
@@ -21,9 +21,14 @@ const applyLocalUiState = (
 ): TreeNode => {
   const children = node.children?.map((child) => applyLocalUiState(child, foldedNodeIds))
 
+  const folded =
+    node.status === 'Merged'
+      ? foldedNodeIds[node.id] !== false
+      : foldedNodeIds[node.id] === true
+
   return {
     ...node,
-    folded: foldedNodeIds[node.id] === true,
+    folded,
     children,
   }
 }

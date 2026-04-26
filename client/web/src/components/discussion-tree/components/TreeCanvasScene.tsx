@@ -36,6 +36,18 @@ export const TreeCanvasScene = ({
         viewBox={`0 0 ${layout.width} ${layout.height}`}
         style={{ zIndex: zIndex.edgeLayer }}
       >
+        <defs>
+          <marker
+            id="merged-arrow"
+            markerWidth="8"
+            markerHeight="8"
+            refX="4"
+            refY="4"
+            orient="auto-start-reverse"
+          >
+            <path d="M 8 0 L 0 4 L 8 8 Z" fill="#79c89d" />
+          </marker>
+        </defs>
         {layout.edges.map((edge) => {
           const from = layout.nodeById.get(edge.from)
           const to = layout.nodeById.get(edge.to)
@@ -51,6 +63,21 @@ export const TreeCanvasScene = ({
           const path = `M ${startX} ${startY} C ${startX + controlOffset} ${startY}, ${
             endX - controlOffset
           } ${endY}, ${endX} ${endY}`
+
+          if (edge.isMergedChild) {
+            return (
+              <path
+                key={`${edge.from}-${edge.to}`}
+                d={path}
+                fill="none"
+                stroke="#79c89d"
+                strokeWidth="2"
+                strokeDasharray="6 4"
+                strokeLinecap="round"
+                markerEnd="url(#merged-arrow)"
+              />
+            )
+          }
 
           return (
             <path
