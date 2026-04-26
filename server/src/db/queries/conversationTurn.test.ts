@@ -158,6 +158,7 @@ describe('conversation turn queries', () => {
       expect.stringContaining('ON CONFLICT (author_user_id, node_id, idempotency_key) DO NOTHING'),
       ['n1', 'u1', true, 'pending', 'gpt-5', 'turn-key-1', false, null, false, null],
     )
+    expect(queryMock.mock.calls[0]?.[0]).toContain("AND status <> 'merged'")
   })
 
   test('createOrGetConversationTurnForAuthor returns existing turn and wasCreated=false', async () => {
@@ -178,6 +179,7 @@ describe('conversation turn queries', () => {
       expect.stringContaining('JOIN workspaces w ON w.id = n.workspace_id'),
       ['n1', 'u1', false, null, 'gpt-5', 'turn-key-1', false, null, false, null],
     )
+    expect(queryMock.mock.calls[0]?.[0]).toContain("AND n.status <> 'merged'")
   })
 
   test('createOrGetConversationTurnForAuthor returns null when node is inaccessible', async () => {

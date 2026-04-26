@@ -1,5 +1,7 @@
 import { TRPCError } from '@trpc/server'
 import { createOrGetConversationTurnForAuthor as createOrGetConversationTurnForAuthorRecord } from '../db/index.js'
+import { getNodeByIdForAuthor } from '../db/queries/node.js'
+import { createNodeIsMergedError } from '../errors/nodeState.js'
 import { createLogger } from '../logging/logger.js'
 import type { SendConversationTurnInput } from './types.js'
 
@@ -27,6 +29,11 @@ export const resolveConversationTurnOrThrow = async ({
   })
 
   if (!resolvedTurn) {
+    const node = await getNodeByIdForAuthor(input.nodeId, currentUserId)
+    if (node?.status === 'merged') {
+      throw createNodeIsMergedError()
+    }
+
     logger.warn('[chat] sendConversationTurn could not resolve node while creating turn.', {
       node_id: input.nodeId,
       author_user_id: currentUserId,
