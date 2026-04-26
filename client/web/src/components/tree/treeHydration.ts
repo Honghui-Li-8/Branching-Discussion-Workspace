@@ -20,6 +20,8 @@ const mapNodeStatusToTreeStatus = (status: HydrationNode['status']): TreeStatus 
       return 'Exploring'
     case 'approved':
       return 'Approved'
+    case 'merged':
+      return 'Merged'
     case 'needs_approval':
     case 'deferred':
     case 'closed':
@@ -127,6 +129,7 @@ export const buildTreeFromWorkspaceNodes = (nodes: HydrationNode[]): TreeNode | 
         id: node.id,
         title: node.title,
         status: mapNodeStatusToTreeStatus(node.status),
+        depth: node.depth,
         folded: false,
         children: [],
       },

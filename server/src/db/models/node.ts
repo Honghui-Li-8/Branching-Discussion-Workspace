@@ -6,6 +6,7 @@ export type NodeStatus =
   | 'approved'
   | 'deferred'
   | 'closed'
+  | 'merged'
 export type NodeConfidence = 'low' | 'medium' | 'high'
 
 export interface NodeRecord {

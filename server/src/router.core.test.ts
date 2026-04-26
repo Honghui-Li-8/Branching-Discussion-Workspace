@@ -121,6 +121,16 @@ const makeContext = (): AppRouterContext => {
       throw new Error('Not implemented in core router test context')
     }),
     branchFollowupStatus: jest.fn(async () => null),
+    initiateNodeMerge: jest.fn(async () => ({
+      proposalMessageId: 'm-merge-proposal',
+      proposedConclusion: 'Merge conclusion.',
+    })),
+    reviseMergeProposal: jest.fn(async () => ({
+      proposalMessageId: 'm-merge-proposal-2',
+      proposedConclusion: 'Revised merge conclusion.',
+    })),
+    cancelMerge: jest.fn(async () => ({ cancelledCount: 1 })),
+    approveMerge: jest.fn(async () => ({ parentMessageId: 'm-parent-merge-event' })),
     conversationSend: jest.fn(async () => ({
       turnId: 't1',
       status: 'completed' as const,

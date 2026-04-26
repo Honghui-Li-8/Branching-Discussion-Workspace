@@ -28,6 +28,16 @@ import type {
   ConversationSendInput,
   ConversationSendResult,
 } from './schemas/conversation.js'
+import type {
+  ApproveMergeInput,
+  ApproveMergeOutput,
+  CancelMergeInput,
+  CancelMergeOutput,
+  InitiateNodeMergeInput,
+  InitiateNodeMergeOutput,
+  ReviseMergeProposalInput,
+  ReviseMergeProposalOutput,
+} from './schemas/merge.js'
 
 export type AppRouterContext = {
   sessionUserId: string | null
@@ -87,4 +97,16 @@ export type AppRouterContext = {
   conversationSend: (
     input: ConversationSendInput,
   ) => Promise<ConversationSendResult>
+  initiateNodeMerge: (
+    input: InitiateNodeMergeInput,
+  ) => Promise<InitiateNodeMergeOutput>
+  reviseMergeProposal: (
+    input: ReviseMergeProposalInput,
+  ) => Promise<ReviseMergeProposalOutput>
+  cancelMerge: (
+    input: CancelMergeInput,
+  ) => Promise<CancelMergeOutput>
+  approveMerge: (
+    input: ApproveMergeInput,
+  ) => Promise<ApproveMergeOutput>
 }

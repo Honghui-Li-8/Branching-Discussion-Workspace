@@ -2,6 +2,7 @@ import {
   type KeyboardEvent,
   type SubmitEvent,
   type PointerEvent as ReactPointerEvent,
+  useCallback,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -11,10 +12,15 @@ import { zIndex } from '../theme/zIndex'
 import type { TreeMessage, TreeNode } from '../types/tree'
 import { useAppSelector } from '../store/hooks'
 import { selectAuthUser } from '../store/slices/authSlice'
+import { selectActiveWorkspace } from '../store/slices/appShellSlice'
+import { trpc } from '../trpc'
 import { useNodeConversation } from './discussion-tree/hooks/useNodeConversation'
 import { useBranchConversationView } from './discussion-tree/hooks/useBranchConversationView'
 import type { TurnStage } from './discussion-tree/hooks/conversationStreamState'
 import type { BranchFollowupBootstrap } from './discussion-tree/hooks/useDiscussionTreeUiState'
+import { invalidateMessagesByNode, invalidateNodesByWorkspace } from './discussion-tree/hooks/mutationInvalidation'
+import { parseMergeProposalMetadata } from '@branching/shared'
+import { isMergeProposalPending } from './merge/mergeProposalCardLogic'
 import { ConversationComposer, CHAT_INPUT_MAX_HEIGHT, CHAT_INPUT_MIN_HEIGHT, CHAT_MODELS } from './conversation/ConversationComposer'
 import { ConversationMessageList } from './conversation/ConversationMessageList'
 import { ConversationPanelHeader } from './conversation/ConversationPanelHeader'
@@ -110,6 +116,7 @@ export const NodeConversationPanel = ({
   onToggleFullScreen,
 }: NodeConversationPanelProps) => {
   const authUser = useAppSelector(selectAuthUser)
+  const activeWorkspace = useAppSelector(selectActiveWorkspace)
   const [conversationModel, setConversationModel] = useState(CHAT_MODELS[0])
   const conversation = useNodeConversation({
     nodeId: node.id,
@@ -124,9 +131,77 @@ export const NodeConversationPanel = ({
   const [conversationInputText, setConversationInputText] = useState('')
   const [isResizing, setIsResizing] = useState(false)
   const [sendBlockAlert, setSendBlockAlert] = useState<string | null>(null)
+  const [mergeError, setMergeError] = useState<string | null>(null)
+  const [mergeTimerStartedAtMs, setMergeTimerStartedAtMs] = useState<number | null>(null)
+  const [mergeTimerNowMs, setMergeTimerNowMs] = useState(0)
+  const [mergeCompletionMessage, setMergeCompletionMessage] = useState<string | null>(null)
+  const [mergeStatusLabel, setMergeStatusLabel] = useState<string | null>(null)
+
+  const utils = trpc.useUtils()
+
+  const invalidateAfterMergeAction = useCallback(async () => {
+    await Promise.all([
+      invalidateMessagesByNode(utils.messagesByNode.invalidate, node.id),
+      activeWorkspace
+        ? invalidateNodesByWorkspace(utils.nodesByWorkspace.invalidate, activeWorkspace.id)
+        : Promise.resolve(),
+    ])
+  }, [utils.messagesByNode.invalidate, utils.nodesByWorkspace.invalidate, node.id, activeWorkspace])
+
+  const onNodeIsMerged = useCallback(async () => {
+    await invalidateAfterMergeAction()
+  }, [invalidateAfterMergeAction])
+
+  const onMergeActionPending = useCallback((label: string): number => {
+    mergeActionTokenRef.current += 1
+    setMergeStatusLabel(label)
+    return mergeActionTokenRef.current
+  }, [])
+
+  const onMergeActionSettled = useCallback((token: number) => {
+    if (token === mergeActionTokenRef.current) {
+      setMergeStatusLabel(null)
+    }
+  }, [])
+
+  const initiateNodeMergeMutation = trpc.initiateNodeMerge.useMutation({
+    onError: (error) => {
+      setMergeError(error.message === 'NODE_IS_MERGED' ? 'This node is already merged.' : 'Failed to initiate merge. Please try again.')
+    },
+    onSuccess: async () => {
+      setMergeError(null)
+      await invalidateAfterMergeAction()
+      setMergeCompletionMessage('Proposal ready')
+      if (mergeCompletionTimeoutRef.current !== null) {
+        clearTimeout(mergeCompletionTimeoutRef.current)
+      }
+      mergeCompletionTimeoutRef.current = setTimeout(() => {
+        setMergeCompletionMessage(null)
+        mergeCompletionTimeoutRef.current = null
+      }, 4000)
+    },
+    onSettled: () => {
+      setMergeStatusLabel(null)
+    },
+  })
+
+  const cancelMergeMutation = trpc.cancelMerge.useMutation({
+    onError: () => {
+      setMergeError('Failed to cancel merge. Please try again.')
+    },
+    onSuccess: async () => {
+      setMergeError(null)
+      await invalidateAfterMergeAction()
+    },
+    onSettled: () => {
+      setMergeStatusLabel(null)
+    },
+  })
 
   const startXRef = useRef(0)
   const startWidthRef = useRef(0)
+  const mergeCompletionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const mergeActionTokenRef = useRef(0)
   const conversationScrollRef = useRef<HTMLDivElement | null>(null)
   const conversationBottomAnchorRef = useRef<HTMLDivElement | null>(null)
   const conversationInputRef = useRef<HTMLTextAreaElement | null>(null)
@@ -142,6 +217,14 @@ export const NodeConversationPanel = ({
   const lastMessageContent = messages[messages.length - 1]?.content ?? ''
   const hasFailedMessages = conversation.failedMessageIds.size > 0
   const streamStatusLabel = conversation.streamStatusLabel
+
+  const isMerged = node.status === 'Merged'
+  const isRootNode = node.depth === 0
+  const hasPendingProposal = messages.some(
+    (m) => m.metadata?.eventType === 'merge_proposal' && isMergeProposalPending(parseMergeProposalMetadata(m.metadata)),
+  )
+  const isMergeInitiating = initiateNodeMergeMutation.isPending
+  const isMergeBlocked = isMerged || isMergeInitiating || hasPendingProposal
   const hasActiveStreamStatus =
     Boolean(streamStatusLabel) && !(streamStatusLabel?.startsWith('Error:') ?? false)
   const runtimeSummary = (() => {
@@ -326,7 +409,34 @@ export const NodeConversationPanel = ({
     setStageDurationsMs({})
     setStatusTimerStartedAtMs(null)
     setStatusTimerNowMs(0)
+    setMergeTimerStartedAtMs(null)
+    setMergeTimerNowMs(0)
+    setMergeCompletionMessage(null)
+    setMergeStatusLabel(null)
+    mergeActionTokenRef.current = 0
+    if (mergeCompletionTimeoutRef.current !== null) {
+      clearTimeout(mergeCompletionTimeoutRef.current)
+      mergeCompletionTimeoutRef.current = null
+    }
   }, [node.id])
+
+  useEffect(() => {
+    if (!mergeStatusLabel) {
+      return
+    }
+    setMergeCompletionMessage(null)
+    if (mergeCompletionTimeoutRef.current !== null) {
+      clearTimeout(mergeCompletionTimeoutRef.current)
+      mergeCompletionTimeoutRef.current = null
+    }
+    const now = Date.now()
+    setMergeTimerStartedAtMs(now)
+    setMergeTimerNowMs(now)
+    const intervalId = window.setInterval(() => {
+      setMergeTimerNowMs(Date.now())
+    }, 1000)
+    return () => window.clearInterval(intervalId)
+  }, [mergeStatusLabel])
 
   useEffect(() => {
     if (!isResizing) {
@@ -364,6 +474,15 @@ export const NodeConversationPanel = ({
   }
 
   const sendConversationMessage = () => {
+    if (isMergeBlocked) {
+      if (isMerged) {
+        setSendBlockAlert('This node has been merged and is read-only.')
+      } else if (hasPendingProposal) {
+        setSendBlockAlert('A merge proposal is pending. Approve, edit, or reject it first.')
+      }
+      return
+    }
+
     const text = conversationInputText.trim()
     if (!text.length) {
       return
@@ -421,6 +540,18 @@ export const NodeConversationPanel = ({
     return `${streamStatusLabel} (${formatStatusElapsed(elapsedSeconds)})`
   })()
 
+  const mergeStatusWithElapsed = (() => {
+    if (!mergeStatusLabel || mergeTimerStartedAtMs === null) {
+      return null
+    }
+
+    const elapsedSeconds = Math.max(
+      0,
+      Math.floor((mergeTimerNowMs - mergeTimerStartedAtMs) / 1000),
+    )
+    return `${mergeStatusLabel} (${formatStatusElapsed(elapsedSeconds)})`
+  })()
+
   return (
     <aside
       className="absolute inset-y-0 right-0 z-[80] flex h-full min-h-0 w-full flex-col overflow-hidden border-l border-[#8bb8cd] bg-[#fefefe] shadow-[-20px_0_38px_rgba(22,57,74,0.12)]"
@@ -438,8 +569,20 @@ export const NodeConversationPanel = ({
         isFullscreen={isFullscreen}
         onToggleFullScreen={onToggleFullScreen}
         onClose={onClose}
+        showMergeButton={!isRootNode && !isMerged}
+        isMergeInitiating={isMergeInitiating}
+        isProposalPending={hasPendingProposal}
+        onInitiateMerge={() => {
+          setMergeStatusLabel('Generating merge proposal')
+          initiateNodeMergeMutation.mutate({ nodeId: node.id })
+        }}
+        onCancelMerge={() => {
+          setMergeStatusLabel('Cancelling merge')
+          cancelMergeMutation.mutate({ nodeId: node.id })
+        }}
       />
       <ConversationMessageList
+        nodeId={node.id}
         messages={messages}
         inheritedMessages={conversationView.inheritedMessages}
         branchEventMessage={conversationView.branchEventMessage}
@@ -453,6 +596,9 @@ export const NodeConversationPanel = ({
         onRetryFailedMessage={conversation.retryFailedMessage}
         onDismissFailedMessage={conversation.dismissFailedMessage}
         onBranchFollowupCreated={onOpenBranchConversation}
+        onNodeIsMerged={onNodeIsMerged}
+        onMergeActionPending={onMergeActionPending}
+        onMergeActionSettled={onMergeActionSettled}
         conversationScrollRef={conversationScrollRef}
         bottomAnchorRef={conversationBottomAnchorRef}
       />
@@ -464,6 +610,16 @@ export const NodeConversationPanel = ({
       {!hasActiveStreamStatus && runtimeSummary ? (
         <p className="m-0 shrink-0 border-t border-[#d8ebf6] bg-[#f8fcff] px-4 py-2 text-[11px] text-[#4d7086]">
           Runtime: {runtimeSummary}
+        </p>
+      ) : null}
+      {mergeStatusWithElapsed ? (
+        <p className="m-0 shrink-0 border-t border-[#b8d9c8] bg-[#f0f9f4] px-4 py-2 text-xs text-[#3a7a5a]">
+          {mergeStatusWithElapsed}
+        </p>
+      ) : null}
+      {!mergeStatusWithElapsed && mergeCompletionMessage ? (
+        <p className="m-0 shrink-0 border-t border-[#b8d9c8] bg-[#f8fcff] px-4 py-2 text-[11px] text-[#3a7a5a]">
+          {mergeCompletionMessage}
         </p>
       ) : null}
       {sendBlockAlert ? (
@@ -479,16 +635,31 @@ export const NodeConversationPanel = ({
           Failed to send message: {conversation.messageSendError}
         </p>
       ) : null}
-      <ConversationComposer
-        conversationModel={conversationModel}
-        setConversationModel={setConversationModel}
-        conversationInputText={conversationInputText}
-        onConversationInputChange={setConversationInputText}
-        onInputResize={adjustConversationInputHeight}
-        onConversationKeyDown={handleConversationKeyDown}
-        onConversationSubmit={handleConversationSubmit}
-        conversationInputRef={conversationInputRef}
-      />
+      {mergeError ? (
+        <p
+          role="alert"
+          className="m-0 shrink-0 border-t border-[#f1cabd] bg-[#fff6f3] px-4 py-2 text-xs text-[#8a3f2b]"
+        >
+          {mergeError}
+        </p>
+      ) : null}
+      {isMerged ? (
+        <p className="m-0 shrink-0 border-t border-[#b8d9c8] bg-[#f0f9f4] px-4 py-2 text-xs text-[#3a7a5a]">
+          This branch has been merged. The conversation is read-only.
+        </p>
+      ) : null}
+      {!isMerged ? (
+        <ConversationComposer
+          conversationModel={conversationModel}
+          setConversationModel={setConversationModel}
+          conversationInputText={conversationInputText}
+          onConversationInputChange={setConversationInputText}
+          onInputResize={adjustConversationInputHeight}
+          onConversationKeyDown={handleConversationKeyDown}
+          onConversationSubmit={handleConversationSubmit}
+          conversationInputRef={conversationInputRef}
+        />
+      ) : null}
     </aside>
   )
 }

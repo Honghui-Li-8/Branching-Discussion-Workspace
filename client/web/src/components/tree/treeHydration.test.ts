@@ -189,6 +189,17 @@ describe('treeHydration', () => {
     warnSpy.mockRestore()
   })
 
+  test('merged DB status maps to Merged TreeStatus and preserves depth', () => {
+    const tree = buildTreeFromWorkspaceNodes([
+      makeNode({ id: 'root', parentNodeId: 'root', depth: 0, status: 'open' }),
+      makeNode({ id: 'child', parentNodeId: 'root', depth: 1, status: 'merged' }),
+    ])
+
+    const child = tree?.children?.[0]
+    expect(child?.status).toBe('Merged')
+    expect(child?.depth).toBe(1)
+  })
+
   test('unknown status warning is deduped and unknown statuses map to Open', () => {
     const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {})
 

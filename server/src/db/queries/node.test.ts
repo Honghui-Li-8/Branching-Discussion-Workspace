@@ -10,6 +10,7 @@ import {
   getNodeByIdForAuthor,
   listNodesByWorkspace,
   listNodesByWorkspaceForAuthor,
+  markNodeMergedForAuthor,
   updateNode,
   updateNodeForAuthor,
 } from './node'
@@ -239,6 +240,47 @@ describe('node queries', () => {
       expect.stringContaining('w.author_user_id = $16'),
       expect.any(Array),
     )
+  })
+
+  test('markNodeMergedForAuthor sets merged status, conclusion, and timestamp for owner', async () => {
+    queryMock.mockResolvedValueOnce({
+      rows: [
+        {
+          ...nodeRow,
+          status: 'merged',
+          conclusion: 'Use GraphQL for realtime data.',
+        },
+      ],
+    } as never)
+
+    const result = await markNodeMergedForAuthor({
+      nodeId: 'n1',
+      authorUserId: 'u1',
+      conclusion: 'Use GraphQL for realtime data.',
+    })
+
+    expect(result).toMatchObject({
+      id: 'n1',
+      status: 'merged',
+      conclusion: 'Use GraphQL for realtime data.',
+    })
+    expect(queryMock).toHaveBeenCalledWith(
+      expect.stringContaining("status = 'merged'"),
+      ['n1', 'u1', 'Use GraphQL for realtime data.'],
+    )
+    expect(queryMock.mock.calls[0]?.[0]).toContain('merged_at = NOW()')
+  })
+
+  test('markNodeMergedForAuthor returns null for non-owner or missing node', async () => {
+    queryMock.mockResolvedValueOnce({ rows: [] } as never)
+
+    const result = await markNodeMergedForAuthor({
+      nodeId: 'n1',
+      authorUserId: 'u2',
+      conclusion: 'Use GraphQL for realtime data.',
+    })
+
+    expect(result).toBeNull()
   })
 
   test('deleteNode returns null when target node does not exist', async () => {

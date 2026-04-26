@@ -95,6 +95,16 @@ const makeContext = (): AppRouterContext => ({
     throw new Error('Not implemented in public API test context')
   }),
   branchFollowupStatus: jest.fn(async () => null),
+  initiateNodeMerge: jest.fn(async () => ({
+    proposalMessageId: 'm-merge-proposal',
+    proposedConclusion: 'Merge conclusion.',
+  })),
+  reviseMergeProposal: jest.fn(async () => ({
+    proposalMessageId: 'm-merge-proposal-2',
+    proposedConclusion: 'Revised merge conclusion.',
+  })),
+  cancelMerge: jest.fn(async () => ({ cancelledCount: 1 })),
+  approveMerge: jest.fn(async () => ({ parentMessageId: 'm-parent-merge-event' })),
   conversationSend: jest.fn(async () => ({
     turnId: 't1',
     status: 'completed' as const,
@@ -122,6 +132,10 @@ describe('shared public API router surface', () => {
     expect(typeof caller.branchAndSendFollowup).toBe('function')
     expect(typeof caller.parentMessagesUpToSource).toBe('function')
     expect(typeof caller.inheritedMessagesByNode).toBe('function')
+    expect(typeof caller.initiateNodeMerge).toBe('function')
+    expect(typeof caller.reviseMergeProposal).toBe('function')
+    expect(typeof caller.cancelMerge).toBe('function')
+    expect(typeof caller.approveMerge).toBe('function')
     expect(typeof caller.conversationSend).toBe('function')
   })
 })

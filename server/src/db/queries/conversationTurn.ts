@@ -201,6 +201,7 @@ export const createOrGetConversationTurn = async (
       SELECT id
       FROM nodes
       WHERE id = $1
+        AND status <> 'merged'
     ),
     inserted_turn AS (
       INSERT INTO conversation_turns (
@@ -325,6 +326,7 @@ export const createOrGetConversationTurnForAuthor = async (
       JOIN workspaces w ON w.id = n.workspace_id
       WHERE n.id = $1
         AND w.author_user_id = $2
+        AND n.status <> 'merged'
     ),
     inserted_turn AS (
       INSERT INTO conversation_turns (

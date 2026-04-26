@@ -1,4 +1,6 @@
 import { createLogger } from '../logging/logger.js'
+import { getNodeByIdForAuthor } from '../db/queries/node.js'
+import { createNodeIsMergedError } from '../errors/nodeState.js'
 import { validateAllowedModelOrThrow, validateProviderRuntimeConfigOrThrow } from './config.js'
 import { enqueuePostprocessJobsForTurn } from './enqueuePostprocessJobsForTurn.js'
 import { scheduleInputClassifier } from './flow/inputClassifier.js'
@@ -43,6 +45,11 @@ export const runConversationTurnPreflight = async ({
   // #region: Validation and Idempotent Replay
   validateAllowedModelOrThrow(input.model)
   validateProviderRuntimeConfigOrThrow(input.model)
+
+  const node = await getNodeByIdForAuthor(input.nodeId, currentUserId)
+  if (node?.status === 'merged') {
+    throw createNodeIsMergedError()
+  }
 
   const resolvedTurn = await resolveConversationTurnOrThrow({
     input,

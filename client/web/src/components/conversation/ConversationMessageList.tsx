@@ -4,8 +4,11 @@ import type { TreeMessage } from '../../types/tree'
 import { UserConversationMessage } from './UserConversationMessage'
 import { AssistantConversationMessage } from './AssistantConversationMessage'
 import { getBranchSummaryLabelForMessage } from './branchConversationView'
+import { MergeProposalCard } from '../merge/MergeProposalCard'
+import { MergeEventMessage } from '../merge/MergeEventMessage'
 
 type ConversationMessageListProps = {
+  nodeId: string
   messages: TreeMessage[]
   inheritedMessages: TreeMessage[]
   branchEventMessage: TreeMessage | null
@@ -22,12 +25,16 @@ type ConversationMessageListProps = {
     nodeId: string,
     branchFollowupBootstrap: BranchFollowupBootstrap,
   ) => void
+  onNodeIsMerged?: () => void
+  onMergeActionPending?: (label: string) => number
+  onMergeActionSettled?: (token: number) => void
   conversationScrollRef: RefObject<HTMLDivElement | null>
   bottomAnchorRef: RefObject<HTMLDivElement | null>
 }
 
 type MessageRowProps = {
   message: TreeMessage
+  nodeId: string
   isPending?: boolean
   isFailed?: boolean
   readOnly?: boolean
@@ -38,10 +45,14 @@ type MessageRowProps = {
     nodeId: string,
     branchFollowupBootstrap: BranchFollowupBootstrap,
   ) => void
+  onNodeIsMerged?: () => void
+  onMergeActionPending?: (label: string) => number
+  onMergeActionSettled?: (token: number) => void
 }
 
 const renderMessageRow = ({
   message,
+  nodeId,
   isPending = false,
   isFailed = false,
   readOnly = false,
@@ -49,10 +60,30 @@ const renderMessageRow = ({
   onRetryFailedMessage,
   onDismissFailedMessage,
   onBranchFollowupCreated,
+  onNodeIsMerged,
+  onMergeActionPending,
+  onMergeActionSettled,
 }: MessageRowProps) => {
   const branchSummaryLabel = getBranchSummaryLabelForMessage(message)
   if (branchSummaryLabel) {
     return <BranchEventRow key={message.id} label={branchSummaryLabel} />
+  }
+
+  if (message.metadata?.eventType === 'merge_proposal') {
+    return (
+      <MergeProposalCard
+        key={message.id}
+        message={message}
+        nodeId={nodeId}
+        onNodeIsMerged={onNodeIsMerged}
+        onMergeActionPending={onMergeActionPending}
+        onMergeActionSettled={onMergeActionSettled}
+      />
+    )
+  }
+
+  if (message.metadata?.eventType === 'merge_event') {
+    return <MergeEventMessage key={message.id} message={message} />
   }
 
   if (message.role === 'user') {
@@ -98,13 +129,16 @@ const BranchEventRow = ({ label }: { label: string | null }) => (
 )
 
 const InheritedHistorySection = ({
+  nodeId,
   messages,
   conversationModel,
   errorMessage,
   onRetryFailedMessage,
   onDismissFailedMessage,
   onBranchFollowupCreated,
+  onNodeIsMerged,
 }: {
+  nodeId: string
   messages: TreeMessage[]
   conversationModel: string
   errorMessage: string | null
@@ -114,6 +148,7 @@ const InheritedHistorySection = ({
     nodeId: string,
     branchFollowupBootstrap: BranchFollowupBootstrap,
   ) => void
+  onNodeIsMerged?: () => void
 }) => {
   const [isExpanded, setIsExpanded] = useState(true)
 
@@ -154,11 +189,13 @@ const InheritedHistorySection = ({
           {messages.map((message) =>
             renderMessageRow({
               message,
+              nodeId,
               readOnly: true,
               conversationModel,
               onRetryFailedMessage,
               onDismissFailedMessage,
               onBranchFollowupCreated,
+              onNodeIsMerged,
             }),
           )}
         </div>
@@ -168,6 +205,7 @@ const InheritedHistorySection = ({
 }
 
 export const ConversationMessageList = ({
+  nodeId,
   messages,
   inheritedMessages,
   branchEventMessage,
@@ -181,6 +219,9 @@ export const ConversationMessageList = ({
   onRetryFailedMessage,
   onDismissFailedMessage,
   onBranchFollowupCreated,
+  onNodeIsMerged,
+  onMergeActionPending,
+  onMergeActionSettled,
   conversationScrollRef,
   bottomAnchorRef,
 }: ConversationMessageListProps) => {
@@ -202,12 +243,14 @@ export const ConversationMessageList = ({
         ) : messages.length || inheritedMessages.length || branchEventMessage ? (
           <>
             <InheritedHistorySection
+              nodeId={nodeId}
               messages={inheritedMessages}
               conversationModel={conversationModel}
               errorMessage={inheritedErrorMessage}
               onRetryFailedMessage={onRetryFailedMessage}
               onDismissFailedMessage={onDismissFailedMessage}
               onBranchFollowupCreated={onBranchFollowupCreated}
+              onNodeIsMerged={onNodeIsMerged}
             />
 
             {branchEventMessage || inheritedMessages.length > 0 ? (
@@ -219,12 +262,16 @@ export const ConversationMessageList = ({
             {messages.map((message) =>
               renderMessageRow({
                 message,
+                nodeId,
                 isPending: pendingMessageIds.has(message.id),
                 isFailed: failedMessageIds.has(message.id),
                 conversationModel,
                 onRetryFailedMessage,
                 onDismissFailedMessage,
                 onBranchFollowupCreated,
+                onNodeIsMerged,
+                onMergeActionPending,
+                onMergeActionSettled,
               }),
             )}
           </>
