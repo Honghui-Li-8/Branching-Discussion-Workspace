@@ -132,6 +132,9 @@ export const NodeConversationPanel = ({
   const [isResizing, setIsResizing] = useState(false)
   const [sendBlockAlert, setSendBlockAlert] = useState<string | null>(null)
   const [mergeError, setMergeError] = useState<string | null>(null)
+  const [mergeTimerStartedAtMs, setMergeTimerStartedAtMs] = useState<number | null>(null)
+  const [mergeTimerNowMs, setMergeTimerNowMs] = useState(0)
+  const [mergeCompletionMessage, setMergeCompletionMessage] = useState<string | null>(null)
 
   const utils = trpc.useUtils()
 
@@ -155,6 +158,14 @@ export const NodeConversationPanel = ({
     onSuccess: async () => {
       setMergeError(null)
       await invalidateAfterMergeAction()
+      setMergeCompletionMessage('Proposal ready')
+      if (mergeCompletionTimeoutRef.current !== null) {
+        clearTimeout(mergeCompletionTimeoutRef.current)
+      }
+      mergeCompletionTimeoutRef.current = setTimeout(() => {
+        setMergeCompletionMessage(null)
+        mergeCompletionTimeoutRef.current = null
+      }, 4000)
     },
   })
 
@@ -170,6 +181,7 @@ export const NodeConversationPanel = ({
 
   const startXRef = useRef(0)
   const startWidthRef = useRef(0)
+  const mergeCompletionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const conversationScrollRef = useRef<HTMLDivElement | null>(null)
   const conversationBottomAnchorRef = useRef<HTMLDivElement | null>(null)
   const conversationInputRef = useRef<HTMLTextAreaElement | null>(null)
@@ -193,6 +205,11 @@ export const NodeConversationPanel = ({
   )
   const isMergeInitiating = initiateNodeMergeMutation.isPending
   const isMergeBlocked = isMerged || isMergeInitiating || hasPendingProposal
+  const mergeStatusLabel = initiateNodeMergeMutation.isPending
+    ? 'Generating merge proposal'
+    : cancelMergeMutation.isPending
+    ? 'Cancelling merge'
+    : null
   const hasActiveStreamStatus =
     Boolean(streamStatusLabel) && !(streamStatusLabel?.startsWith('Error:') ?? false)
   const runtimeSummary = (() => {
@@ -377,7 +394,32 @@ export const NodeConversationPanel = ({
     setStageDurationsMs({})
     setStatusTimerStartedAtMs(null)
     setStatusTimerNowMs(0)
+    setMergeTimerStartedAtMs(null)
+    setMergeTimerNowMs(0)
+    setMergeCompletionMessage(null)
+    if (mergeCompletionTimeoutRef.current !== null) {
+      clearTimeout(mergeCompletionTimeoutRef.current)
+      mergeCompletionTimeoutRef.current = null
+    }
   }, [node.id])
+
+  useEffect(() => {
+    if (!mergeStatusLabel) {
+      return
+    }
+    setMergeCompletionMessage(null)
+    if (mergeCompletionTimeoutRef.current !== null) {
+      clearTimeout(mergeCompletionTimeoutRef.current)
+      mergeCompletionTimeoutRef.current = null
+    }
+    const now = Date.now()
+    setMergeTimerStartedAtMs(now)
+    setMergeTimerNowMs(now)
+    const intervalId = window.setInterval(() => {
+      setMergeTimerNowMs(Date.now())
+    }, 1000)
+    return () => window.clearInterval(intervalId)
+  }, [mergeStatusLabel])
 
   useEffect(() => {
     if (!isResizing) {
@@ -481,6 +523,18 @@ export const NodeConversationPanel = ({
     return `${streamStatusLabel} (${formatStatusElapsed(elapsedSeconds)})`
   })()
 
+  const mergeStatusWithElapsed = (() => {
+    if (!mergeStatusLabel || mergeTimerStartedAtMs === null) {
+      return null
+    }
+
+    const elapsedSeconds = Math.max(
+      0,
+      Math.floor((mergeTimerNowMs - mergeTimerStartedAtMs) / 1000),
+    )
+    return `${mergeStatusLabel} (${formatStatusElapsed(elapsedSeconds)})`
+  })()
+
   return (
     <aside
       className="absolute inset-y-0 right-0 z-[80] flex h-full min-h-0 w-full flex-col overflow-hidden border-l border-[#8bb8cd] bg-[#fefefe] shadow-[-20px_0_38px_rgba(22,57,74,0.12)]"
@@ -531,6 +585,16 @@ export const NodeConversationPanel = ({
       {!hasActiveStreamStatus && runtimeSummary ? (
         <p className="m-0 shrink-0 border-t border-[#d8ebf6] bg-[#f8fcff] px-4 py-2 text-[11px] text-[#4d7086]">
           Runtime: {runtimeSummary}
+        </p>
+      ) : null}
+      {mergeStatusWithElapsed ? (
+        <p className="m-0 shrink-0 border-t border-[#b8d9c8] bg-[#f0f9f4] px-4 py-2 text-xs text-[#3a7a5a]">
+          {mergeStatusWithElapsed}
+        </p>
+      ) : null}
+      {!mergeStatusWithElapsed && mergeCompletionMessage ? (
+        <p className="m-0 shrink-0 border-t border-[#b8d9c8] bg-[#f8fcff] px-4 py-2 text-[11px] text-[#3a7a5a]">
+          {mergeCompletionMessage}
         </p>
       ) : null}
       {sendBlockAlert ? (
