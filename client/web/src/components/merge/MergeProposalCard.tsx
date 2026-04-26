@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { parseMergeProposalMetadata } from '@branching/shared'
 import { trpc } from '../../trpc'
 import type { TreeMessage } from '../../types/tree'
@@ -13,17 +13,26 @@ type MergeProposalCardProps = {
   message: TreeMessage
   nodeId: string
   onNodeIsMerged?: () => void
+  onMergeActionPending?: (label: string) => number
+  onMergeActionSettled?: (token: number) => void
 }
 
 type CardMode = 'pending' | 'editing' | 'rejecting'
 
-export const MergeProposalCard = ({ message, nodeId, onNodeIsMerged }: MergeProposalCardProps) => {
+export const MergeProposalCard = ({
+  message,
+  nodeId,
+  onNodeIsMerged,
+  onMergeActionPending,
+  onMergeActionSettled,
+}: MergeProposalCardProps) => {
   const metadata = parseMergeProposalMetadata(message.metadata)
 
   const [mode, setMode] = useState<CardMode>('pending')
   const [editText, setEditText] = useState(metadata?.proposedConclusion ?? '')
   const [rejectInstruction, setRejectInstruction] = useState('')
   const [inlineError, setInlineError] = useState<string | null>(null)
+  const currentActionTokenRef = useRef(0)
 
   const utils = trpc.useUtils()
 
@@ -50,6 +59,9 @@ export const MergeProposalCard = ({ message, nodeId, onNodeIsMerged }: MergeProp
       setInlineError(null)
       await invalidateMessages()
     },
+    onSettled: () => {
+      onMergeActionSettled?.(currentActionTokenRef.current)
+    },
   })
 
   const approveMutation = trpc.approveMerge.useMutation({
@@ -69,6 +81,9 @@ export const MergeProposalCard = ({ message, nodeId, onNodeIsMerged }: MergeProp
     onSuccess: async () => {
       setInlineError(null)
       await invalidateMessages()
+    },
+    onSettled: () => {
+      onMergeActionSettled?.(currentActionTokenRef.current)
     },
   })
 
@@ -93,12 +108,14 @@ export const MergeProposalCard = ({ message, nodeId, onNodeIsMerged }: MergeProp
   const handleApprove = () => {
     if (isSubmitting) return
     setInlineError(null)
+    currentActionTokenRef.current = onMergeActionPending?.('Approving merge') ?? 0
     approveMutation.mutate({ nodeId, proposalMessageId: message.id })
   }
 
   const handleEditConfirm = () => {
     if (isSubmitting || isEditEmpty) return
     setInlineError(null)
+    currentActionTokenRef.current = onMergeActionPending?.('Saving edit') ?? 0
     reviseMutation.mutate({
       nodeId,
       proposalMessageId: message.id,
@@ -116,6 +133,7 @@ export const MergeProposalCard = ({ message, nodeId, onNodeIsMerged }: MergeProp
     const instruction = rejectInstruction.trim()
     if (isSubmitting || instruction.length === 0) return
     setInlineError(null)
+    currentActionTokenRef.current = onMergeActionPending?.('Revising proposal') ?? 0
     reviseMutation.mutate({
       nodeId,
       proposalMessageId: message.id,

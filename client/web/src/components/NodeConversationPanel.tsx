@@ -135,6 +135,7 @@ export const NodeConversationPanel = ({
   const [mergeTimerStartedAtMs, setMergeTimerStartedAtMs] = useState<number | null>(null)
   const [mergeTimerNowMs, setMergeTimerNowMs] = useState(0)
   const [mergeCompletionMessage, setMergeCompletionMessage] = useState<string | null>(null)
+  const [mergeStatusLabel, setMergeStatusLabel] = useState<string | null>(null)
 
   const utils = trpc.useUtils()
 
@@ -150,6 +151,18 @@ export const NodeConversationPanel = ({
   const onNodeIsMerged = useCallback(async () => {
     await invalidateAfterMergeAction()
   }, [invalidateAfterMergeAction])
+
+  const onMergeActionPending = useCallback((label: string): number => {
+    mergeActionTokenRef.current += 1
+    setMergeStatusLabel(label)
+    return mergeActionTokenRef.current
+  }, [])
+
+  const onMergeActionSettled = useCallback((token: number) => {
+    if (token === mergeActionTokenRef.current) {
+      setMergeStatusLabel(null)
+    }
+  }, [])
 
   const initiateNodeMergeMutation = trpc.initiateNodeMerge.useMutation({
     onError: (error) => {
@@ -167,6 +180,9 @@ export const NodeConversationPanel = ({
         mergeCompletionTimeoutRef.current = null
       }, 4000)
     },
+    onSettled: () => {
+      setMergeStatusLabel(null)
+    },
   })
 
   const cancelMergeMutation = trpc.cancelMerge.useMutation({
@@ -177,11 +193,15 @@ export const NodeConversationPanel = ({
       setMergeError(null)
       await invalidateAfterMergeAction()
     },
+    onSettled: () => {
+      setMergeStatusLabel(null)
+    },
   })
 
   const startXRef = useRef(0)
   const startWidthRef = useRef(0)
   const mergeCompletionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const mergeActionTokenRef = useRef(0)
   const conversationScrollRef = useRef<HTMLDivElement | null>(null)
   const conversationBottomAnchorRef = useRef<HTMLDivElement | null>(null)
   const conversationInputRef = useRef<HTMLTextAreaElement | null>(null)
@@ -205,11 +225,6 @@ export const NodeConversationPanel = ({
   )
   const isMergeInitiating = initiateNodeMergeMutation.isPending
   const isMergeBlocked = isMerged || isMergeInitiating || hasPendingProposal
-  const mergeStatusLabel = initiateNodeMergeMutation.isPending
-    ? 'Generating merge proposal'
-    : cancelMergeMutation.isPending
-    ? 'Cancelling merge'
-    : null
   const hasActiveStreamStatus =
     Boolean(streamStatusLabel) && !(streamStatusLabel?.startsWith('Error:') ?? false)
   const runtimeSummary = (() => {
@@ -397,6 +412,8 @@ export const NodeConversationPanel = ({
     setMergeTimerStartedAtMs(null)
     setMergeTimerNowMs(0)
     setMergeCompletionMessage(null)
+    setMergeStatusLabel(null)
+    mergeActionTokenRef.current = 0
     if (mergeCompletionTimeoutRef.current !== null) {
       clearTimeout(mergeCompletionTimeoutRef.current)
       mergeCompletionTimeoutRef.current = null
@@ -555,8 +572,14 @@ export const NodeConversationPanel = ({
         showMergeButton={!isRootNode && !isMerged}
         isMergeInitiating={isMergeInitiating}
         isProposalPending={hasPendingProposal}
-        onInitiateMerge={() => initiateNodeMergeMutation.mutate({ nodeId: node.id })}
-        onCancelMerge={() => cancelMergeMutation.mutate({ nodeId: node.id })}
+        onInitiateMerge={() => {
+          setMergeStatusLabel('Generating merge proposal')
+          initiateNodeMergeMutation.mutate({ nodeId: node.id })
+        }}
+        onCancelMerge={() => {
+          setMergeStatusLabel('Cancelling merge')
+          cancelMergeMutation.mutate({ nodeId: node.id })
+        }}
       />
       <ConversationMessageList
         nodeId={node.id}
@@ -574,6 +597,8 @@ export const NodeConversationPanel = ({
         onDismissFailedMessage={conversation.dismissFailedMessage}
         onBranchFollowupCreated={onOpenBranchConversation}
         onNodeIsMerged={onNodeIsMerged}
+        onMergeActionPending={onMergeActionPending}
+        onMergeActionSettled={onMergeActionSettled}
         conversationScrollRef={conversationScrollRef}
         bottomAnchorRef={conversationBottomAnchorRef}
       />

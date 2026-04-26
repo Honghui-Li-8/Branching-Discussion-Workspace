@@ -26,6 +26,8 @@ type ConversationMessageListProps = {
     branchFollowupBootstrap: BranchFollowupBootstrap,
   ) => void
   onNodeIsMerged?: () => void
+  onMergeActionPending?: (label: string) => number
+  onMergeActionSettled?: (token: number) => void
   conversationScrollRef: RefObject<HTMLDivElement | null>
   bottomAnchorRef: RefObject<HTMLDivElement | null>
 }
@@ -44,6 +46,8 @@ type MessageRowProps = {
     branchFollowupBootstrap: BranchFollowupBootstrap,
   ) => void
   onNodeIsMerged?: () => void
+  onMergeActionPending?: (label: string) => number
+  onMergeActionSettled?: (token: number) => void
 }
 
 const renderMessageRow = ({
@@ -57,6 +61,8 @@ const renderMessageRow = ({
   onDismissFailedMessage,
   onBranchFollowupCreated,
   onNodeIsMerged,
+  onMergeActionPending,
+  onMergeActionSettled,
 }: MessageRowProps) => {
   const branchSummaryLabel = getBranchSummaryLabelForMessage(message)
   if (branchSummaryLabel) {
@@ -70,6 +76,8 @@ const renderMessageRow = ({
         message={message}
         nodeId={nodeId}
         onNodeIsMerged={onNodeIsMerged}
+        onMergeActionPending={onMergeActionPending}
+        onMergeActionSettled={onMergeActionSettled}
       />
     )
   }
@@ -212,6 +220,8 @@ export const ConversationMessageList = ({
   onDismissFailedMessage,
   onBranchFollowupCreated,
   onNodeIsMerged,
+  onMergeActionPending,
+  onMergeActionSettled,
   conversationScrollRef,
   bottomAnchorRef,
 }: ConversationMessageListProps) => {
@@ -260,6 +270,8 @@ export const ConversationMessageList = ({
                 onDismissFailedMessage,
                 onBranchFollowupCreated,
                 onNodeIsMerged,
+                onMergeActionPending,
+                onMergeActionSettled,
               }),
             )}
           </>
