@@ -1,5 +1,4 @@
-import type { AppRouterContext } from '@branching/shared'
-import { STRUCTURAL_MESSAGE_TYPES } from '@branching/shared'
+import { type AppRouterContext, STRUCTURAL_MESSAGE_TYPES } from '@branching/shared'
 import { TRPCError } from '@trpc/server'
 import {
   createOrGetBranchEventMessageForAuthor,

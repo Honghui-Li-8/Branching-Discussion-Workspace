@@ -2,8 +2,7 @@ import { describe, expect, jest, test } from '@jest/globals'
 import { TRPCError } from '@trpc/server'
 import { createMergeNodeToParentService } from './mergeNodeToParent'
 import type { MessageRecord, NodeRecord } from '../db/models/index.js'
-import type { BranchEventMetadata, MergeProposalMetadata } from '@branching/shared'
-import { STRUCTURAL_MESSAGE_TYPES } from '@branching/shared'
+import { type BranchEventMetadata, type MergeProposalMetadata, STRUCTURAL_MESSAGE_TYPES } from '@branching/shared'
 
 const fixedNow = '2026-04-26T00:00:00.000Z'
 

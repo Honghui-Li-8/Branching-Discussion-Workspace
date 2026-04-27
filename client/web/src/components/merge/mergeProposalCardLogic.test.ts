@@ -1,6 +1,5 @@
 import { describe, expect, test } from '@jest/globals'
-import type { MergeProposalMetadata } from '@branching/shared'
-import { STRUCTURAL_MESSAGE_TYPES } from '@branching/shared'
+import { type MergeProposalMetadata, STRUCTURAL_MESSAGE_TYPES } from '@branching/shared'
 import {
   MERGE_ERROR_EMPTY_CONCLUSION,
   MERGE_ERROR_INVALID_PROPOSAL,

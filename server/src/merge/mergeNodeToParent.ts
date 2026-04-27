@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import type { AppRouterContext, MergeProposalMetadata } from '@branching/shared'
-import { STRUCTURAL_MESSAGE_TYPES } from '@branching/shared'
+import { type AppRouterContext, type MergeProposalMetadata, STRUCTURAL_MESSAGE_TYPES } from '@branching/shared'
 import { TRPCError } from '@trpc/server'
 import { getClient } from '../db/client.js'
 import type { MessageRecord, NodeRecord } from '../db/models/index.js'
