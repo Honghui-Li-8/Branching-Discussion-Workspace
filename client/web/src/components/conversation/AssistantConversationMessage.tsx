@@ -7,7 +7,7 @@ import {
 } from './citationMetadata'
 import { AssistantMessageAnnotationWrapper } from './AssistantMessageAnnotations'
 import { ModelMarkdown } from './ModelMarkdown'
-import { isDebugRawMarkdownEnabled } from '../../devFlags'
+import { DEBUG_RAW_MARKDOWN } from '../../devFlags'
 
 type AssistantConversationMessageProps = {
   message: TreeMessage
@@ -26,12 +26,9 @@ export const AssistantConversationMessage = ({
   onBranchFollowupCreated,
 }: AssistantConversationMessageProps) => {
   const citations = getRenderableCitations(message)
-  const showRawMarkdown = isDebugRawMarkdownEnabled({
-    viteEnv: import.meta.env,
-  })
 
   useEffect(() => {
-    if (!showRawMarkdown) {
+    if (!DEBUG_RAW_MARKDOWN) {
       return
     }
 
@@ -39,7 +36,7 @@ export const AssistantConversationMessage = ({
       messageId: message.id,
       content: message.content,
     })
-  }, [message.content, message.id, showRawMarkdown])
+  }, [message.content, message.id])
 
   return (
     <div className="mb-5 flex justify-start">
@@ -48,7 +45,7 @@ export const AssistantConversationMessage = ({
           className="w-full rounded-[14px] border border-[#9fc4d8]/85 bg-white/55 px-5 py-4 text-sm leading-relaxed text-[#1f4f68] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] backdrop-blur-[2px]"
           style={{ overflowWrap: 'anywhere' }}
         >
-          {showRawMarkdown ? (
+          {DEBUG_RAW_MARKDOWN ? (
             <div data-debug-raw-markdown="true">
               <div className="mb-2 font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-[#8a5a00]">
                 Raw markdown debug

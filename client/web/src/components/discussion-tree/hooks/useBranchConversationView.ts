@@ -4,7 +4,7 @@ import type { AppRouter } from '@branching/shared'
 import { parseMessageMetadata } from '@branching/shared/metadata'
 import { trpc } from '../../../trpc'
 import type { TreeMessage } from '../../../types/tree'
-import { isDebugRawMarkdownEnabled } from '../../../devFlags'
+import { DEBUG_RAW_MARKDOWN } from '../../../devFlags'
 import { buildBranchConversationSegments } from '../../conversation/branchConversationView'
 
 type RouterOutputs = inferRouterOutputs<AppRouter>
@@ -74,7 +74,7 @@ export const useBranchConversationView = ({
     if (
       !nodeId ||
       !inheritedMessagesQuery.data ||
-      !isDebugRawMarkdownEnabled({ viteEnv: import.meta.env })
+      !DEBUG_RAW_MARKDOWN
     ) {
       return
     }
