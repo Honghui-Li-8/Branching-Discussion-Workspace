@@ -32,14 +32,20 @@ export const AssistantConversationMessage = ({
           className="w-full rounded-[14px] border border-[#9fc4d8]/85 bg-white/55 px-5 py-4 text-sm leading-relaxed text-[#1f4f68] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] backdrop-blur-[2px]"
           style={{ overflowWrap: 'anywhere' }}
         >
-          <AssistantMessageAnnotationWrapper
-            messageId={message.id}
-            conversationModel={conversationModel}
-            readOnly={readOnly}
-            onBranchFollowupCreated={onBranchFollowupCreated}
-          >
-            <ModelMarkdown content={message.content} />
-          </AssistantMessageAnnotationWrapper>
+          {import.meta.env.VITE_DEBUG_RAW_MARKDOWN === 'true' ? (
+            <pre className="m-0 whitespace-pre-wrap break-words font-mono text-xs text-[#1f4f68]">
+              {message.content}
+            </pre>
+          ) : (
+            <AssistantMessageAnnotationWrapper
+              messageId={message.id}
+              conversationModel={conversationModel}
+              readOnly={readOnly}
+              onBranchFollowupCreated={onBranchFollowupCreated}
+            >
+              <ModelMarkdown content={message.content} />
+            </AssistantMessageAnnotationWrapper>
+          )}
         </div>
 
         {citations.length > 0 ? (
