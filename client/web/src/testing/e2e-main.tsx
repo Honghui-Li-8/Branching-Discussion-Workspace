@@ -7,8 +7,11 @@ import '../index.css'
 import { trpc } from '../trpc'
 import { httpBatchLink } from '@trpc/client'
 import { AnnotationE2EHarness } from './AnnotationE2EHarness'
+import { MarkdownE2EHarness } from './MarkdownE2EHarness'
 
 const e2eQueryClient = new QueryClient()
+
+const fixtureParam = new URLSearchParams(window.location.search).get('fixture')
 
 const e2eTrpcClient = trpc.createClient({
   links: [
@@ -28,7 +31,7 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <trpc.Provider client={e2eTrpcClient} queryClient={e2eQueryClient}>
       <QueryClientProvider client={e2eQueryClient}>
-        <AnnotationE2EHarness />
+        {fixtureParam === 'markdown' ? <MarkdownE2EHarness /> : <AnnotationE2EHarness />}
       </QueryClientProvider>
     </trpc.Provider>
   </StrictMode>,
