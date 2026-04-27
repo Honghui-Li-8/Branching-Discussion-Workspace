@@ -38,9 +38,9 @@ export const ModelMarkdown = ({ content }: ModelMarkdownProps) => {
           h5: ({ children }) => <h5 className="m-0 text-[0.9rem] font-semibold leading-tight">{children}</h5>,
           h6: ({ children }) => <h6 className="m-0 text-[0.88rem] font-semibold leading-tight">{children}</h6>,
           p: ({ children }) => <p className="m-0 whitespace-pre-wrap">{children}</p>,
-          ul: ({ children }) => <ul className="m-0 list-disc pl-5">{children}</ul>,
-          ol: ({ children }) => <ol className="m-0 list-decimal pl-5">{children}</ol>,
-          li: ({ children }) => <li className="my-1">{children}</li>,
+          ul: ({ children, ...props }) => <ul {...props} className="m-0 list-disc pl-5">{children}</ul>,
+          ol: ({ children, ...props }) => <ol {...props} className="m-0 list-decimal pl-5">{children}</ol>,
+          li: ({ children, ...props }) => <li {...props} className="my-1">{children}</li>,
           blockquote: ({ children }) => (
             <blockquote className="m-0 border-l-2 border-[#abd0e5] pl-3 text-[#2d617f]">{children}</blockquote>
           ),

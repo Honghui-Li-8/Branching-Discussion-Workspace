@@ -1,9 +1,10 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import type { inferRouterOutputs } from '@trpc/server'
 import type { AppRouter } from '@branching/shared'
 import { parseMessageMetadata } from '@branching/shared/metadata'
 import { trpc } from '../../../trpc'
 import type { TreeMessage } from '../../../types/tree'
+import { isDebugRawMarkdownEnabled } from '../../../devFlags'
 import { buildBranchConversationSegments } from '../../conversation/branchConversationView'
 
 type RouterOutputs = inferRouterOutputs<AppRouter>
@@ -68,6 +69,25 @@ export const useBranchConversationView = ({
       enabled: Boolean(nodeId && branchEventMetadata),
     },
   )
+
+  useEffect(() => {
+    if (
+      !nodeId ||
+      !inheritedMessagesQuery.data ||
+      !isDebugRawMarkdownEnabled({ viteEnv: import.meta.env })
+    ) {
+      return
+    }
+
+    console.log('[branch-conversation-view] fetched inherited messages', {
+      nodeId,
+      messages: inheritedMessagesQuery.data.map((message) => ({
+        id: message.id,
+        role: message.role,
+        content: message.content,
+      })),
+    })
+  }, [inheritedMessagesQuery.data, nodeId])
 
   const inheritedMessages = useMemo<TreeMessage[]>(
     () =>

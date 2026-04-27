@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import type { TreeMessage } from '../../types/tree'
 import type { BranchFollowupBootstrap } from '../discussion-tree/hooks/useDiscussionTreeUiState'
 import {
@@ -6,6 +7,7 @@ import {
 } from './citationMetadata'
 import { AssistantMessageAnnotationWrapper } from './AssistantMessageAnnotations'
 import { ModelMarkdown } from './ModelMarkdown'
+import { isDebugRawMarkdownEnabled } from '../../devFlags'
 
 type AssistantConversationMessageProps = {
   message: TreeMessage
@@ -24,6 +26,20 @@ export const AssistantConversationMessage = ({
   onBranchFollowupCreated,
 }: AssistantConversationMessageProps) => {
   const citations = getRenderableCitations(message)
+  const showRawMarkdown = isDebugRawMarkdownEnabled({
+    viteEnv: import.meta.env,
+  })
+
+  useEffect(() => {
+    if (!showRawMarkdown) {
+      return
+    }
+
+    console.log('[assistant-message] raw content render debug', {
+      messageId: message.id,
+      content: message.content,
+    })
+  }, [message.content, message.id, showRawMarkdown])
 
   return (
     <div className="mb-5 flex justify-start">
@@ -32,7 +48,7 @@ export const AssistantConversationMessage = ({
           className="w-full rounded-[14px] border border-[#9fc4d8]/85 bg-white/55 px-5 py-4 text-sm leading-relaxed text-[#1f4f68] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] backdrop-blur-[2px]"
           style={{ overflowWrap: 'anywhere' }}
         >
-          {import.meta.env.VITE_DEBUG_RAW_MARKDOWN === 'true' ? (
+          {showRawMarkdown ? (
             <pre className="m-0 whitespace-pre-wrap break-words font-mono text-xs text-[#1f4f68]">
               {message.content}
             </pre>

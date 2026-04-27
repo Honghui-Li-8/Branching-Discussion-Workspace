@@ -4,6 +4,7 @@ import type { AppRouter } from '@branching/shared'
 import { parseMessageMetadata } from '@branching/shared/metadata'
 import { trpc } from '../../../trpc'
 import type { TreeMessage } from '../../../types/tree'
+import { isDebugRawMarkdownEnabled } from '../../../devFlags'
 import { invalidateMessagesByNode } from './mutationInvalidation'
 import type { BranchFollowupBootstrap } from './useDiscussionTreeUiState'
 import {
@@ -159,6 +160,25 @@ export const useNodeConversation = ({
       refetchOnWindowFocus: false,
     },
   )
+
+  useEffect(() => {
+    if (
+      !nodeId ||
+      !messagesQuery.data ||
+      !isDebugRawMarkdownEnabled({ viteEnv: import.meta.env })
+    ) {
+      return
+    }
+
+    console.log('[node-conversation] fetched messages', {
+      nodeId,
+      messages: messagesQuery.data.map((message) => ({
+        id: message.id,
+        role: message.role,
+        content: message.content,
+      })),
+    })
+  }, [messagesQuery.data, nodeId])
 
   const invalidateNodeMessages = useCallback(async (targetNodeId: string) => {
     await invalidateMessagesByNode(utils.messagesByNode.invalidate, targetNodeId)
