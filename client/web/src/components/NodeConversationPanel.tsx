@@ -19,7 +19,7 @@ import { useBranchConversationView } from './discussion-tree/hooks/useBranchConv
 import type { TurnStage } from './discussion-tree/hooks/conversationStreamState'
 import type { BranchFollowupBootstrap } from './discussion-tree/hooks/useDiscussionTreeUiState'
 import { invalidateMessagesByNode, invalidateNodesByWorkspace } from './discussion-tree/hooks/mutationInvalidation'
-import { parseMergeProposalMetadata } from '@branching/shared'
+import { parseMergeProposalMetadata, STRUCTURAL_MESSAGE_TYPES } from '@branching/shared'
 import { isMergeProposalPending } from './merge/mergeProposalCardLogic'
 import { ConversationComposer, CHAT_INPUT_MAX_HEIGHT, CHAT_INPUT_MIN_HEIGHT, CHAT_MODELS } from './conversation/ConversationComposer'
 import { ConversationMessageList } from './conversation/ConversationMessageList'
@@ -221,7 +221,7 @@ export const NodeConversationPanel = ({
   const isMerged = node.status === 'Merged'
   const isRootNode = node.depth === 0
   const hasPendingProposal = messages.some(
-    (m) => m.metadata?.eventType === 'merge_proposal' && isMergeProposalPending(parseMergeProposalMetadata(m.metadata)),
+    (m) => m.metadata?.eventType === STRUCTURAL_MESSAGE_TYPES.mergeProposal && isMergeProposalPending(parseMergeProposalMetadata(m.metadata)),
   )
   const isMergeInitiating = initiateNodeMergeMutation.isPending
   const isMergeBlocked = isMerged || isMergeInitiating || hasPendingProposal

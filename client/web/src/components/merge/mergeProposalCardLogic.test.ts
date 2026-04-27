@@ -1,5 +1,6 @@
 import { describe, expect, test } from '@jest/globals'
 import type { MergeProposalMetadata } from '@branching/shared'
+import { STRUCTURAL_MESSAGE_TYPES } from '@branching/shared'
 import {
   MERGE_ERROR_EMPTY_CONCLUSION,
   MERGE_ERROR_INVALID_PROPOSAL,
@@ -11,7 +12,7 @@ import {
 } from './mergeProposalCardLogic'
 
 const makeMetadata = (mergeStatus: MergeProposalMetadata['mergeStatus']): MergeProposalMetadata => ({
-  eventType: 'merge_proposal',
+  eventType: STRUCTURAL_MESSAGE_TYPES.mergeProposal,
   proposalId: 'test-id',
   proposedConclusion: 'Test conclusion',
   mergeStatus,

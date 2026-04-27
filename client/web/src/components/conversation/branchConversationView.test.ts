@@ -1,4 +1,5 @@
 import { describe, expect, test } from '@jest/globals'
+import { STRUCTURAL_MESSAGE_TYPES } from '@branching/shared'
 import type { TreeMessage } from '../../types/tree'
 import {
   buildBranchConversationSegments,
@@ -37,7 +38,7 @@ describe('branchConversationView', () => {
         role: 'user',
         content: 'Selected source text',
         metadata: {
-          eventType: 'branch_event',
+          eventType: STRUCTURAL_MESSAGE_TYPES.branchEvent,
           sourceNodeId: 'parent-node',
           sourceMessageId: 'parent-message',
           branchNodeId: 'child-node',
@@ -66,7 +67,7 @@ describe('branchConversationView', () => {
       inheritedMessages,
       branchEventMessage: localMessages[0],
       branchEventMetadata: {
-        eventType: 'branch_event',
+        eventType: STRUCTURAL_MESSAGE_TYPES.branchEvent,
         sourceNodeId: 'parent-node',
         sourceMessageId: 'parent-message',
         branchNodeId: 'child-node',
@@ -108,7 +109,7 @@ describe('branchConversationView', () => {
       role: 'user',
       content: 'Selected source text',
       metadata: {
-        eventType: 'branch_event',
+        eventType: STRUCTURAL_MESSAGE_TYPES.branchEvent,
         sourceNodeId: 'parent-node',
         sourceMessageId: 'parent-message',
         branchNodeId: 'child-node',
@@ -147,7 +148,7 @@ describe('branchConversationView — branch follow-up UI flow', () => {
     role: 'user',
     content: 'A is faster but B is more reliable.',
     metadata: {
-      eventType: 'branch_event',
+      eventType: STRUCTURAL_MESSAGE_TYPES.branchEvent,
       sourceNodeId: 'parent-node',
       sourceMessageId: 'parent-assistant',
       sourceAnnotationId: 'a1',
@@ -231,7 +232,7 @@ describe('branchConversationView — branch follow-up UI flow', () => {
       role: 'user',
       content: 'A is faster but B is more reliable.',
       metadata: {
-        eventType: 'branch_event',
+        eventType: STRUCTURAL_MESSAGE_TYPES.branchEvent,
         sourceNodeId: 'parent-node',
         sourceMessageId: 'parent-assistant',
         sourceAnnotationId: 'a1',
@@ -246,7 +247,7 @@ describe('branchConversationView — branch follow-up UI flow', () => {
       role: 'user',
       content: 'fewer failures under load',
       metadata: {
-        eventType: 'branch_event',
+        eventType: STRUCTURAL_MESSAGE_TYPES.branchEvent,
         sourceNodeId: 'child-node',
         sourceMessageId: 'child-assistant',
         sourceAnnotationId: 'a2',

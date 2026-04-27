@@ -1,4 +1,5 @@
 import { useState, type RefObject } from 'react'
+import { STRUCTURAL_MESSAGE_TYPES } from '@branching/shared'
 import type { BranchFollowupBootstrap } from '../discussion-tree/hooks/useDiscussionTreeUiState'
 import type { TreeMessage } from '../../types/tree'
 import { UserConversationMessage } from './UserConversationMessage'
@@ -69,7 +70,7 @@ const renderMessageRow = ({
     return <BranchEventRow key={message.id} label={branchSummaryLabel} />
   }
 
-  if (message.metadata?.eventType === 'merge_proposal') {
+  if (message.metadata?.eventType === STRUCTURAL_MESSAGE_TYPES.mergeProposal) {
     return (
       <MergeProposalCard
         key={message.id}
@@ -82,7 +83,7 @@ const renderMessageRow = ({
     )
   }
 
-  if (message.metadata?.eventType === 'merge_event') {
+  if (message.metadata?.eventType === STRUCTURAL_MESSAGE_TYPES.mergeEvent) {
     return <MergeEventMessage key={message.id} message={message} />
   }
 
