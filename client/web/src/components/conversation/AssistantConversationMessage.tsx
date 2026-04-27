@@ -35,7 +35,7 @@ export const AssistantConversationMessage = ({
       return
     }
 
-    console.log('[assistant-message] raw content render debug', {
+    console.log('[assistant-message] raw markdown branch active', {
       messageId: message.id,
       content: message.content,
     })
@@ -49,9 +49,14 @@ export const AssistantConversationMessage = ({
           style={{ overflowWrap: 'anywhere' }}
         >
           {showRawMarkdown ? (
-            <pre className="m-0 whitespace-pre-wrap break-words font-mono text-xs text-[#1f4f68]">
-              {message.content}
-            </pre>
+            <div data-debug-raw-markdown="true">
+              <div className="mb-2 font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-[#8a5a00]">
+                Raw markdown debug
+              </div>
+              <pre className="m-0 whitespace-pre-wrap break-words font-mono text-xs text-[#1f4f68]">
+                {message.content}
+              </pre>
+            </div>
           ) : (
             <AssistantMessageAnnotationWrapper
               messageId={message.id}
