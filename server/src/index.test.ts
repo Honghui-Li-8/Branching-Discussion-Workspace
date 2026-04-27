@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globals'
+import { STRUCTURAL_MESSAGE_TYPES } from '@branching/shared'
 import { appRouter } from './router.js'
 import { clearAllSessions, createSession } from './auth/sessionStore.js'
 import type { SessionUser } from './auth/types.js'
@@ -1681,25 +1682,25 @@ describe('tRPC ownership integration', () => {
     listMessagesForNodeForAuthorMock.mockResolvedValueOnce([branchEventMessageRecord])
     getBranchEventMetadataFromRecordMock
       .mockReturnValueOnce({
-        eventType: 'branch_event',
+        eventType: STRUCTURAL_MESSAGE_TYPES.branchEvent,
         sourceNodeId: ownedNodeRecord.id,
         sourceMessageId: 'parent-source-message',
         branchNodeId: ownedBranchNodeRecord.id,
       })
       .mockReturnValueOnce({
-        eventType: 'branch_event',
+        eventType: STRUCTURAL_MESSAGE_TYPES.branchEvent,
         sourceNodeId: ownedNodeRecord.id,
         sourceMessageId: 'parent-source-message',
         branchNodeId: ownedBranchNodeRecord.id,
       })
       .mockReturnValueOnce({
-        eventType: 'branch_event',
+        eventType: STRUCTURAL_MESSAGE_TYPES.branchEvent,
         sourceNodeId: 'root-node',
         sourceMessageId: 'root-source-message',
         branchNodeId: ownedNodeRecord.id,
       })
       .mockReturnValueOnce({
-        eventType: 'branch_event',
+        eventType: STRUCTURAL_MESSAGE_TYPES.branchEvent,
         sourceNodeId: 'root-node',
         sourceMessageId: 'root-source-message',
         branchNodeId: ownedNodeRecord.id,

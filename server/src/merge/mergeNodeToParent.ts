@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { AppRouterContext, MergeProposalMetadata } from '@branching/shared'
+import { STRUCTURAL_MESSAGE_TYPES } from '@branching/shared'
 import { TRPCError } from '@trpc/server'
 import { getClient } from '../db/client.js'
 import type { MessageRecord, NodeRecord } from '../db/models/index.js'
@@ -191,7 +192,7 @@ export const createMergeNodeToParentService = (
       }),
     })
     const metadata: MergeProposalMetadata & { mergeStatus: 'pending' } = {
-      eventType: 'merge_proposal',
+      eventType: STRUCTURAL_MESSAGE_TYPES.mergeProposal,
       proposalId: resolvedDeps.createProposalId(),
       proposedConclusion: conclusion,
       mergeStatus: 'pending',
@@ -273,7 +274,7 @@ export const createMergeNodeToParentService = (
         mergeStatus: 'superseded',
       })
       const nextMetadata: MergeProposalMetadata = {
-        eventType: 'merge_proposal',
+        eventType: STRUCTURAL_MESSAGE_TYPES.mergeProposal,
         proposalId: resolvedDeps.createProposalId(),
         proposedConclusion: nextConclusion,
         mergeStatus: 'pending',
@@ -409,7 +410,7 @@ export const createMergeNodeToParentService = (
           conclusion,
         }),
         metadata: {
-          eventType: 'merge_event',
+          eventType: STRUCTURAL_MESSAGE_TYPES.mergeEvent,
           sourceNodeId: node.id,
           sourceBranchTitle: node.title,
           sourceBranchOriginMessageId,

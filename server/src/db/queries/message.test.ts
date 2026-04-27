@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, jest, test } from '@jest/globals'
+import { STRUCTURAL_MESSAGE_TYPES } from '@branching/shared'
 import { query } from '../client.js'
 import {
   createMessage,
@@ -157,7 +158,7 @@ describe('message queries', () => {
           ...messageRow,
           turn_id: null,
           metadata: {
-            eventType: 'branch_event',
+            eventType: STRUCTURAL_MESSAGE_TYPES.branchEvent,
             sourceNodeId: 'n-parent',
             sourceMessageId: 'm-source',
             sourceAnnotationId: 'a1',
@@ -173,7 +174,7 @@ describe('message queries', () => {
       authorUserId: 'u1',
       content: 'surrounding context',
       metadata: {
-        eventType: 'branch_event',
+        eventType: STRUCTURAL_MESSAGE_TYPES.branchEvent,
         sourceNodeId: 'n-parent',
         sourceMessageId: 'm-source',
         sourceAnnotationId: 'a1',
@@ -183,7 +184,7 @@ describe('message queries', () => {
     })
 
     expect(result?.metadata).toEqual({
-      eventType: 'branch_event',
+      eventType: STRUCTURAL_MESSAGE_TYPES.branchEvent,
       sourceNodeId: 'n-parent',
       sourceMessageId: 'm-source',
       sourceAnnotationId: 'a1',
@@ -197,7 +198,7 @@ describe('message queries', () => {
         'u1',
         'surrounding context',
         JSON.stringify({
-          eventType: 'branch_event',
+          eventType: STRUCTURAL_MESSAGE_TYPES.branchEvent,
           sourceNodeId: 'n-parent',
           sourceMessageId: 'm-source',
           sourceAnnotationId: 'a1',
@@ -216,7 +217,7 @@ describe('message queries', () => {
           ...messageRow,
           role: 'assistant',
           metadata: {
-            eventType: 'merge_proposal',
+            eventType: STRUCTURAL_MESSAGE_TYPES.mergeProposal,
             proposalId: 'proposal-1',
             proposedConclusion: 'Use GraphQL for realtime data.',
             mergeStatus: 'pending',
@@ -231,7 +232,7 @@ describe('message queries', () => {
       authorUserId: 'u1',
       content: 'Use GraphQL for realtime data.',
       metadata: {
-        eventType: 'merge_proposal',
+        eventType: STRUCTURAL_MESSAGE_TYPES.mergeProposal,
         proposalId: 'proposal-1',
         proposedConclusion: 'Use GraphQL for realtime data.',
         mergeStatus: 'pending',
@@ -241,7 +242,7 @@ describe('message queries', () => {
 
     expect(result?.role).toBe('assistant')
     expect(result?.metadata).toMatchObject({
-      eventType: 'merge_proposal',
+      eventType: STRUCTURAL_MESSAGE_TYPES.mergeProposal,
       mergeStatus: 'pending',
     })
     expect(queryMock).toHaveBeenCalledWith(
@@ -251,7 +252,7 @@ describe('message queries', () => {
         'u1',
         'Use GraphQL for realtime data.',
         JSON.stringify({
-          eventType: 'merge_proposal',
+          eventType: STRUCTURAL_MESSAGE_TYPES.mergeProposal,
           proposalId: 'proposal-1',
           proposedConclusion: 'Use GraphQL for realtime data.',
           mergeStatus: 'pending',
@@ -268,7 +269,7 @@ describe('message queries', () => {
           ...messageRow,
           role: 'assistant' as const,
           metadata: {
-            eventType: 'merge_proposal',
+            eventType: STRUCTURAL_MESSAGE_TYPES.mergeProposal,
             proposalId: 'proposal-1',
             proposedConclusion: 'Use GraphQL for realtime data.',
             mergeStatus: 'pending',
@@ -285,7 +286,7 @@ describe('message queries', () => {
         authorUserId: 'u1',
         content: 'Use GraphQL for realtime data.',
         metadata: {
-          eventType: 'merge_proposal',
+          eventType: STRUCTURAL_MESSAGE_TYPES.mergeProposal,
           proposalId: 'proposal-1',
           proposedConclusion: 'Use GraphQL for realtime data.',
           mergeStatus: 'pending',
@@ -294,7 +295,7 @@ describe('message queries', () => {
       },
     )
 
-    expect(result?.metadata).toMatchObject({ eventType: 'merge_proposal' })
+    expect(result?.metadata).toMatchObject({ eventType: STRUCTURAL_MESSAGE_TYPES.mergeProposal })
     expect(transactionQueryMock).toHaveBeenCalledTimes(1)
     expect(queryMock).not.toHaveBeenCalled()
   })
@@ -306,7 +307,7 @@ describe('message queries', () => {
           ...messageRow,
           role: 'assistant',
           metadata: {
-            eventType: 'merge_proposal',
+            eventType: STRUCTURAL_MESSAGE_TYPES.mergeProposal,
             proposalId: 'proposal-1',
             proposedConclusion: 'Use GraphQL for realtime data.',
             mergeStatus: 'pending',
@@ -343,7 +344,7 @@ describe('message queries', () => {
         {
           ...messageRow,
           metadata: {
-            eventType: 'merge_proposal',
+            eventType: STRUCTURAL_MESSAGE_TYPES.mergeProposal,
             proposalId: 'proposal-1',
             proposedConclusion: 'Use GraphQL for realtime data.',
             mergeStatus: 'superseded',
@@ -375,7 +376,7 @@ describe('message queries', () => {
           role: 'user',
           node_id: 'parent-node',
           metadata: {
-            eventType: 'merge_event',
+            eventType: STRUCTURAL_MESSAGE_TYPES.mergeEvent,
             sourceNodeId: 'n1',
             sourceBranchTitle: 'Realtime API choice',
             sourceBranchOriginMessageId: 'source-message-1',
@@ -391,7 +392,7 @@ describe('message queries', () => {
       authorUserId: 'u1',
       content: 'Merged from Realtime API choice: Use GraphQL for realtime data.',
       metadata: {
-        eventType: 'merge_event',
+        eventType: STRUCTURAL_MESSAGE_TYPES.mergeEvent,
         sourceNodeId: 'n1',
         sourceBranchTitle: 'Realtime API choice',
         sourceBranchOriginMessageId: 'source-message-1',
@@ -401,7 +402,7 @@ describe('message queries', () => {
     })
 
     expect(result?.role).toBe('user')
-    expect(result?.metadata).toMatchObject({ eventType: 'merge_event' })
+    expect(result?.metadata).toMatchObject({ eventType: STRUCTURAL_MESSAGE_TYPES.mergeEvent })
     expect(queryMock).toHaveBeenCalledWith(
       expect.stringContaining("'user'"),
       [
@@ -409,7 +410,7 @@ describe('message queries', () => {
         'u1',
         'Merged from Realtime API choice: Use GraphQL for realtime data.',
         JSON.stringify({
-          eventType: 'merge_event',
+          eventType: STRUCTURAL_MESSAGE_TYPES.mergeEvent,
           sourceNodeId: 'n1',
           sourceBranchTitle: 'Realtime API choice',
           sourceBranchOriginMessageId: 'source-message-1',
@@ -427,7 +428,7 @@ describe('message queries', () => {
           ...messageRow,
           turn_id: null,
           metadata: {
-            eventType: 'branch_event',
+            eventType: STRUCTURAL_MESSAGE_TYPES.branchEvent,
             sourceNodeId: 'parent-node',
             sourceMessageId: 'source-message-1',
             branchNodeId: 'n1',
@@ -750,7 +751,7 @@ describe('message queries', () => {
         ...baseRecord,
         role: 'user' as const,
         metadata: {
-          eventType: 'branch_event' as const,
+          eventType: STRUCTURAL_MESSAGE_TYPES.branchEvent,
           sourceNodeId: 'node-1',
           sourceMessageId: 'msg-1',
           branchNodeId: 'branch-node-1',
@@ -760,7 +761,7 @@ describe('message queries', () => {
       const result = getBranchEventMetadataFromRecord(record)
 
       expect(result).toEqual({
-        eventType: 'branch_event',
+        eventType: STRUCTURAL_MESSAGE_TYPES.branchEvent,
         sourceNodeId: 'node-1',
         sourceMessageId: 'msg-1',
         branchNodeId: 'branch-node-1',
@@ -784,7 +785,7 @@ describe('message queries', () => {
         ...baseRecord,
         role: 'assistant' as const,
         metadata: {
-          eventType: 'merge_proposal' as const,
+          eventType: STRUCTURAL_MESSAGE_TYPES.mergeProposal,
           proposalId: 'proposal-1',
           proposedConclusion: 'Use GraphQL for realtime data.',
           mergeStatus: 'pending' as const,
@@ -793,7 +794,7 @@ describe('message queries', () => {
       }
 
       expect(getMergeProposalMetadataFromRecord(record)).toEqual({
-        eventType: 'merge_proposal',
+        eventType: STRUCTURAL_MESSAGE_TYPES.mergeProposal,
         proposalId: 'proposal-1',
         proposedConclusion: 'Use GraphQL for realtime data.',
         mergeStatus: 'pending',
@@ -807,7 +808,7 @@ describe('message queries', () => {
         ...baseRecord,
         role: 'user' as const,
         metadata: {
-          eventType: 'merge_event' as const,
+          eventType: STRUCTURAL_MESSAGE_TYPES.mergeEvent,
           sourceNodeId: 'branch-node-1',
           sourceBranchTitle: 'Realtime API choice',
           sourceBranchOriginMessageId: 'source-message-1',
@@ -817,7 +818,7 @@ describe('message queries', () => {
       }
 
       expect(getMergeEventMetadataFromRecord(record)).toEqual({
-        eventType: 'merge_event',
+        eventType: STRUCTURAL_MESSAGE_TYPES.mergeEvent,
         sourceNodeId: 'branch-node-1',
         sourceBranchTitle: 'Realtime API choice',
         sourceBranchOriginMessageId: 'source-message-1',

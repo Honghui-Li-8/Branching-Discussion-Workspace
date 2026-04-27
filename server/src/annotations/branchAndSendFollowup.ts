@@ -1,4 +1,5 @@
 import type { AppRouterContext } from '@branching/shared'
+import { STRUCTURAL_MESSAGE_TYPES } from '@branching/shared'
 import { TRPCError } from '@trpc/server'
 import {
   createOrGetBranchEventMessageForAuthor,
@@ -143,7 +144,7 @@ export const branchAndSendFollowup = async ({
     authorUserId: currentUserId,
     content: sourceContext,
     metadata: {
-      eventType: 'branch_event',
+      eventType: STRUCTURAL_MESSAGE_TYPES.branchEvent,
       sourceNodeId: source.parentNodeId,
       sourceMessageId: input.messageId,
       sourceAnnotationId: input.sourceAnnotationId ?? branchResult.annotation.id,

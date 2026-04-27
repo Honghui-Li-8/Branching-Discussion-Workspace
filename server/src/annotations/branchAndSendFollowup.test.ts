@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, jest, test } from '@jest/globals'
+import { STRUCTURAL_MESSAGE_TYPES } from '@branching/shared'
 import {
   getMessageBranchSourceContextForAuthor,
   createOrGetBranchEventMessageForAuthor,
@@ -20,7 +21,7 @@ jest.mock('../db/queries/message.js', () => ({
   createOrGetBranchEventMessageForAuthor: jest.fn(),
   listMessagesByTurn: jest.fn(),
   getBranchEventMetadataFromRecord: jest.fn((record: { metadata: { eventType?: string } }) =>
-    record.metadata?.eventType === 'branch_event' ? record.metadata : null,
+    record.metadata?.eventType === STRUCTURAL_MESSAGE_TYPES.branchEvent ? record.metadata : null,
   ),
 }))
 jest.mock('../db/index.js', () => ({
@@ -116,7 +117,7 @@ const branchEventMessageRecord = {
   role: 'user' as const,
   content: 'hello world',
   metadata: {
-    eventType: 'branch_event' as const,
+    eventType: STRUCTURAL_MESSAGE_TYPES.branchEvent,
     sourceNodeId: 'n-parent',
     sourceMessageId: 'm1',
     sourceAnnotationId: 'a1',
@@ -148,7 +149,7 @@ describe('branchAndSendFollowup', () => {
     jest.resetAllMocks()
     getBranchEventMetadataFromRecordMock.mockImplementation(
       (record) =>
-        record.metadata?.eventType === 'branch_event' ? (record.metadata as never) : null,
+        record.metadata?.eventType === STRUCTURAL_MESSAGE_TYPES.branchEvent ? (record.metadata as never) : null,
     )
   })
 
@@ -203,7 +204,7 @@ describe('branchAndSendFollowup', () => {
     expect(createOrGetBranchEventMessageForAuthorMock).toHaveBeenCalledWith(
       expect.objectContaining({
         content: 'hello world',
-        metadata: expect.objectContaining({ eventType: 'branch_event' }),
+        metadata: expect.objectContaining({ eventType: STRUCTURAL_MESSAGE_TYPES.branchEvent }),
       }),
     )
   })
@@ -220,7 +221,7 @@ describe('branchAndSendFollowup', () => {
       expect.objectContaining({
         nodeId: 'n-branch',
         metadata: expect.objectContaining({
-          eventType: 'branch_event',
+          eventType: STRUCTURAL_MESSAGE_TYPES.branchEvent,
           sourceNodeId: 'n-parent',
           sourceMessageId: 'm1',
           sourceAnnotationId: 'a1',
@@ -418,7 +419,7 @@ describe('branchAndSendFollowup — idempotency and partial-write recovery', () 
     jest.resetAllMocks()
     getBranchEventMetadataFromRecordMock.mockImplementation(
       (record) =>
-        record.metadata?.eventType === 'branch_event' ? (record.metadata as never) : null,
+        record.metadata?.eventType === STRUCTURAL_MESSAGE_TYPES.branchEvent ? (record.metadata as never) : null,
     )
   })
 
@@ -606,7 +607,7 @@ describe('branchAndSendFollowup — first child turn ordering', () => {
     jest.resetAllMocks()
     getBranchEventMetadataFromRecordMock.mockImplementation(
       (record) =>
-        record.metadata?.eventType === 'branch_event' ? (record.metadata as never) : null,
+        record.metadata?.eventType === STRUCTURAL_MESSAGE_TYPES.branchEvent ? (record.metadata as never) : null,
     )
   })
 
@@ -676,7 +677,7 @@ describe('branchAndSendFollowup — first child turn ordering', () => {
         // inherited-history summary for the child node's context window.
         content: buildInput().selection.quote,
         metadata: expect.objectContaining({
-          eventType: 'branch_event',
+          eventType: STRUCTURAL_MESSAGE_TYPES.branchEvent,
           sourceNodeId: sourceContextRecord.parentNodeId,
           sourceMessageId: sourceContextRecord.messageId,
           sourceAnnotationId: branchResult.annotation.id,

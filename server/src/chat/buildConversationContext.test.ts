@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, jest, test } from '@jest/globals'
+import { STRUCTURAL_MESSAGE_TYPES } from '@branching/shared'
 import {
   getNodeByIdForAuthor,
   listMessagesForNodeForAuthor,
@@ -254,7 +255,7 @@ describe('buildConversationContext', () => {
         role: 'user' as const,
         content: 'surrounding branch context',
         metadata: {
-          eventType: 'branch_event' as const,
+          eventType: STRUCTURAL_MESSAGE_TYPES.branchEvent,
           sourceNodeId: 'n-parent',
           sourceMessageId: 'm-parent-source',
           branchNodeId: 'n-child',
@@ -334,7 +335,7 @@ describe('buildConversationContext — branch-node context assembly', () => {
     role: 'user' as const,
     content: 'surrounding branch context',
     metadata: {
-      eventType: 'branch_event' as const,
+      eventType: STRUCTURAL_MESSAGE_TYPES.branchEvent,
       sourceNodeId: 'n-parent',
       sourceMessageId: 'm-parent-source',
       sourceAnnotationId: 'a1',
@@ -500,7 +501,7 @@ describe('buildConversationContext — branch-node context assembly', () => {
       role: 'user' as const,
       content: 'grandchild branch context',
       metadata: {
-        eventType: 'branch_event' as const,
+        eventType: STRUCTURAL_MESSAGE_TYPES.branchEvent,
         sourceNodeId: 'n-child',
         sourceMessageId: 'm-child-source',
         sourceAnnotationId: 'a2',

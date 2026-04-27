@@ -1,4 +1,5 @@
 import { describe, expect, test } from '@jest/globals'
+import { STRUCTURAL_MESSAGE_TYPES } from '@branching/shared'
 import { getFollowupUserMessageForTurn } from './annotationHelpers.js'
 
 const fixedNow = '2026-04-18T00:00:00.000Z'
@@ -14,7 +15,7 @@ describe('getFollowupUserMessageForTurn', () => {
         role: 'user',
         content: 'branch context',
         metadata: {
-          eventType: 'branch_event',
+          eventType: STRUCTURAL_MESSAGE_TYPES.branchEvent,
           sourceNodeId: 'n-parent',
           sourceMessageId: 'm-parent',
           branchNodeId: 'n1',

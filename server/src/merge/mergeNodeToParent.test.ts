@@ -3,6 +3,7 @@ import { TRPCError } from '@trpc/server'
 import { createMergeNodeToParentService } from './mergeNodeToParent'
 import type { MessageRecord, NodeRecord } from '../db/models/index.js'
 import type { BranchEventMetadata, MergeProposalMetadata } from '@branching/shared'
+import { STRUCTURAL_MESSAGE_TYPES } from '@branching/shared'
 
 const fixedNow = '2026-04-26T00:00:00.000Z'
 
@@ -24,7 +25,7 @@ const branchNode: NodeRecord = {
 }
 
 const pendingMetadata: MergeProposalMetadata = {
-  eventType: 'merge_proposal',
+  eventType: STRUCTURAL_MESSAGE_TYPES.mergeProposal,
   proposalId: 'proposal-1',
   proposedConclusion: 'Use GraphQL subscriptions.',
   mergeStatus: 'pending',
@@ -43,7 +44,7 @@ const pendingProposal: MessageRecord = {
 }
 
 const branchOriginMetadata: BranchEventMetadata = {
-  eventType: 'branch_event',
+  eventType: STRUCTURAL_MESSAGE_TYPES.branchEvent,
   sourceNodeId: 'node-parent',
   sourceMessageId: 'message-source',
   sourceAnnotationId: 'annotation-1',
@@ -170,7 +171,7 @@ describe('mergeNodeToParent service', () => {
     expect(deps.createPendingMergeProposalMessageForAuthorIdempotent).toHaveBeenCalledWith(
       expect.objectContaining({
         metadata: expect.objectContaining({
-          eventType: 'merge_proposal',
+          eventType: STRUCTURAL_MESSAGE_TYPES.mergeProposal,
           mergeStatus: 'pending',
           proposedConclusion: 'Use GraphQL subscriptions.',
         }),
@@ -474,7 +475,7 @@ describe('mergeNodeToParent service', () => {
       role: 'user',
       content: 'Merged from "Realtime API choice": Use GraphQL subscriptions.',
       metadata: {
-        eventType: 'merge_event',
+        eventType: STRUCTURAL_MESSAGE_TYPES.mergeEvent,
         sourceNodeId: 'node-child',
         sourceBranchTitle: 'Realtime API choice',
         sourceBranchOriginMessageId: 'message-source',
