@@ -34,7 +34,8 @@ describe('buildAssistantPrompt', () => {
       'Node confidence: medium',
       `Response format requirements:
 - Answer in clean Markdown format.
-    - Use short section headers and bold key conclusions when helpful.
+    - Use short Markdown headings (## or ###) to organize multi-part answers by default.
+    - Use bold lead-ins or bold key conclusions to make important points easy to scan.
     - Use bullet points for collections, and use numbered points when order, priority, or steps matter.
     - For fixed-count or clearly delineated sets, use a numbered top-level list.
     - Avoid long paragraphs. Put thresholds or rules of thumb in a compact list.
