@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { STRUCTURAL_MESSAGE_TYPES } from './messageTypes.js'
 
 const finiteNumberSchema = z
   .number()
@@ -51,7 +52,7 @@ export const contextSnapshotSchema = z.looseObject({
 })
 
 export const branchEventMetadataSchema = z.looseObject({
-  eventType: z.literal('branch_event'),
+  eventType: z.literal(STRUCTURAL_MESSAGE_TYPES.branchEvent),
   sourceNodeId: z.string().min(1),
   sourceMessageId: z.string().min(1),
   sourceAnnotationId: z.string().min(1).optional(),
@@ -60,7 +61,7 @@ export const branchEventMetadataSchema = z.looseObject({
 })
 
 export const mergeProposalMetadataSchema = z.looseObject({
-  eventType: z.literal('merge_proposal'),
+  eventType: z.literal(STRUCTURAL_MESSAGE_TYPES.mergeProposal),
   proposalId: z.string().min(1),
   proposedConclusion: z.string().trim().min(1),
   mergeStatus: z.enum(['pending', 'approved', 'superseded', 'cancelled']),
@@ -68,7 +69,7 @@ export const mergeProposalMetadataSchema = z.looseObject({
 })
 
 export const mergeEventMetadataSchema = z.looseObject({
-  eventType: z.literal('merge_event'),
+  eventType: z.literal(STRUCTURAL_MESSAGE_TYPES.mergeEvent),
   sourceNodeId: z.string().min(1),
   sourceBranchTitle: z.string().min(1),
   sourceBranchOriginMessageId: z.string().min(1),
@@ -78,7 +79,7 @@ export const mergeEventMetadataSchema = z.looseObject({
 
 export const messageMetadataSchema = z.looseObject({
   citations: z.array(citationSchema).optional(),
-  eventType: z.enum(['branch_event', 'merge_proposal', 'merge_event']).optional(),
+  eventType: z.enum([STRUCTURAL_MESSAGE_TYPES.branchEvent, STRUCTURAL_MESSAGE_TYPES.mergeProposal, STRUCTURAL_MESSAGE_TYPES.mergeEvent]).optional(),
   sourceNodeId: z.string().min(1).optional(),
   sourceMessageId: z.string().min(1).optional(),
   sourceAnnotationId: z.string().min(1).optional(),
@@ -111,6 +112,25 @@ export type MergeProposalMetadata = z.infer<typeof mergeProposalMetadataSchema>
 export type MergeEventMetadata = z.infer<typeof mergeEventMetadataSchema>
 export type MessageMetadata = z.infer<typeof messageMetadataSchema>
 export type ConversationTurnMetadata = z.infer<typeof conversationTurnMetadataSchema>
+
+export type StructuralMessageMetadata =
+  | BranchEventMetadata
+  | MergeProposalMetadata
+  | MergeEventMetadata
+
+export function isStructuralMessageMetadata(
+  metadata: unknown,
+): metadata is StructuralMessageMetadata {
+  if (metadata === null || typeof metadata !== 'object' || !('eventType' in metadata)) {
+    return false
+  }
+  const { eventType } = metadata as { eventType: unknown }
+  return (
+    eventType === STRUCTURAL_MESSAGE_TYPES.branchEvent ||
+    eventType === STRUCTURAL_MESSAGE_TYPES.mergeProposal ||
+    eventType === STRUCTURAL_MESSAGE_TYPES.mergeEvent
+  )
+}
 
 const normalizeMessageMetadataInput = (value: unknown): unknown =>
   value === null || value === undefined ? {} : value
