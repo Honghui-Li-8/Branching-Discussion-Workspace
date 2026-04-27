@@ -134,6 +134,17 @@ plain text without language tag
 no highlighting expected
 \`\`\``
 
+export const MD_LINKS = `\
+[Safe http link](http://example.com)
+
+[Safe https link](https://example.com)
+
+[Safe mailto link](mailto:test@example.com)
+
+[Relative link](/about)
+
+[Unsafe protocol](javascript:alert(1))`
+
 export const MD_ANNOTATION_TARGET = `\
 The model returned a structured answer with several key points.
 

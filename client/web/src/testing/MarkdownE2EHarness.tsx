@@ -16,6 +16,7 @@ import {
   MD_HEADINGS,
   MD_IMAGE,
   MD_INLINE_CODE,
+  MD_LINKS,
   MD_LOOSE_ORDERED_LIST,
   MD_NESTED_LISTS,
   MD_ORDERED_LIST,
@@ -135,6 +136,10 @@ export const MarkdownE2EHarness = () => {
 
         <Section testId="fixture-code-plain" label="Code: No language tag">
           <ModelMarkdown content={MD_CODE_PLAIN} />
+        </Section>
+
+        <Section testId="fixture-links" label="Anchor URLs (safe http / https / mailto / relative / unsafe)">
+          <ModelMarkdown content={MD_LINKS} />
         </Section>
 
         {/*
