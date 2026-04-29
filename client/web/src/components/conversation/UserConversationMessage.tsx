@@ -38,14 +38,14 @@ export const UserConversationMessage = ({
             <p className="m-0 text-[11px] text-[#8a3f2b]">Not sent</p>
             <button
               type="button"
-              className="rounded border border-[#e8b8a8] bg-white px-2 py-0.5 text-[11px] text-[#8a3f2b] hover:bg-[#fff3ee]"
+              className="rounded border border-[#6ea9c7] bg-white px-2 py-0.5 text-[11px] text-[#1f607d] hover:bg-[#eef9ff] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5da8d2]/50"
               onClick={() => onRetryFailedMessage(message.id)}
             >
               Retry
             </button>
             <button
               type="button"
-              className="rounded border border-[#e8b8a8] bg-white px-2 py-0.5 text-[11px] text-[#8a3f2b] hover:bg-[#fff3ee]"
+              className="rounded px-2 py-0.5 text-[11px] text-[#2b6382] hover:bg-[#eef9ff] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5da8d2]/50"
               onClick={() => onDismissFailedMessage(message.id)}
             >
               Dismiss

@@ -171,7 +171,7 @@ const InheritedHistorySection = ({
     <section className="mb-3 rounded-3xl border border-[#d8e8f2] bg-white/55 p-3 text-[#45697e]">
       <button
         type="button"
-        className="flex w-full items-center justify-between rounded-md border border-transparent bg-transparent px-1 py-0 text-left text-[12px] font-semibold uppercase tracking-[0.08em] text-[#53798f] hover:border-[#d8e8f2] hover:bg-white/60"
+        className="flex w-full items-center justify-between rounded-md border border-transparent bg-transparent px-1 py-0 text-left text-[12px] font-semibold uppercase tracking-[0.08em] text-[#53798f] hover:border-[#d8e8f2] hover:bg-white/60 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5da8d2]/50"
         onClick={() => setIsExpanded((current) => !current)}
         aria-expanded={isExpanded}
       >

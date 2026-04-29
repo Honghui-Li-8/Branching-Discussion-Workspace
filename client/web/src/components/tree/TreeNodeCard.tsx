@@ -60,7 +60,7 @@ export const TreeNodeCard = ({
       >
         <button
           type="button"
-          className="inline-flex h-6 min-w-8 items-center justify-center rounded-full border border-[#7eb9d5] bg-[#f8fdff] px-1.5 text-[11px] font-semibold text-[#235d79] hover:bg-[#eef9ff]"
+          className="inline-flex h-6 min-w-8 items-center justify-center rounded-full border border-[#6ea9c7] bg-white px-1.5 text-[11px] font-semibold text-[#1f607d] hover:bg-[#eef9ff] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5da8d2]/50"
           aria-label={`${foldedCount} folded nodes`}
           onClick={(event) => {
             event.stopPropagation()

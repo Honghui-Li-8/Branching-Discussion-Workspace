@@ -83,7 +83,7 @@ export const AppSidebar = () => {
           </h2>
           <button
             type="button"
-            className="h-7 w-7 cursor-pointer rounded-xl border border-[#6ea9c7] bg-[#fbfeff] text-xl leading-none text-[#1f607d] transition hover:bg-[#eef9ff] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ffad3f]"
+            className="h-7 w-7 cursor-pointer rounded-xl border border-[#185270] bg-[#1f607d] text-xl leading-none text-white hover:bg-[#185270] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5da8d2]/50"
             onClick={createWorkspace}
             aria-label="Create workspace"
             disabled={!isAuthenticated || isAuthBootstrapPending || isCreateWorkspacePending}
@@ -142,7 +142,7 @@ export const AppSidebar = () => {
           </div>
           <button
             type="button"
-            className="cursor-pointer rounded-xl border border-[#6ea9c7] bg-[#fbfeff] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.04em] text-[#1f607d] transition hover:bg-[#eef9ff] disabled:cursor-not-allowed disabled:opacity-60"
+            className="cursor-pointer rounded-xl border border-[#6ea9c7] bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.04em] text-[#1f607d] hover:bg-[#eef9ff] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5da8d2]/50 disabled:cursor-not-allowed disabled:opacity-60"
             onClick={isAuthenticated ? () => void logout() : () => void login()}
             disabled={isAuthActionPending || isAuthBootstrapPending}
           >

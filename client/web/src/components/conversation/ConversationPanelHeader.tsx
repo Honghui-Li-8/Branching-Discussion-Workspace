@@ -32,7 +32,7 @@ export const ConversationPanelHeader = ({
         <div className="min-w-0 flex items-start gap-2">
           <button
             type="button"
-            className="mt-1 inline-flex items-center justify-center text-[#2b6382] hover:text-[#1a4f69]"
+            className="mt-1 inline-flex items-center justify-center text-[#2b6382] hover:text-[#1a4f69] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5da8d2]/50"
             title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
             onClick={onToggleFullScreen}
             aria-label="Toggle fullscreen conversation panel"
@@ -71,7 +71,7 @@ export const ConversationPanelHeader = ({
           {showMergeButton && !isProposalPending ? (
             <button
               type="button"
-              className="rounded-lg border border-[#b8d9c8] bg-[#f0f9f4] px-2 py-1 text-xs text-[#3a7a5a] hover:bg-[#e4f4ec] disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg border border-[#6ea9c7] bg-white px-2 py-1 text-xs text-[#1f607d] hover:bg-[#eef9ff] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5da8d2]/50 disabled:cursor-not-allowed disabled:opacity-50"
               onClick={onInitiateMerge}
               disabled={isMergeInitiating}
               aria-label="Merge branch back to parent"
@@ -82,7 +82,7 @@ export const ConversationPanelHeader = ({
           {isProposalPending ? (
             <button
               type="button"
-              className="rounded-lg border border-[#d8e7f0] bg-white px-2 py-1 text-xs text-[#55798e] hover:bg-[#f4f9fc]"
+              className="rounded-lg px-2 py-1 text-xs text-[#2b6382] hover:bg-[#eef9ff] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5da8d2]/50"
               onClick={onCancelMerge}
               aria-label="Cancel merge proposal"
             >
@@ -91,7 +91,7 @@ export const ConversationPanelHeader = ({
           ) : null}
           <button
             type="button"
-            className="rounded-lg border border-[#b8d9ee] px-2 py-1 text-xs text-[#2b6382] hover:bg-[#eef9ff]"
+            className="rounded-lg px-2 py-1 text-xs text-[#2b6382] hover:bg-[#eef9ff] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5da8d2]/50"
             onClick={onClose}
             aria-label="Close conversation"
           >

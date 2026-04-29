@@ -273,7 +273,7 @@ export const AssistantSelectionMenu = ({
         type="button"
         aria-label="Close selection menu"
         onClick={onDismiss}
-        className="absolute top-2 right-2.5 z-10 px-1 text-[18px] font-semibold leading-none text-[#d89a9a] transition-colors hover:text-[#cc7a7a]"
+        className="absolute top-2 right-2.5 z-10 px-1 text-[18px] font-semibold leading-none text-[#d89a9a] transition-colors hover:text-[#cc7a7a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e8b8a8]/50"
       >
         ×
       </button>
@@ -309,7 +309,7 @@ export const AssistantSelectionMenu = ({
               onClick={() => handleSuggestionClick(suggestion)}
               title={suggestion}
               // TODO: Show full suggestion in a tooltip after 1 s hover (deferred)
-              className="flex-shrink-0 rounded-md border border-[#d4e9c1] bg-[#edf7e4] px-2 py-0.5 text-left text-[11px] leading-4 text-[#3d6b22] transition-colors hover:bg-[#ddf0d0]"
+              className="flex-shrink-0 rounded-md border border-[#c6dff0] bg-[#eef7fd] px-2 py-0.5 text-left text-[11px] leading-4 text-[#2d647f] hover:bg-[#ddf0fb] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5da8d2]/50"
               style={{
                 minWidth: '72px',
                 maxWidth: `${containerWidth * 0.4}px`,
@@ -337,7 +337,7 @@ export const AssistantSelectionMenu = ({
             onMouseDown={longPressMouseDown}
             onMouseUp={longPressMouseUp}
             onMouseLeave={longPressMouseLeave}
-            className="mb-0.5 flex-shrink-0 select-none rounded-md border border-[#7fb2cf] bg-[#dff0fa] px-3 py-1 text-[11px] font-semibold text-[#22516c] transition-colors hover:bg-[#d2e9f6] disabled:cursor-not-allowed disabled:opacity-50"
+            className="mb-0.5 flex-shrink-0 select-none rounded-md border border-[#6ea9c7] bg-white px-3 py-1 text-[11px] font-semibold text-[#1f607d] hover:bg-[#eef9ff] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5da8d2]/50 disabled:cursor-not-allowed disabled:opacity-50"
             style={getLongPressButtonStyle(longPressProgress)}
           >
             {isBranchActionPending ? 'Branching…' : 'Branch'}

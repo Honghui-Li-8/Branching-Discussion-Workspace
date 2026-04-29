@@ -165,7 +165,7 @@ export const MergeProposalCard = ({
         <div className="mt-2 flex gap-2">
           <button
             type="button"
-            className="rounded border border-[#b8d9c8] bg-[#f0f9f4] px-3 py-1 text-sm text-[#3a7a5a] hover:bg-[#e4f4ec] disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded border border-[#185270] bg-[#1f607d] px-3 py-1 text-sm text-white hover:bg-[#185270] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5da8d2]/50 disabled:cursor-not-allowed disabled:opacity-50"
             onClick={handleEditConfirm}
             disabled={isSubmitting || isEditEmpty}
           >
@@ -173,7 +173,7 @@ export const MergeProposalCard = ({
           </button>
           <button
             type="button"
-            className="rounded border border-[#d8e7f0] bg-white px-3 py-1 text-sm text-[#55798e] hover:bg-[#f4f9fc]"
+            className="rounded px-3 py-1 text-sm text-[#2b6382] hover:bg-[#eef9ff] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5da8d2]/50"
             onClick={handleDiscardEdit}
             disabled={isSubmitting}
           >
@@ -210,7 +210,7 @@ export const MergeProposalCard = ({
         <div className="mt-2 flex gap-2">
           <button
             type="button"
-            className="rounded border border-[#b8d9c8] bg-[#f0f9f4] px-3 py-1 text-sm text-[#3a7a5a] hover:bg-[#e4f4ec] disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded border border-[#185270] bg-[#1f607d] px-3 py-1 text-sm text-white hover:bg-[#185270] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5da8d2]/50 disabled:cursor-not-allowed disabled:opacity-50"
             onClick={handleRejectSubmit}
             disabled={isSubmitting || rejectInstruction.trim().length === 0}
           >
@@ -218,7 +218,7 @@ export const MergeProposalCard = ({
           </button>
           <button
             type="button"
-            className="rounded border border-[#d8e7f0] bg-white px-3 py-1 text-sm text-[#55798e] hover:bg-[#f4f9fc]"
+            className="rounded px-3 py-1 text-sm text-[#2b6382] hover:bg-[#eef9ff] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5da8d2]/50"
             onClick={() => {
               setMode('pending')
               setInlineError(null)
@@ -246,7 +246,7 @@ export const MergeProposalCard = ({
       <div className="flex gap-2">
         <button
           type="button"
-          className="rounded border border-[#b8d9c8] bg-[#f0f9f4] px-3 py-1 text-sm text-[#3a7a5a] hover:bg-[#e4f4ec] disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded border border-[#185270] bg-[#1f607d] px-3 py-1 text-sm text-white hover:bg-[#185270] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5da8d2]/50 disabled:cursor-not-allowed disabled:opacity-50"
           onClick={handleApprove}
           disabled={isSubmitting}
         >
@@ -254,7 +254,7 @@ export const MergeProposalCard = ({
         </button>
         <button
           type="button"
-          className="rounded border border-[#d8e7f0] bg-white px-3 py-1 text-sm text-[#55798e] hover:bg-[#f4f9fc] disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded border border-[#6ea9c7] bg-white px-3 py-1 text-sm text-[#1f607d] hover:bg-[#eef9ff] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5da8d2]/50 disabled:cursor-not-allowed disabled:opacity-50"
           onClick={() => {
             setMode('editing')
             setEditText(metadata?.proposedConclusion ?? '')
@@ -266,7 +266,7 @@ export const MergeProposalCard = ({
         </button>
         <button
           type="button"
-          className="rounded border border-[#d8e7f0] bg-white px-3 py-1 text-sm text-[#55798e] hover:bg-[#f4f9fc] disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded px-3 py-1 text-sm text-[#8a3f2b] hover:bg-[#fff6f3] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e8b8a8]/50 disabled:cursor-not-allowed disabled:opacity-50"
           onClick={() => {
             setMode('rejecting')
             setInlineError(null)
