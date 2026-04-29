@@ -71,7 +71,7 @@ export const ConversationPanelHeader = ({
           {showMergeButton && !isProposalPending ? (
             <button
               type="button"
-              className="rounded border border-[#b8d9c8] bg-[#f0f9f4] px-2 py-1 text-xs text-[#3a7a5a] hover:bg-[#e4f4ec] disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg border border-[#b8d9c8] bg-[#f0f9f4] px-2 py-1 text-xs text-[#3a7a5a] hover:bg-[#e4f4ec] disabled:cursor-not-allowed disabled:opacity-50"
               onClick={onInitiateMerge}
               disabled={isMergeInitiating}
               aria-label="Merge branch back to parent"
@@ -82,7 +82,7 @@ export const ConversationPanelHeader = ({
           {isProposalPending ? (
             <button
               type="button"
-              className="rounded border border-[#d8e7f0] bg-white px-2 py-1 text-xs text-[#55798e] hover:bg-[#f4f9fc]"
+              className="rounded-lg border border-[#d8e7f0] bg-white px-2 py-1 text-xs text-[#55798e] hover:bg-[#f4f9fc]"
               onClick={onCancelMerge}
               aria-label="Cancel merge proposal"
             >
@@ -91,7 +91,7 @@ export const ConversationPanelHeader = ({
           ) : null}
           <button
             type="button"
-            className="rounded border border-[#b8d9ee] px-2 py-1 text-xs text-[#2b6382] hover:bg-[#eef9ff]"
+            className="rounded-lg border border-[#b8d9ee] px-2 py-1 text-xs text-[#2b6382] hover:bg-[#eef9ff]"
             onClick={onClose}
             aria-label="Close conversation"
           >

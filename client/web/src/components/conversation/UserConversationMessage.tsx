@@ -19,10 +19,10 @@ export const UserConversationMessage = ({
     <div className="flex justify-end">
       <div className="max-w-[82%]">
         <div
-          className={`rounded-[14px] px-3 py-2 text-sm leading-relaxed ${
+          className={`rounded-2xl px-3 py-2 text-sm leading-relaxed ${
             isFailed
               ? 'border border-[#f1cabd] bg-[#fff6f3] text-[#8a3f2b]'
-              : 'bg-[#e8f4fd] text-[#12384c]'
+              : 'bg-[#1f607d] text-white'
           }`}
           style={{ overflowWrap: 'anywhere' }}
         >

@@ -33,7 +33,7 @@ export const TreeNodeCard = ({
   style,
 }: TreeNodeCardProps) => (
   <article
-    className={`absolute flex min-h-[72px] max-h-[104px] w-[230px] -translate-y-1/2 flex-col gap-2 overflow-visible rounded-[14px] border bg-white p-2.5 shadow-[0_8px_20px_rgba(47,104,130,0.12)] ${statusCardClass(
+    className={`absolute flex min-h-[72px] max-h-[104px] w-[230px] -translate-y-1/2 flex-col gap-2 overflow-visible rounded-2xl border bg-white p-2.5 shadow-[0_8px_20px_rgba(47,104,130,0.12)] ${statusCardClass(
       node.status,
     )} ${isConversationSelected ? 'ring-2 ring-[#4b90ac]' : ''}`}
     style={{

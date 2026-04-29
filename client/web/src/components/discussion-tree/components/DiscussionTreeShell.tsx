@@ -13,7 +13,7 @@ type DiscussionTreeShellProps = {
 export const DiscussionTreeShell = ({ workspaceTitle, children }: DiscussionTreeShellProps) => {
   return (
     <section
-      className="relative flex h-auto min-h-[430px] flex-col overflow-hidden rounded-[18px] border border-[#a8d1e5] bg-[linear-gradient(180deg,#f5fbff_0%,#f8fdff_100%)] lg:h-[calc(100vh-40px)] lg:min-h-0"
+      className="relative flex h-auto min-h-[430px] flex-col overflow-hidden rounded-3xl border border-[#a8d1e5] bg-[linear-gradient(180deg,#f5fbff_0%,#f8fdff_100%)] lg:h-[calc(100vh-40px)] lg:min-h-0"
       aria-label="Discussion tree view"
     >
       <header

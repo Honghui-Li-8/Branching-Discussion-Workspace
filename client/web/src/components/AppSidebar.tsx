@@ -83,7 +83,7 @@ export const AppSidebar = () => {
           </h2>
           <button
             type="button"
-            className="h-7 w-7 cursor-pointer rounded-[10px] border border-[#6ea9c7] bg-[#fbfeff] text-xl leading-none text-[#1f607d] transition hover:bg-[#eef9ff] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ffad3f]"
+            className="h-7 w-7 cursor-pointer rounded-xl border border-[#6ea9c7] bg-[#fbfeff] text-xl leading-none text-[#1f607d] transition hover:bg-[#eef9ff] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ffad3f]"
             onClick={createWorkspace}
             aria-label="Create workspace"
             disabled={!isAuthenticated || isAuthBootstrapPending || isCreateWorkspacePending}
@@ -94,11 +94,11 @@ export const AppSidebar = () => {
 
         <ul className="m-0 flex max-h-[220px] list-none flex-col gap-[7px] overflow-y-auto p-2 lg:max-h-none">
           {isWorkspacesLoading && workspaces.length === 0 ? (
-            <li className="rounded-[10px] border border-[#a6cee1] bg-[#fbfeff] px-2.5 py-2.5 text-[12px] text-[#40718a]">
+            <li className="rounded-xl border border-[#a6cee1] bg-[#fbfeff] px-2.5 py-2.5 text-[12px] text-[#40718a]">
               Loading workspaces...
             </li>
           ) : workspaces.length === 0 ? (
-            <li className="rounded-[10px] border border-dashed border-[#a6cee1] bg-[#fbfeff] px-2.5 py-2.5 text-[12px] text-[#40718a]">
+            <li className="rounded-xl border border-dashed border-[#a6cee1] bg-[#fbfeff] px-2.5 py-2.5 text-[12px] text-[#40718a]">
               No workspaces yet.
             </li>
           ) : (
@@ -110,7 +110,7 @@ export const AppSidebar = () => {
                 <li key={workspace.id}>
                   <button
                     type="button"
-                    className={`flex w-full cursor-pointer flex-col gap-1.5 rounded-[10px] border px-2.5 py-2.5 text-left transition ${
+                    className={`flex w-full cursor-pointer flex-col gap-1.5 rounded-xl border px-2.5 py-2.5 text-left transition ${
                       isActive
                         ? 'border-[#ffbe62] bg-[#fff8eb]'
                         : 'border-[#a6cee1] bg-[#fbfeff] hover:border-[#7eb9d5] hover:bg-[#f2fbff]'
@@ -142,7 +142,7 @@ export const AppSidebar = () => {
           </div>
           <button
             type="button"
-            className="cursor-pointer rounded-[10px] border border-[#6ea9c7] bg-[#fbfeff] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.04em] text-[#1f607d] transition hover:bg-[#eef9ff] disabled:cursor-not-allowed disabled:opacity-60"
+            className="cursor-pointer rounded-xl border border-[#6ea9c7] bg-[#fbfeff] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.04em] text-[#1f607d] transition hover:bg-[#eef9ff] disabled:cursor-not-allowed disabled:opacity-60"
             onClick={isAuthenticated ? () => void logout() : () => void login()}
             disabled={isAuthActionPending || isAuthBootstrapPending}
           >

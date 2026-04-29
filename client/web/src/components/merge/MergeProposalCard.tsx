@@ -143,7 +143,7 @@ export const MergeProposalCard = ({
 
   if (mode === 'editing') {
     return (
-      <div key={message.id} className="rounded-[14px] border border-[#c6ddea] bg-white px-4 py-3">
+      <div key={message.id} className="rounded-2xl border border-[#c6ddea] bg-white px-4 py-3">
         <p className="m-0 mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#4d7186]">
           Edit conclusion
         </p>
@@ -186,7 +186,7 @@ export const MergeProposalCard = ({
 
   if (mode === 'rejecting') {
     return (
-      <div key={message.id} className="rounded-[14px] border border-[#c6ddea] bg-white px-4 py-3">
+      <div key={message.id} className="rounded-2xl border border-[#c6ddea] bg-white px-4 py-3">
         <p className="m-0 mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#4d7186]">
           Request revision
         </p>
@@ -233,7 +233,7 @@ export const MergeProposalCard = ({
   }
 
   return (
-    <div key={message.id} className="rounded-[14px] border border-[#c6ddea] bg-white px-4 py-3">
+    <div key={message.id} className="rounded-2xl border border-[#c6ddea] bg-white px-4 py-3">
       <p className="m-0 mb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#4d7186]">
         Proposed conclusion
       </p>
