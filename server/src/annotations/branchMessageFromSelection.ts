@@ -48,7 +48,7 @@ const compactWhitespace = (value: string): string => value.replace(/\s+/g, ' ').
 const buildDefaultBranchTitle = (quote: string): string => {
   const normalizedQuote = compactWhitespace(quote)
   const core = normalizedQuote.length > 0 ? normalizedQuote : 'Selected passage'
-  const prefix = 'Branch: '
+  const prefix = ''
   const allowedCoreLength = Math.max(8, MAX_BRANCH_TITLE_LENGTH - prefix.length)
 
   if (core.length <= allowedCoreLength) {
