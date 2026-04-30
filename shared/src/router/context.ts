@@ -2,8 +2,10 @@ import type {
   CreateMessageInput,
   CreateNodeInput,
   CreateWorkspaceInput,
+  InheritedMessagesByNodeInput,
   Message,
   Node,
+  ParentMessagesUpToSourceInput,
   UpdateMessageInput,
   UpdateNodeInput,
   UpdateWorkspaceInput,
@@ -11,6 +13,10 @@ import type {
   Workspace,
 } from './schemas/core.js'
 import type {
+  BranchAndSendFollowupInput,
+  BranchAndSendFollowupResult,
+  BranchFollowupStatusInput,
+  BranchFollowupStatusResult,
   MessageAnnotation,
   MessageAnnotationDeleteInput,
   MessageAnnotationDeleteResult,
@@ -22,6 +28,16 @@ import type {
   ConversationSendInput,
   ConversationSendResult,
 } from './schemas/conversation.js'
+import type {
+  ApproveMergeInput,
+  ApproveMergeOutput,
+  CancelMergeInput,
+  CancelMergeOutput,
+  InitiateNodeMergeInput,
+  InitiateNodeMergeOutput,
+  ReviseMergeProposalInput,
+  ReviseMergeProposalOutput,
+} from './schemas/merge.js'
 
 export type AppRouterContext = {
   sessionUserId: string | null
@@ -53,6 +69,12 @@ export type AppRouterContext = {
     deletedMessageCount: number
   } | null>
   listMessagesForNode: (nodeId: string) => Promise<Message[]>
+  listParentMessagesUpToSource: (
+    input: ParentMessagesUpToSourceInput,
+  ) => Promise<Message[]>
+  listInheritedMessagesForNode: (
+    input: InheritedMessagesByNodeInput,
+  ) => Promise<Message[]>
   createMessage: (input: CreateMessageInput) => Promise<Message>
   updateMessage: (input: UpdateMessageInput) => Promise<Message | null>
   deleteMessage: (id: string) => Promise<{ id: string } | null>
@@ -66,7 +88,25 @@ export type AppRouterContext = {
   messageBranchFromSelection: (
     input: MessageBranchFromSelectionInput,
   ) => Promise<MessageBranchFromSelectionResult>
+  branchAndSendFollowup: (
+    input: BranchAndSendFollowupInput,
+  ) => Promise<BranchAndSendFollowupResult>
+  branchFollowupStatus: (
+    input: BranchFollowupStatusInput,
+  ) => Promise<BranchFollowupStatusResult | null>
   conversationSend: (
     input: ConversationSendInput,
   ) => Promise<ConversationSendResult>
+  initiateNodeMerge: (
+    input: InitiateNodeMergeInput,
+  ) => Promise<InitiateNodeMergeOutput>
+  reviseMergeProposal: (
+    input: ReviseMergeProposalInput,
+  ) => Promise<ReviseMergeProposalOutput>
+  cancelMerge: (
+    input: CancelMergeInput,
+  ) => Promise<CancelMergeOutput>
+  approveMerge: (
+    input: ApproveMergeInput,
+  ) => Promise<ApproveMergeOutput>
 }

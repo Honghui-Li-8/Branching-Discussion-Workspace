@@ -1,5 +1,6 @@
 import { describe, expect, jest, test } from '@jest/globals'
-import { appRouter, type AppRouterContext } from '../index'
+import { appRouter } from './router.js'
+import type { AppRouterContext } from '@branching/shared'
 
 const fixedNow = '2026-03-17T00:00:00.000Z'
 
@@ -74,6 +75,8 @@ const makeContext = (): AppRouterContext => {
       deletedMessageCount: 4,
     })),
     listMessagesForNode: jest.fn(async () => [message]),
+    listParentMessagesUpToSource: jest.fn(async () => [message]),
+    listInheritedMessagesForNode: jest.fn(async () => [message]),
     createMessage: jest.fn(async () => message),
     updateMessage: jest.fn(async () => message),
     deleteMessage: jest.fn(async () => ({ id: message.id })),
@@ -114,6 +117,20 @@ const makeContext = (): AppRouterContext => {
       },
       branchNodeId: 'n-child-1',
     })),
+    branchAndSendFollowup: jest.fn(async () => {
+      throw new Error('Not implemented in core router test context')
+    }),
+    branchFollowupStatus: jest.fn(async () => null),
+    initiateNodeMerge: jest.fn(async () => ({
+      proposalMessageId: 'm-merge-proposal',
+      proposedConclusion: 'Merge conclusion.',
+    })),
+    reviseMergeProposal: jest.fn(async () => ({
+      proposalMessageId: 'm-merge-proposal-2',
+      proposedConclusion: 'Revised merge conclusion.',
+    })),
+    cancelMerge: jest.fn(async () => ({ cancelledCount: 1 })),
+    approveMerge: jest.fn(async () => ({ parentMessageId: 'm-parent-merge-event' })),
     conversationSend: jest.fn(async () => ({
       turnId: 't1',
       status: 'completed' as const,
@@ -213,6 +230,33 @@ describe('appRouter core routes', () => {
 
     expect(ctx.createMessage).toHaveBeenCalledWith(input)
     expect(result.nodeId).toBe('n1')
+  })
+
+  test('parentMessagesUpToSource delegates to context', async () => {
+    const ctx = makeContext()
+    const caller = appRouter.createCaller(ctx)
+    const input = {
+      sourceNodeId: 'n1',
+      sourceMessageId: 'm1',
+    }
+
+    const result = await caller.parentMessagesUpToSource(input)
+
+    expect(ctx.listParentMessagesUpToSource).toHaveBeenCalledWith(input)
+    expect(result).toHaveLength(1)
+    expect(result[0]?.id).toBe('m1')
+  })
+
+  test('inheritedMessagesByNode delegates to context', async () => {
+    const ctx = makeContext()
+    const caller = appRouter.createCaller(ctx)
+    const input = { nodeId: 'n1' }
+
+    const result = await caller.inheritedMessagesByNode(input)
+
+    expect(ctx.listInheritedMessagesForNode).toHaveBeenCalledWith(input)
+    expect(result).toHaveLength(1)
+    expect(result[0]?.id).toBe('m1')
   })
 
   test('messageUpdate validates patch payload', async () => {

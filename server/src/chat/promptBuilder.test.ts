@@ -34,7 +34,8 @@ describe('buildAssistantPrompt', () => {
       'Node confidence: medium',
       `Response format requirements:
 - Answer in clean Markdown format.
-    - Use short section headers and bold key conclusions when helpful.
+    - Use short Markdown headings (## or ###) to organize multi-part answers by default.
+    - Use bold lead-ins or bold key conclusions to make important points easy to scan.
     - Use bullet points for collections, and use numbered points when order, priority, or steps matter.
     - For fixed-count or clearly delineated sets, use a numbered top-level list.
     - Avoid long paragraphs. Put thresholds or rules of thumb in a compact list.
@@ -115,6 +116,53 @@ describe('buildAssistantPrompt', () => {
         nodeId: 'n1',
         chunkIndex: 0,
         content: 'retrieved evidence',
+      },
+    ])
+  })
+
+  test('passes branch event messages through in conversation history', () => {
+    const prompt = buildAssistantPrompt({
+      node: {
+        id: 'n-child',
+        workspaceId: 'w1',
+        title: 'Child Branch',
+        summary: 'child summary',
+        status: 'open',
+        confidence: 'medium',
+        conclusion: null,
+        rationale: null,
+        depth: 1,
+        parentNodeId: 'n-parent',
+      },
+      recentMessages: [
+        {
+          id: 'm-branch-event',
+          role: 'user',
+          content: 'surrounding branch context',
+          createdAt: '2026-03-30T00:03:00.000Z',
+        },
+        {
+          id: 'm-child-followup',
+          role: 'user',
+          content: 'follow-up question',
+          createdAt: '2026-03-30T00:04:00.000Z',
+        },
+      ],
+      userInput: 'next child turn',
+    })
+
+    expect(prompt.conversation).toEqual([
+      {
+        id: 'm-branch-event',
+        role: 'user',
+        content: 'surrounding branch context',
+        createdAt: '2026-03-30T00:03:00.000Z',
+      },
+      {
+        id: 'm-child-followup',
+        role: 'user',
+        content: 'follow-up question',
+        createdAt: '2026-03-30T00:04:00.000Z',
       },
     ])
   })

@@ -1,30 +1,69 @@
+import { useEffect } from 'react'
 import type { TreeMessage } from '../../types/tree'
+import type { BranchFollowupBootstrap } from '../discussion-tree/hooks/useDiscussionTreeUiState'
 import {
   formatCitationLabel,
   getRenderableCitations,
 } from './citationMetadata'
 import { AssistantMessageAnnotationWrapper } from './AssistantMessageAnnotations'
 import { ModelMarkdown } from './ModelMarkdown'
+import { DEBUG_RAW_MARKDOWN } from '../../devFlags'
 
 type AssistantConversationMessageProps = {
   message: TreeMessage
+  conversationModel: string
+  readOnly?: boolean
+  onBranchFollowupCreated?: (
+    nodeId: string,
+    branchFollowupBootstrap: BranchFollowupBootstrap,
+  ) => void
 }
 
 export const AssistantConversationMessage = ({
   message,
+  conversationModel,
+  readOnly = false,
+  onBranchFollowupCreated,
 }: AssistantConversationMessageProps) => {
   const citations = getRenderableCitations(message)
 
+  useEffect(() => {
+    if (!DEBUG_RAW_MARKDOWN) {
+      return
+    }
+
+    console.log('[assistant-message] raw markdown branch active', {
+      messageId: message.id,
+      content: message.content,
+    })
+  }, [message.content, message.id])
+
   return (
     <div className="mb-5 flex justify-start">
-      <div className="w-full">
+      <div className="min-w-0 w-full">
         <div
           className="w-full rounded-[14px] border border-[#9fc4d8]/85 bg-white/55 px-5 py-4 text-sm leading-relaxed text-[#1f4f68] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] backdrop-blur-[2px]"
           style={{ overflowWrap: 'anywhere' }}
         >
-          <AssistantMessageAnnotationWrapper messageId={message.id}>
-            <ModelMarkdown content={message.content} />
-          </AssistantMessageAnnotationWrapper>
+          {DEBUG_RAW_MARKDOWN ? (
+            <div data-debug-raw-markdown="true">
+              <div className="mb-2 font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-[#8a5a00]">
+                Raw markdown debug
+              </div>
+              <pre className="m-0 whitespace-pre-wrap break-words font-mono text-xs text-[#1f4f68]">
+                {message.content}
+              </pre>
+            </div>
+          ) : (
+            <AssistantMessageAnnotationWrapper
+              messageId={message.id}
+              conversationModel={conversationModel}
+              readOnly={readOnly}
+              onBranchFollowupCreated={onBranchFollowupCreated}
+            >
+              <ModelMarkdown content={message.content} />
+            </AssistantMessageAnnotationWrapper>
+          )}
         </div>
 
         {citations.length > 0 ? (

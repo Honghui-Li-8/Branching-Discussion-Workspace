@@ -10,6 +10,7 @@ export type PositionedNode = {
   id: string
   title: string
   status: TreeNode['status']
+  isMerged: boolean
   canFold: boolean
   foldedChildren: FoldedNodeSummary[]
   x: number
@@ -19,6 +20,7 @@ export type PositionedNode = {
 export type TreeEdge = {
   from: string
   to: string
+  isMergedChild: boolean
 }
 
 export type TreeLayout = {
@@ -65,7 +67,7 @@ export const buildTreeLayout = (root: TreeNode): TreeLayout => {
 
     const childYs = visibleChildren.map((child) => {
       const childY = visit(child, depth + 1)
-      edges.push({ from: node.id, to: child.id })
+      edges.push({ from: node.id, to: child.id, isMergedChild: child.status === 'Merged' })
       return childY
     })
 
@@ -78,6 +80,7 @@ export const buildTreeLayout = (root: TreeNode): TreeLayout => {
       id: node.id,
       title: node.title,
       status: node.status,
+      isMerged: node.status === 'Merged',
       canFold: depth > 0,
       foldedChildren,
       x: CANVAS_PADDING + depth * HORIZONTAL_GAP,
@@ -106,6 +109,10 @@ export const statusCardClass = (status: TreeNode['status']) => {
 
   if (status === 'Exploring') {
     return 'border-[#ffbe62]'
+  }
+
+  if (status === 'Merged') {
+    return 'border-[#b8d9c8] opacity-60'
   }
 
   return 'border-[#8bb8cd]'

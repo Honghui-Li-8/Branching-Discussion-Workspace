@@ -1,4 +1,5 @@
 import { selectProvider } from './providers/selectProvider.js'
+import { emitTokenDeltas } from './providers/tokenDeltas.js'
 import { summarizePromptSections } from './promptObservability.js'
 import type { ResolvedConversationTurn } from './resolveConversationTurnOrThrow.js'
 import { toDebugPreview } from './debugPreview.js'
@@ -11,6 +12,9 @@ import type {
 import { createLogger } from '../logging/logger.js'
 
 const logger = createLogger('chat-turn')
+const TEMP_ECHO_ASSISTANT_INPUT = false // debug use echo history
+const TEMP_ECHO_CONTEXT_TAIL_COUNT = 10
+const TEMP_ECHO_MESSAGE_MAX_CHARS = 600
 
 export type TurnGenerationRuntime = {
   input: SendConversationTurnInput
@@ -24,6 +28,63 @@ type GenerateAssistantReplyForTurnParams = {
   retrievalState: RetrievalStageState
 }
 
+const buildTempEchoContent = (retrievalState: RetrievalStageState): string => {
+  const tailMessages = retrievalState.prompt.conversation.slice(-TEMP_ECHO_CONTEXT_TAIL_COUNT)
+  const contextTail = tailMessages
+    .map((message, i) => {
+      const distanceFromPresent = i - tailMessages.length
+      const compactContent = message.content.replace(/\s+/g, ' ').trim()
+      const preview =
+        compactContent.length > TEMP_ECHO_MESSAGE_MAX_CHARS
+          ? `${compactContent.slice(0, TEMP_ECHO_MESSAGE_MAX_CHARS)}...`
+          : compactContent
+      return `- [${distanceFromPresent}] [${message.role}] ${preview}`
+    })
+    .join('\n')
+
+  return [
+    '[TEMP ECHO OVERRIDE]',
+    `Current input: ${retrievalState.prompt.currentUserMessage}`,
+    'Note: current input is shown above and is not part of "Recent prompt messages".',
+    `Prompt history count before budget: ${retrievalState.promptBudgetSummary?.conversationCountBefore ?? retrievalState.prompt.conversation.length}`,
+    `Prompt history count after budget: ${retrievalState.prompt.conversation.length}`,
+    `Recent prompt messages (${Math.min(TEMP_ECHO_CONTEXT_TAIL_COUNT, retrievalState.prompt.conversation.length)}):`,
+    contextTail || '- (none)',
+  ].join('\n\n')
+}
+
+const generateTempEchoAssistantReply = async ({
+  runtime,
+  retrievalState,
+}: GenerateAssistantReplyForTurnParams): Promise<GenerateAssistantResult> => {
+  const echoedContent = buildTempEchoContent(retrievalState)
+  await runtime.publishTurnEvent({
+    type: 'turn.status',
+    payload: {
+      status: 'generating',
+      detail: 'Generating assistant response.',
+    },
+  })
+  await emitTokenDeltas(echoedContent, async (delta) => {
+    await runtime.publishTurnEvent({
+      type: 'token.delta',
+      payload: {
+        delta,
+      },
+    })
+  })
+  logger.warn('[llm] temporary echo override enabled; returning current user input as assistant output.', {
+    turn_id: runtime.turn.id,
+    node_id: runtime.input.nodeId,
+    author_user_id: runtime.currentUserId,
+  })
+  return {
+    content: echoedContent,
+    finishReason: 'stop',
+    providerResponseId: null,
+  }
+}
+
 export const generateAssistantReplyForTurn = async ({
   runtime,
   retrievalState,
@@ -35,6 +96,16 @@ export const generateAssistantReplyForTurn = async ({
       detail: 'Waiting for model service.',
     },
   })
+
+  // TEMP DEBUG OVERRIDE:
+  // Force assistant output to echo prompt inputs so branch/context behavior
+  // can be validated deterministically without model variability.
+  if (TEMP_ECHO_ASSISTANT_INPUT) {
+    return await generateTempEchoAssistantReply({
+      runtime,
+      retrievalState,
+    })
+  }
 
   const provider = selectProvider({ model: runtime.input.model })
   logger.debug('[llm] provider selected.', {

@@ -3,6 +3,7 @@ import type { AppRouterContext } from '@branching/shared'
 import {
   createMessageAnnotationForAuthor as createMessageAnnotationForAuthorRecord,
   deleteNodeForAuthor as deleteNodeForAuthorRecord,
+  getConversationTurnByIdForAuthor as getConversationTurnByIdForAuthorRecord,
   getNodeByIdForAuthor as getNodeByIdForAuthorRecord,
   getMessageAnnotationByIdForAuthor as getMessageAnnotationByIdForAuthorRecord,
   getMessageByIdForAuthor as getMessageByIdForAuthorRecord,
@@ -10,14 +11,21 @@ import {
   softDeleteMessageAnnotationForAuthor as softDeleteMessageAnnotationForAuthorRecord,
   transitionMessageAnnotationToSuggestionForAuthor as transitionMessageAnnotationToSuggestionForAuthorRecord,
 } from '../db/index.js'
-import { messageExists as messageExistsRecord } from '../db/queries/message.js'
+import {
+  listMessagesByTurn as listMessagesByTurnRecord,
+  messageExists as messageExistsRecord,
+} from '../db/queries/message.js'
 import { messageAnnotationExists as messageAnnotationExistsRecord } from '../db/queries/messageAnnotation.js'
 import {
   branchMessageFromSelectionInTransaction,
   MessageBranchSelectionConflictError,
   MessageBranchSelectionInvalidInputError,
 } from '../annotations/branchMessageFromSelection.js'
+import {
+  branchAndSendFollowup as branchAndSendFollowupService,
+} from '../annotations/branchAndSendFollowup.js'
 import { createLogger } from '../logging/logger.js'
+import { getFollowupUserMessageForTurn } from './annotationHelpers.js'
 import type { ContextOwnershipHelpers } from './types.js'
 
 type AnnotationHandlers = Pick<
@@ -26,6 +34,8 @@ type AnnotationHandlers = Pick<
   | 'messageSuggestFromSelection'
   | 'messageAnnotationDelete'
   | 'messageBranchFromSelection'
+  | 'branchAndSendFollowup'
+  | 'branchFollowupStatus'
 >
 
 const logger = createLogger('trpc-context')
@@ -358,6 +368,109 @@ export const createAnnotationHandlers = ({
         message_id: input.messageId,
         author_user_id: currentUserId,
         idempotency_key: input.idempotencyKey,
+        error,
+      })
+      throw error
+    }
+  },
+  branchAndSendFollowup: async (input) => {
+    let currentUserId: string | null = null
+
+    try {
+      const resolvedUserId = requireSessionUserId()
+      currentUserId = resolvedUserId
+      logger.info('[annotations] branch-and-send-followup request received.', {
+        message_id: input.messageId,
+        author_user_id: resolvedUserId,
+        idempotency_key: input.idempotencyKey,
+        selection_quote_length: input.selection.quote.length,
+        text_length: input.text.length,
+        model: input.model,
+      })
+
+      await resolveOwnedRecordOrNotFound(
+        await getMessageByIdForAuthorRecord(input.messageId, resolvedUserId),
+        input.messageId,
+        messageExistsRecord,
+        'Message not found.',
+      )
+
+      const result = await branchAndSendFollowupService({ input, currentUserId: resolvedUserId })
+
+      if (!result) {
+        return throwNotFound('Message not found.')
+      }
+
+      logger.info('[annotations] branch-and-send-followup request completed.', {
+        message_id: input.messageId,
+        author_user_id: resolvedUserId,
+        branch_node_id: result.branchNodeId,
+        annotation_id: result.annotationId,
+        turn_id: result.turnId,
+        status: result.status,
+      })
+      return result
+    } catch (error) {
+      if (error instanceof MessageBranchSelectionInvalidInputError) {
+        logger.warn('[annotations] branch-and-send-followup invalid input.', {
+          message_id: input.messageId,
+          author_user_id: currentUserId,
+          idempotency_key: input.idempotencyKey,
+          error_message: error.message,
+        })
+        throw new TRPCError({ code: 'BAD_REQUEST', message: error.message })
+      }
+
+      if (error instanceof MessageBranchSelectionConflictError) {
+        logger.warn('[annotations] branch-and-send-followup conflict.', {
+          message_id: input.messageId,
+          author_user_id: currentUserId,
+          idempotency_key: input.idempotencyKey,
+          error_message: error.message,
+        })
+        throw new TRPCError({ code: 'CONFLICT', message: error.message })
+      }
+
+      logger.error('[annotations] branch-and-send-followup request failed.', {
+        message_id: input.messageId,
+        author_user_id: currentUserId,
+        idempotency_key: input.idempotencyKey,
+        error,
+      })
+      logger.debug('[annotations] branch-and-send-followup debug error details.', {
+        message_id: input.messageId,
+        author_user_id: currentUserId,
+        idempotency_key: input.idempotencyKey,
+        error,
+      })
+      throw error
+    }
+  },
+  branchFollowupStatus: async (input) => {
+    let currentUserId: string | null = null
+
+    try {
+      const resolvedUserId = requireSessionUserId()
+      currentUserId = resolvedUserId
+
+      const turn = await getConversationTurnByIdForAuthorRecord(input.turnId, resolvedUserId)
+      if (!turn) {
+        return null
+      }
+
+      const turnMessages = await listMessagesByTurnRecord(turn.id)
+      const userFollowupMessage = getFollowupUserMessageForTurn(turnMessages)
+
+      return {
+        turnId: turn.id,
+        status: turn.status,
+        userFollowupMessageId: userFollowupMessage?.id ?? null,
+        error: turn.error ?? null,
+      }
+    } catch (error) {
+      logger.error('[annotations] branch-followup-status request failed.', {
+        turn_id: input.turnId,
+        author_user_id: currentUserId,
         error,
       })
       throw error

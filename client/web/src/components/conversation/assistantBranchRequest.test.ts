@@ -45,6 +45,32 @@ describe('assistantBranchRequest', () => {
     })
   })
 
+  test('canSubmitBranchRequest is false when both guard flags are set simultaneously', () => {
+    // Both flags being true at once is a valid concurrent state (e.g. the previous
+    // mutation is still in-flight when the user re-selects). The guard must still block.
+    expect(
+      canSubmitBranchRequest({
+        hasPendingBranchRequest: true,
+        isBranchMutationPending: true,
+      }),
+    ).toBe(false)
+  })
+
+  test('buildBranchSelectionPayload uses the minimum start and maximum end across all ranges', () => {
+    // When a selection spans multiple disjoint ranges (e.g. user selected text across
+    // two separate paragraphs), startOffset must be the smallest range start and
+    // endOffset must be the largest range end so the branch covers the full selection.
+    const payload = buildBranchSelectionPayload([
+      { quote: 'last fragment', start: 50, end: 63 },
+      { quote: 'first fragment', start: 5, end: 19 },
+      { quote: 'middle bit', start: 25, end: 35 },
+    ])
+
+    expect(payload).not.toBeNull()
+    expect(payload?.startOffset).toBe(5)   // min of [50, 5, 25]
+    expect(payload?.endOffset).toBe(63)    // max of [63, 19, 35]
+  })
+
   test('buildBranchSelectionPayload rejects invalid ranges', () => {
     expect(
       buildBranchSelectionPayload([{ quote: ' ', start: 0, end: 2 }]),

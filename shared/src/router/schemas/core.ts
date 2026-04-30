@@ -1,6 +1,16 @@
 import { z } from 'zod'
 import { messageMetadataSchema } from '../../metadata.js'
 
+export const nodeStatusSchema = z.enum([
+  'open',
+  'exploring',
+  'needs_approval',
+  'approved',
+  'deferred',
+  'closed',
+  'merged',
+])
+
 export const userSchema = z.object({
   id: z.string(),
   authUserId: z.string(),
@@ -29,7 +39,7 @@ export const nodeSchema = z.object({
   depth: z.number(),
   type: z.enum(['decision', 'question', 'option', 'constraint']),
   title: z.string(),
-  status: z.enum(['open', 'exploring', 'needs_approval', 'approved', 'deferred', 'closed']),
+  status: nodeStatusSchema,
   confidence: z.enum(['low', 'medium', 'high']),
   summary: z.string(),
   conclusion: z.string().nullable(),
@@ -69,7 +79,7 @@ export const createNodeInputSchema = z.object({
   parentNodeId: z.string(),
   type: z.enum(['decision', 'question', 'option', 'constraint']),
   title: z.string(),
-  status: z.enum(['open', 'exploring', 'needs_approval', 'approved', 'deferred', 'closed']).optional(),
+  status: nodeStatusSchema.optional(),
   confidence: z.enum(['low', 'medium', 'high']).optional(),
   summary: z.string(),
   conclusion: z.string().nullable().optional(),
@@ -81,7 +91,7 @@ export const updateNodeInputSchema = z
     id: z.string(),
     type: z.enum(['decision', 'question', 'option', 'constraint']).optional(),
     title: z.string().min(1).optional(),
-    status: z.enum(['open', 'exploring', 'needs_approval', 'approved', 'deferred', 'closed']).optional(),
+    status: nodeStatusSchema.optional(),
     confidence: z.enum(['low', 'medium', 'high']).optional(),
     summary: z.string().optional(),
     conclusion: z.string().nullable().optional(),
@@ -109,6 +119,15 @@ export const createMessageInputSchema = z.object({
   content: z.string(),
 })
 
+export const parentMessagesUpToSourceInputSchema = z.object({
+  sourceNodeId: z.string(),
+  sourceMessageId: z.string(),
+})
+
+export const inheritedMessagesByNodeInputSchema = z.object({
+  nodeId: z.string(),
+})
+
 export const updateMessageInputSchema = z
   .object({
     id: z.string(),
@@ -127,6 +146,7 @@ export const deleteMessageInputSchema = z.object({
 export type User = z.infer<typeof userSchema>
 export type Workspace = z.infer<typeof workspaceSchema>
 export type Node = z.infer<typeof nodeSchema>
+export type NodeStatus = z.infer<typeof nodeStatusSchema>
 export type Message = z.infer<typeof messageSchema>
 export type CreateWorkspaceInput = z.infer<typeof createWorkspaceInputSchema>
 export type UpdateWorkspaceInput = z.infer<typeof updateWorkspaceInputSchema>
@@ -134,3 +154,5 @@ export type CreateNodeInput = z.infer<typeof createNodeInputSchema>
 export type UpdateNodeInput = z.infer<typeof updateNodeInputSchema>
 export type CreateMessageInput = z.infer<typeof createMessageInputSchema>
 export type UpdateMessageInput = z.infer<typeof updateMessageInputSchema>
+export type ParentMessagesUpToSourceInput = z.infer<typeof parentMessagesUpToSourceInputSchema>
+export type InheritedMessagesByNodeInput = z.infer<typeof inheritedMessagesByNodeInputSchema>

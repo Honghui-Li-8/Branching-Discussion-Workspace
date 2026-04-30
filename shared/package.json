@@ -15,6 +15,36 @@
       "types": "./src/metadata.ts",
       "import": "./src/metadata.ts",
       "default": "./src/metadata.ts"
+    },
+    "./router-types": {
+      "types": "./src/router-types.ts",
+      "import": "./src/router-types.ts",
+      "default": "./src/router-types.ts"
+    },
+    "./router/context": {
+      "types": "./src/router/context.ts",
+      "import": "./src/router/context.ts",
+      "default": "./src/router/context.ts"
+    },
+    "./router/schemas/core": {
+      "types": "./src/router/schemas/core.ts",
+      "import": "./src/router/schemas/core.ts",
+      "default": "./src/router/schemas/core.ts"
+    },
+    "./router/schemas/annotations": {
+      "types": "./src/router/schemas/annotations.ts",
+      "import": "./src/router/schemas/annotations.ts",
+      "default": "./src/router/schemas/annotations.ts"
+    },
+    "./router/schemas/conversation": {
+      "types": "./src/router/schemas/conversation.ts",
+      "import": "./src/router/schemas/conversation.ts",
+      "default": "./src/router/schemas/conversation.ts"
+    },
+    "./router/schemas/merge": {
+      "types": "./src/router/schemas/merge.ts",
+      "import": "./src/router/schemas/merge.ts",
+      "default": "./src/router/schemas/merge.ts"
     }
   },
   "devDependencies": {

@@ -354,3 +354,86 @@ describe('branchMessageFromSelectionInTransaction', () => {
     expect(releaseMock).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('regression: branch-from-selection unaffected by branch-follow-up additions', () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+  })
+
+  test('original plain-branch path (no annotationKind, no sourceAnnotationId) still runs full 7-query transaction', async () => {
+    // Verifies the classic branch-from-selection flow is completely unaffected by the
+    // new annotationKind/sourceAnnotationId paths added for the branch follow-up MVP.
+    // Query sequence must match the pre-MVP contract: BEGIN, source, idempotency check,
+    // placeholder annotation, node insert, annotation link, COMMIT.
+    const { queryMock, releaseMock } = createMockClient()
+
+    queryMock
+      .mockResolvedValueOnce({ rows: [] })                                                               // BEGIN
+      .mockResolvedValueOnce({ rows: [sourceRow] })                                                      // source context
+      .mockResolvedValueOnce({ rows: [] })                                                               // no existing idempotent row
+      .mockResolvedValueOnce({ rows: [baseAnnotationRow] })                                             // placeholder annotation
+      .mockResolvedValueOnce({ rows: [{ id: 'n-child-reg' }] })                                        // node insert
+      .mockResolvedValueOnce({ rows: [{ ...baseAnnotationRow, leads_to_node_id: 'n-child-reg' }] })    // link annotation
+      .mockResolvedValueOnce({ rows: [] })                                                               // COMMIT
+
+    const result = await branchMessageFromSelectionInTransaction({
+      input: buildInput(), // no annotationKind, no sourceAnnotationId
+      currentUserId: 'u1',
+    })
+
+    expect(result?.branchNodeId).toBe('n-child-reg')
+    expect(result?.annotation.kind).toBe('branch')
+    expect(queryMock).toHaveBeenCalledTimes(7)
+    expect(queryMock).toHaveBeenNthCalledWith(1, 'BEGIN')
+    expect(queryMock).toHaveBeenLastCalledWith('COMMIT')
+    expect(releaseMock).toHaveBeenCalledTimes(1)
+  })
+
+  test('explicit annotationKind: "branch" is identical to the default (no kind supplied)', async () => {
+    // branchAndSendFollowup passes annotationKind: input.annotationKind ?? 'branch'.
+    // When that resolves to 'branch', downstream behavior must be identical to the
+    // path where annotationKind is omitted entirely — no regressions at the branch
+    // boundary between the two callers.
+    const { queryMock, releaseMock } = createMockClient()
+
+    queryMock
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [sourceRow] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [baseAnnotationRow] })
+      .mockResolvedValueOnce({ rows: [{ id: 'n-child-explicit' }] })
+      .mockResolvedValueOnce({ rows: [{ ...baseAnnotationRow, leads_to_node_id: 'n-child-explicit' }] })
+      .mockResolvedValueOnce({ rows: [] })
+
+    const result = await branchMessageFromSelectionInTransaction({
+      input: { ...buildInput(), annotationKind: 'branch' as const },
+      currentUserId: 'u1',
+    })
+
+    expect(result?.branchNodeId).toBe('n-child-explicit')
+    expect(result?.annotation.kind).toBe('branch')
+    expect(queryMock).toHaveBeenCalledTimes(7)
+    expect(queryMock).toHaveBeenLastCalledWith('COMMIT')
+    expect(releaseMock).toHaveBeenCalledTimes(1)
+  })
+
+  test('rollback still fires and client is always released when source message is inaccessible', async () => {
+    // Transaction lifecycle (client acquire → BEGIN → ROLLBACK → release) must be
+    // preserved after the MVP additions. This is the critical error-path regression.
+    const { queryMock, releaseMock } = createMockClient()
+
+    queryMock
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({ rows: [] }) // source not found
+      .mockResolvedValueOnce({ rows: [] }) // ROLLBACK
+
+    const result = await branchMessageFromSelectionInTransaction({
+      input: buildInput(),
+      currentUserId: 'u1',
+    })
+
+    expect(result).toBeNull()
+    expect(queryMock).toHaveBeenNthCalledWith(3, 'ROLLBACK')
+    expect(releaseMock).toHaveBeenCalledTimes(1)
+  })
+})

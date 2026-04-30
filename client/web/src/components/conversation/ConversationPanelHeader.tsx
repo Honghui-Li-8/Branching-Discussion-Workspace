@@ -7,6 +7,11 @@ type ConversationPanelHeaderProps = {
   isFullscreen: boolean
   onToggleFullScreen: () => void
   onClose: () => void
+  showMergeButton?: boolean
+  isMergeInitiating?: boolean
+  isProposalPending?: boolean
+  onInitiateMerge?: () => void
+  onCancelMerge?: () => void
 }
 
 export const ConversationPanelHeader = ({
@@ -15,6 +20,11 @@ export const ConversationPanelHeader = ({
   isFullscreen,
   onToggleFullScreen,
   onClose,
+  showMergeButton = false,
+  isMergeInitiating = false,
+  isProposalPending = false,
+  onInitiateMerge,
+  onCancelMerge,
 }: ConversationPanelHeaderProps) => {
   return (
     <header className="relative shrink-0 border-b border-[#c2dfef] px-4 py-3">
@@ -58,6 +68,27 @@ export const ConversationPanelHeader = ({
           {conclusion}
         </p>
         <div className="flex items-center gap-2">
+          {showMergeButton && !isProposalPending ? (
+            <button
+              type="button"
+              className="rounded border border-[#b8d9c8] bg-[#f0f9f4] px-2 py-1 text-xs text-[#3a7a5a] hover:bg-[#e4f4ec] disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={onInitiateMerge}
+              disabled={isMergeInitiating}
+              aria-label="Merge branch back to parent"
+            >
+              {isMergeInitiating ? 'Merging…' : '↩ Merge'}
+            </button>
+          ) : null}
+          {isProposalPending ? (
+            <button
+              type="button"
+              className="rounded border border-[#d8e7f0] bg-white px-2 py-1 text-xs text-[#55798e] hover:bg-[#f4f9fc]"
+              onClick={onCancelMerge}
+              aria-label="Cancel merge proposal"
+            >
+              Cancel merge
+            </button>
+          ) : null}
           <button
             type="button"
             className="rounded border border-[#b8d9ee] px-2 py-1 text-xs text-[#2b6382] hover:bg-[#eef9ff]"

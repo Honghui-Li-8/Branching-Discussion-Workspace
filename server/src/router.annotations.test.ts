@@ -1,5 +1,6 @@
 import { describe, expect, jest, test } from '@jest/globals'
-import { appRouter, type AppRouterContext } from '../index'
+import { appRouter } from './router.js'
+import type { AppRouterContext } from '@branching/shared'
 
 const fixedNow = '2026-03-17T00:00:00.000Z'
 
@@ -56,6 +57,8 @@ const makeContext = (): AppRouterContext => {
     updateNode: jest.fn(async () => null),
     deleteNode: jest.fn(async () => null),
     listMessagesForNode: jest.fn(async () => []),
+    listParentMessagesUpToSource: jest.fn(async () => []),
+    listInheritedMessagesForNode: jest.fn(async () => []),
     createMessage: jest.fn(async () => {
       throw new Error('Not implemented in annotation test context')
     }),
@@ -78,6 +81,10 @@ const makeContext = (): AppRouterContext => {
       annotation,
       branchNodeId: 'n-child-1',
     })),
+    branchAndSendFollowup: jest.fn(async () => {
+      throw new Error('Not implemented in annotation test context')
+    }),
+    branchFollowupStatus: jest.fn(async () => null),
     conversationSend: jest.fn(async () => {
       throw new Error('Not implemented in annotation test context')
     }),

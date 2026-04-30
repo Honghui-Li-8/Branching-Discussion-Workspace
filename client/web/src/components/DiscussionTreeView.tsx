@@ -28,7 +28,9 @@ const WorkspaceTreeCanvas = ({ activeWorkspace }: WorkspaceTreeCanvasProps) => {
     foldedNodeIds: ui.foldedNodeIds,
   })
   const conversationNode =
-    tree && ui.conversationNodeId ? findNodeById(tree, ui.conversationNodeId) : null
+    tree && ui.conversationTarget?.nodeId
+      ? findNodeById(tree, ui.conversationTarget.nodeId)
+      : null
 
   return (
     <DiscussionTreeShell workspaceTitle={activeWorkspace.title}>
@@ -58,8 +60,10 @@ const WorkspaceTreeCanvas = ({ activeWorkspace }: WorkspaceTreeCanvasProps) => {
 
         {conversationNode ? (
           <NodeConversationPanel
-            key={conversationNode.id}
+            key={`${conversationNode.id}:${ui.conversationTarget?.branchFollowupBootstrap?.turnId ?? 'base'}`}
             node={conversationNode}
+            branchFollowupBootstrap={ui.conversationTarget?.branchFollowupBootstrap ?? null}
+            onOpenBranchConversation={ui.openConversationWithBranchFollowup}
             width={ui.panelWidth}
             isFullscreen={ui.isPanelFullscreenLike}
             onClose={ui.closeConversation}

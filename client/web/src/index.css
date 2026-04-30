@@ -57,3 +57,216 @@
     transform: scaleX(1);
   }
 }
+
+/* ─── Assistant Markdown ────────────────────────────────────────────────────
+   All selectors are rooted at .model-markdown so nothing here affects tree
+   cards, menus, or other app UI.
+   Written as plain (unlayered) CSS so these rules take precedence over
+   Tailwind's @layer base preflight resets where needed (e.g. list-style).
+   ─────────────────────────────────────────────────────────────────────── */
+
+.model-markdown {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Lists — explicit list-style guards against Tailwind preflight resetting
+   list-style: none on ol and ul inside @layer base. */
+.model-markdown ol {
+  list-style-type: decimal;
+}
+
+.model-markdown ul {
+  list-style-type: disc;
+}
+
+/* Divider — react-markdown renders --- as a bare <hr> with no component
+   override, so styling lives here. */
+.model-markdown hr {
+  border: none;
+  border-top: 1px solid #d0e5f2;
+  margin: 0.25rem 0;
+}
+
+/* Inline emphasis — explicit in case Tailwind preflight resets these. */
+.model-markdown strong {
+  font-weight: 600;
+}
+
+.model-markdown em {
+  font-style: italic;
+}
+
+.model-markdown del {
+  text-decoration: line-through;
+  opacity: 0.75;
+}
+
+/* Task-list checkboxes — rendered by remark-gfm as real <input> elements
+   inside <li>. Make them read-only and non-interactive. */
+.model-markdown input[type='checkbox'] {
+  pointer-events: none;
+  cursor: default;
+  margin-right: 0.375rem;
+  vertical-align: middle;
+}
+
+/* Code blocks — max-width: 100% lets overflow-x: auto (applied by the pre
+   component via Tailwind) actually scroll rather than expand the bubble. */
+.model-markdown pre {
+  max-width: 100%;
+}
+
+/* ─── Syntax highlight token theme (GitHub Light) ───────────────────────────
+   Tokens are produced by rehype-highlight / lowlight. All selectors are
+   scoped under .model-markdown so they never bleed into the rest of the UI.
+   Background is #f4fafe (set on the pre element by ModelMarkdown.tsx).
+   ─────────────────────────────────────────────────────────────────────── */
+
+.model-markdown .hljs {
+  color: #24292f;
+}
+
+.model-markdown .hljs-keyword {
+  color: #cf222e;
+}
+
+.model-markdown .hljs-built_in {
+  color: #953800;
+}
+
+.model-markdown .hljs-type {
+  color: #953800;
+}
+
+.model-markdown .hljs-literal {
+  color: #0550ae;
+}
+
+.model-markdown .hljs-number {
+  color: #0550ae;
+}
+
+.model-markdown .hljs-operator {
+  color: #24292f;
+}
+
+.model-markdown .hljs-punctuation {
+  color: #24292f;
+}
+
+.model-markdown .hljs-string {
+  color: #116329;
+}
+
+.model-markdown .hljs-comment {
+  color: #6e7781;
+  font-style: italic;
+}
+
+.model-markdown .hljs-doctag {
+  color: #6e7781;
+}
+
+.model-markdown .hljs-meta {
+  color: #6e7781;
+}
+
+.model-markdown .hljs-title {
+  color: #8250df;
+}
+
+.model-markdown .hljs-title.class_ {
+  color: #8250df;
+  font-weight: 500;
+}
+
+.model-markdown .hljs-title.function_ {
+  color: #8250df;
+}
+
+.model-markdown .hljs-attr {
+  color: #0550ae;
+}
+
+.model-markdown .hljs-attribute {
+  color: #0550ae;
+}
+
+.model-markdown .hljs-variable {
+  color: #953800;
+}
+
+.model-markdown .hljs-variable.language_ {
+  color: #0550ae;
+}
+
+.model-markdown .hljs-params {
+  color: #24292f;
+}
+
+.model-markdown .hljs-property {
+  color: #0550ae;
+}
+
+.model-markdown .hljs-symbol {
+  color: #0550ae;
+}
+
+.model-markdown .hljs-regexp {
+  color: #116329;
+}
+
+.model-markdown .hljs-tag {
+  color: #116329;
+}
+
+.model-markdown .hljs-name {
+  color: #116329;
+}
+
+.model-markdown .hljs-selector-tag {
+  color: #116329;
+}
+
+.model-markdown .hljs-selector-class {
+  color: #8250df;
+}
+
+.model-markdown .hljs-selector-id {
+  color: #0550ae;
+}
+
+.model-markdown .hljs-selector-attr {
+  color: #cf222e;
+}
+
+.model-markdown .hljs-selector-pseudo {
+  color: #8250df;
+}
+
+.model-markdown .hljs-template-tag {
+  color: #cf222e;
+}
+
+.model-markdown .hljs-template-variable {
+  color: #953800;
+}
+
+.model-markdown .hljs-addition {
+  color: #116329;
+  background-color: #dafbe1;
+}
+
+.model-markdown .hljs-deletion {
+  color: #82071e;
+  background-color: #ffebe9;
+}
+
+.model-markdown .hljs-emphasis {
+  font-style: italic;
+}
+
+.model-markdown .hljs-strong {
+  font-weight: bold;
+}

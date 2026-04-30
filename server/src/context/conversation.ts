@@ -2,6 +2,7 @@ import type { AppRouterContext } from '@branching/shared'
 import { getNodeByIdForAuthor as getNodeByIdForAuthorRecord } from '../db/index.js'
 import { nodeExists as nodeExistsRecord } from '../db/queries/node.js'
 import { runConversationTurnFlow } from '../chat/runConversationTurnFlow.js'
+import { createNodeIsMergedError } from '../errors/nodeState.js'
 import { createLogger } from '../logging/logger.js'
 import type { ContextOwnershipHelpers } from './types.js'
 
@@ -17,12 +18,15 @@ export const createConversationHandlers = ({
     const currentUserId = requireSessionUserId()
 
     try {
-      await resolveOwnedRecordOrNotFound(
+      const node = await resolveOwnedRecordOrNotFound(
         await getNodeByIdForAuthorRecord(input.nodeId, currentUserId),
         input.nodeId,
         nodeExistsRecord,
         'Node not found.',
       )
+      if (node.status === 'merged') {
+        throw createNodeIsMergedError()
+      }
 
       logger.info('[chat] conversationSend request accepted.', {
         node_id: input.nodeId,

@@ -88,8 +88,14 @@ export const TreeNodeCard = ({
     >
       {node.title}
     </h3>
-    <span className="inline-flex self-start rounded-full border border-[#93bfd3] bg-[#ecf9ff] px-2.5 py-[2px] text-[11px] text-[#2d647f]">
-      {node.status}
-    </span>
+    {node.isMerged ? (
+      <span className="inline-flex self-start rounded-full border border-[#b8d9c8] bg-[#f0f9f4] px-2.5 py-[2px] text-[11px] text-[#3a7a5a]">
+        ↩ Merged
+      </span>
+    ) : (
+      <span className="inline-flex self-start rounded-full border border-[#93bfd3] bg-[#ecf9ff] px-2.5 py-[2px] text-[11px] text-[#2d647f]">
+        {node.status}
+      </span>
+    )}
   </article>
 )
