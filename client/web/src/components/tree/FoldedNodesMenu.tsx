@@ -76,9 +76,6 @@ export const FoldedNodesMenu = ({
               <span className="block flex-1 truncate text-xs text-[#1d516a]">
                 {foldedNode.title}
               </span>
-              <span className="shrink-0 rounded border border-[#8ab8cd] px-1 text-[10px] text-[#2e6883]">
-                Open
-              </span>
             </button>
           </li>
         ))}
