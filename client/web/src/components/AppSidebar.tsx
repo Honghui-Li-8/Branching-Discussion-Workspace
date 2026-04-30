@@ -1,3 +1,6 @@
+import { useState } from 'react'
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
+import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import { useAppDispatch, useAppSelector } from '../store/hooks'
 import {
   selectActiveWorkspaceId,
@@ -66,6 +69,8 @@ export const AppSidebar = () => {
     })
   }
 
+  const [isCollapsed, setIsCollapsed] = useState(false)
+
   const currentUserName = isAuthBootstrapPending ? '...' : (authUser?.displayName ?? 'Guest')
   const avatarInitial = currentUserName.trim().slice(0, 1).toUpperCase() || '?'
   const isCreateWorkspacePending = workspaceMutations.create.isPending
@@ -73,23 +78,55 @@ export const AppSidebar = () => {
 
   return (
     <aside
-      className="flex min-h-0 flex-col border-b border-[#b8dced] bg-[linear-gradient(180deg,#d9f0fd_0%,#e9f7ff_100%)] lg:min-h-screen lg:border-r lg:border-b-0"
+      className={`flex min-h-0 flex-col border-b border-[#b8dced] bg-[linear-gradient(180deg,#d9f0fd_0%,#e9f7ff_100%)] transition-[width] duration-200 lg:min-h-screen lg:border-r lg:border-b-0 ${isCollapsed ? 'lg:w-10 lg:overflow-hidden' : 'lg:w-[240px]'}`}
       aria-label="Workspace navigation"
     >
-      <section className="flex min-h-0 flex-1 flex-col">
+      {/* Collapsed strip — desktop only */}
+      <div className={`hidden flex-1 flex-col items-center justify-between py-2.5 ${isCollapsed ? 'lg:flex' : ''}`}>
+        <button
+          type="button"
+          className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-xl border border-[#6ea9c7] bg-white/70 text-[#1f607d] hover:bg-white hover:border-[#185270] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5da8d2]/50"
+          onClick={() => setIsCollapsed(false)}
+          aria-label="Expand sidebar"
+          title="Expand sidebar"
+        >
+          <ChevronRightIcon sx={{ fontSize: 16 }} />
+        </button>
+
+        <span
+          className="inline-flex h-[26px] w-[26px] cursor-default items-center justify-center rounded-full border border-[#97c2d8] bg-white text-[13px] font-bold text-[#225c79] shadow-sm"
+          title={currentUserName}
+          aria-label={currentUserName}
+        >
+          {avatarInitial}
+        </span>
+      </div>
+
+      <section className={`flex min-h-0 flex-1 flex-col ${isCollapsed ? 'lg:hidden' : ''}`}>
         <header className="flex items-center justify-between gap-2.5 border-b border-[#b8dced] px-2.5 pt-2.5 pb-2">
           <h2 className="m-0 text-[11px] uppercase tracking-[0.1em] text-[#1f607d]">
             Workspaces
           </h2>
-          <button
-            type="button"
-            className="h-7 w-7 cursor-pointer rounded-xl border border-[#185270] bg-[#1f607d] text-xl leading-none text-white hover:bg-[#185270] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5da8d2]/50"
-            onClick={createWorkspace}
-            aria-label="Create workspace"
-            disabled={!isAuthenticated || isAuthBootstrapPending || isCreateWorkspacePending}
-          >
-            +
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              className="h-7 w-7 cursor-pointer rounded-xl border border-[#185270] bg-[#1f607d] text-xl leading-none text-white hover:bg-[#185270] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5da8d2]/50"
+              onClick={createWorkspace}
+              aria-label="Create workspace"
+              disabled={!isAuthenticated || isAuthBootstrapPending || isCreateWorkspacePending}
+            >
+              +
+            </button>
+            <button
+              type="button"
+              className="hidden h-7 w-7 cursor-pointer items-center justify-center rounded-xl border border-[#6ea9c7] bg-white text-sm leading-none text-[#1f607d] hover:bg-[#eef9ff] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5da8d2]/50 lg:flex"
+              onClick={() => setIsCollapsed(true)}
+              aria-label="Collapse sidebar"
+              title="Collapse sidebar"
+            >
+              <ChevronLeftIcon sx={{ fontSize: 16 }} />
+            </button>
+          </div>
         </header>
 
         <ul className="m-0 flex max-h-[220px] list-none flex-col gap-[7px] overflow-y-auto p-2 lg:max-h-none">
@@ -129,7 +166,7 @@ export const AppSidebar = () => {
         </ul>
       </section>
 
-      <section className="border-t border-[#b8dced] px-3 py-3">
+      <section className={`border-t border-[#b8dced] px-3 py-3 ${isCollapsed ? 'lg:hidden' : ''}`}>
         <div className="flex items-center justify-between gap-2.5">
           <div className="flex items-center gap-2.5">
             <span
