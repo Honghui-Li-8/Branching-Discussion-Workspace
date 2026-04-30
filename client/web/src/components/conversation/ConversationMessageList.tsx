@@ -156,7 +156,7 @@ const InheritedHistorySection = ({
   if (messages.length === 0) {
     if (errorMessage) {
       return (
-        <section className="mb-3 rounded-[18px] border border-[#d8e8f2] bg-white/55 p-3 text-[#45697e]">
+        <section className="mb-3 rounded-3xl border border-[#d8e8f2] bg-white/55 p-3 text-[#45697e]">
           <div className="rounded-lg border border-[#f1cabd] bg-[#fff6f3] p-3 text-sm text-[#8a3f2b]">
             Failed to load inherited history: {errorMessage}
           </div>
@@ -168,10 +168,10 @@ const InheritedHistorySection = ({
   }
 
   return (
-    <section className="mb-3 rounded-[18px] border border-[#d8e8f2] bg-white/55 p-3 text-[#45697e]">
+    <section className="mb-3 rounded-3xl border border-[#d8e8f2] bg-white/55 p-3 text-[#45697e]">
       <button
         type="button"
-        className="flex w-full items-center justify-between rounded-md border border-transparent bg-transparent px-1 py-0 text-left text-[12px] font-semibold uppercase tracking-[0.08em] text-[#53798f] hover:border-[#d8e8f2] hover:bg-white/60"
+        className="flex w-full items-center justify-between rounded-md border border-transparent bg-transparent px-1 py-0 text-left text-[12px] font-semibold uppercase tracking-[0.08em] text-[#53798f] hover:border-[#d8e8f2] hover:bg-white/60 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5da8d2]/50"
         onClick={() => setIsExpanded((current) => !current)}
         aria-expanded={isExpanded}
       >
@@ -277,9 +277,10 @@ export const ConversationMessageList = ({
             )}
           </>
         ) : (
-          <p className="m-0 self-stretch rounded-lg border border-dashed border-[#bdd7eb] bg-white p-3 text-sm text-[#40657d]">
-            No messages yet for this node. Start with your first thought below.
-          </p>
+          <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+            <span className="text-3xl opacity-30" aria-hidden="true">✦</span>
+            <p className="m-0 text-sm text-[#40718a]">What would you like to explore?</p>
+          </div>
         )}
         <div ref={bottomAnchorRef} className="h-px w-full shrink-0" aria-hidden="true" />
       </div>

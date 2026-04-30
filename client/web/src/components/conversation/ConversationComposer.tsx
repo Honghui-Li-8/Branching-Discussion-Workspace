@@ -76,7 +76,7 @@ export const ConversationComposer = ({
         />
         <button
           type="submit"
-          className="h-9 rounded-lg border border-[#5a92ba] bg-gradient-to-b from-[#6db6e2] to-[#4ea2d3] px-4 text-sm font-semibold text-white shadow-[0_8px_18px_rgba(46,111,156,0.2)] hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
+          className="h-9 rounded-lg border border-[#185270] bg-[#1f607d] px-4 text-sm font-semibold text-white hover:bg-[#185270] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5da8d2]/50 disabled:cursor-not-allowed disabled:opacity-50"
           disabled={!conversationInputText.trim().length}
         >
           Send

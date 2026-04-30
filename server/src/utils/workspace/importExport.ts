@@ -16,6 +16,7 @@ const nodeStatusSchema = z.enum([
   'approved',
   'deferred',
   'closed',
+  'merged',
 ])
 const nodeConfidenceSchema = z.enum(['low', 'medium', 'high'])
 const messageRoleSchema = z.enum(['user', 'assistant', 'system'])

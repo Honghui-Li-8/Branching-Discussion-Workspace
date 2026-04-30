@@ -88,6 +88,18 @@ const makeContext = (): AppRouterContext => {
     conversationSend: jest.fn(async () => {
       throw new Error('Not implemented in annotation test context')
     }),
+    initiateNodeMerge: jest.fn(async () => {
+      throw new Error('Not implemented in annotation test context')
+    }),
+    reviseMergeProposal: jest.fn(async () => {
+      throw new Error('Not implemented in annotation test context')
+    }),
+    cancelMerge: jest.fn(async () => {
+      throw new Error('Not implemented in annotation test context')
+    }),
+    approveMerge: jest.fn(async () => {
+      throw new Error('Not implemented in annotation test context')
+    }),
   }
 }
 

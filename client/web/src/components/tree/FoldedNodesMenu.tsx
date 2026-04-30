@@ -57,11 +57,11 @@ export const FoldedNodesMenu = ({
         </p>
         <button
           type="button"
-          className="inline-flex h-5 w-5 items-center justify-center rounded border border-[#efb6aa] bg-[#fff3ef] text-xs font-semibold text-[#bf6454] hover:bg-[#ffe8e1]"
+          className="inline-flex h-5 w-5 items-center justify-center rounded-lg border border-[#efb6aa] bg-[#fff3ef] text-xs font-semibold text-[#bf6454] hover:bg-[#ffe8e1] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e8b8a8]/50"
           aria-label="Close folded nodes menu"
           onClick={onClose}
         >
-          x
+          ×
         </button>
       </div>
 
@@ -70,14 +70,11 @@ export const FoldedNodesMenu = ({
           <li key={foldedNode.id}>
             <button
               type="button"
-              className="flex w-full items-center gap-2 rounded border border-[#d0e8f4] px-2 py-1 text-left hover:bg-[#f3fbff]"
+              className="flex w-full items-center gap-2 rounded-lg border border-[#6ea9c7] bg-white px-2 py-1 text-left text-[#1f607d] hover:bg-[#eef9ff] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5da8d2]/50"
               onClick={() => onOpenNode(foldedNode.id)}
             >
               <span className="block flex-1 truncate text-xs text-[#1d516a]">
                 {foldedNode.title}
-              </span>
-              <span className="shrink-0 rounded border border-[#8ab8cd] px-1 text-[10px] text-[#2e6883]">
-                Open
               </span>
             </button>
           </li>

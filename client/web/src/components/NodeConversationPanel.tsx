@@ -552,9 +552,39 @@ export const NodeConversationPanel = ({
     return `${mergeStatusLabel} (${formatStatusElapsed(elapsedSeconds)})`
   })()
 
+  const messageSendErrorEntry =
+    conversation.messageSendError && !hasFailedMessages
+      ? conversation.messageSendError
+      : null
+
+  type StatusSeverity = 'error' | 'merge' | 'info'
+
+  const activeStatusEntry: { message: string; severity: StatusSeverity } | null =
+    sendBlockAlert
+      ? { message: sendBlockAlert, severity: 'error' }
+      : messageSendErrorEntry
+        ? { message: `Failed to send message: ${messageSendErrorEntry}`, severity: 'error' }
+        : mergeError
+          ? { message: mergeError, severity: 'error' }
+          : mergeStatusWithElapsed
+            ? { message: mergeStatusWithElapsed, severity: 'merge' }
+            : mergeCompletionMessage
+              ? { message: mergeCompletionMessage, severity: 'merge' }
+              : streamStatusWithElapsed
+                ? { message: streamStatusWithElapsed, severity: 'info' }
+                : isMerged
+                  ? { message: 'This branch has been merged. The conversation is read-only.', severity: 'merge' }
+                  : null
+
+  const statusBarClass: Record<StatusSeverity, string> = {
+    error: 'border-[#f1cabd] bg-[#fff6f3] text-[#8a3f2b]',
+    merge: 'border-[#b8d9c8] bg-[#f0f9f4] text-[#3a7a5a]',
+    info:  'border-[#c2dfef] bg-[#f4fbff] text-[#2f6688]',
+  }
+
   return (
     <aside
-      className="absolute inset-y-0 right-0 z-[80] flex h-full min-h-0 w-full flex-col overflow-hidden border-l border-[#8bb8cd] bg-[#fefefe] shadow-[-20px_0_38px_rgba(22,57,74,0.12)]"
+      className="absolute inset-y-0 right-0 flex h-full min-h-0 w-full flex-col overflow-hidden border-l border-[#8bb8cd] bg-[#fefefe] shadow-[-20px_0_38px_rgba(22,57,74,0.12)]"
       style={{ width: `${width}px`, zIndex: zIndex.conversationPanel }}
     >
       <div
@@ -602,51 +632,21 @@ export const NodeConversationPanel = ({
         conversationScrollRef={conversationScrollRef}
         bottomAnchorRef={conversationBottomAnchorRef}
       />
-      {streamStatusWithElapsed ? (
-        <p className="m-0 shrink-0 border-t border-[#d8ebf6] bg-[#f4fbff] px-4 py-2 text-xs text-[#2f6688]">
-          {streamStatusWithElapsed}
-        </p>
-      ) : null}
-      {!hasActiveStreamStatus && runtimeSummary ? (
-        <p className="m-0 shrink-0 border-t border-[#d8ebf6] bg-[#f8fcff] px-4 py-2 text-[11px] text-[#4d7086]">
-          Runtime: {runtimeSummary}
-        </p>
-      ) : null}
-      {mergeStatusWithElapsed ? (
-        <p className="m-0 shrink-0 border-t border-[#b8d9c8] bg-[#f0f9f4] px-4 py-2 text-xs text-[#3a7a5a]">
-          {mergeStatusWithElapsed}
-        </p>
-      ) : null}
-      {!mergeStatusWithElapsed && mergeCompletionMessage ? (
-        <p className="m-0 shrink-0 border-t border-[#b8d9c8] bg-[#f8fcff] px-4 py-2 text-[11px] text-[#3a7a5a]">
-          {mergeCompletionMessage}
-        </p>
-      ) : null}
-      {sendBlockAlert ? (
+      {activeStatusEntry ? (
         <p
-          role="alert"
-          className="m-0 shrink-0 border-t border-[#f1cabd] bg-[#fff6f3] px-4 py-2 text-xs text-[#8a3f2b]"
+          role="status"
+          className={`m-0 shrink-0 border-t px-4 py-2 text-xs ${statusBarClass[activeStatusEntry.severity]}`}
         >
-          {sendBlockAlert}
+          {activeStatusEntry.message}
         </p>
       ) : null}
-      {conversation.messageSendError && !hasFailedMessages ? (
-        <p className="m-0 shrink-0 border-t border-[#f1cabd] bg-[#fff6f3] px-4 py-2 text-xs text-[#8a3f2b]">
-          Failed to send message: {conversation.messageSendError}
-        </p>
-      ) : null}
-      {mergeError ? (
-        <p
-          role="alert"
-          className="m-0 shrink-0 border-t border-[#f1cabd] bg-[#fff6f3] px-4 py-2 text-xs text-[#8a3f2b]"
-        >
-          {mergeError}
-        </p>
-      ) : null}
-      {isMerged ? (
-        <p className="m-0 shrink-0 border-t border-[#b8d9c8] bg-[#f0f9f4] px-4 py-2 text-xs text-[#3a7a5a]">
-          This branch has been merged. The conversation is read-only.
-        </p>
+      {runtimeSummary ? (
+        <details className="shrink-0 border-t border-[#d8ebf6]">
+          <summary className="cursor-pointer px-4 py-1.5 text-[11px] text-[#4d7086] transition-colors duration-150 hover:bg-[#f4fbff]">
+            Runtime
+          </summary>
+          <p className="m-0 px-4 pb-2 text-[11px] text-[#4d7086]">{runtimeSummary}</p>
+        </details>
       ) : null}
       {!isMerged ? (
         <ConversationComposer

@@ -6,12 +6,14 @@ import {
   deleteMessageInputSchema,
   deleteNodeInputSchema,
   deleteWorkspaceInputSchema,
+  exampleWorkspaceCreateInputSchema,
   inheritedMessagesByNodeInputSchema,
   parentMessagesUpToSourceInputSchema,
   updateMessageInputSchema,
   updateNodeInputSchema,
   updateWorkspaceInputSchema,
 } from '@branching/shared/router/schemas/core'
+import { createWorkspaceFromExample } from './db/queries/exampleWorkspaces.js'
 import {
   branchAndSendFollowupInputSchema,
   branchAndSendFollowupResultSchema,
@@ -65,6 +67,9 @@ export const appRouter = t.router({
   workspaceDelete: protectedProcedure
     .input(deleteWorkspaceInputSchema)
     .mutation(({ ctx, input }) => ctx.deleteWorkspace(input.id)),
+  workspaceCreateFromExample: protectedProcedure
+    .input(exampleWorkspaceCreateInputSchema)
+    .mutation(({ ctx, input }) => createWorkspaceFromExample(input.key, ctx.sessionUserId!)),
 
   nodesByWorkspace: protectedProcedure
     .input(z.object({ workspaceId: z.string() }))

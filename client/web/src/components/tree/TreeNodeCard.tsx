@@ -33,7 +33,7 @@ export const TreeNodeCard = ({
   style,
 }: TreeNodeCardProps) => (
   <article
-    className={`absolute flex min-h-[72px] max-h-[104px] w-[230px] -translate-y-1/2 flex-col gap-2 overflow-visible rounded-[14px] border bg-white p-2.5 shadow-[0_8px_20px_rgba(47,104,130,0.12)] ${statusCardClass(
+    className={`absolute flex min-h-[72px] max-h-[104px] w-[230px] -translate-y-1/2 flex-col gap-2 overflow-visible rounded-2xl border bg-white p-2.5 shadow-[0_8px_20px_rgba(47,104,130,0.12)] ${statusCardClass(
       node.status,
     )} ${isConversationSelected ? 'ring-2 ring-[#4b90ac]' : ''}`}
     style={{
@@ -60,7 +60,7 @@ export const TreeNodeCard = ({
       >
         <button
           type="button"
-          className="inline-flex h-6 min-w-8 items-center justify-center rounded-full border border-[#7eb9d5] bg-[#f8fdff] px-1.5 text-[11px] font-semibold text-[#235d79] hover:bg-[#eef9ff]"
+          className="inline-flex h-6 min-w-8 items-center justify-center rounded-full border border-[#6ea9c7] bg-white px-1.5 text-[11px] font-semibold text-[#1f607d] hover:bg-[#eef9ff] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5da8d2]/50"
           aria-label={`${foldedCount} folded nodes`}
           onClick={(event) => {
             event.stopPropagation()
@@ -92,10 +92,10 @@ export const TreeNodeCard = ({
       <span className="inline-flex self-start rounded-full border border-[#b8d9c8] bg-[#f0f9f4] px-2.5 py-[2px] text-[11px] text-[#3a7a5a]">
         ↩ Merged
       </span>
-    ) : (
+    ) : node.status !== 'Open' ? (
       <span className="inline-flex self-start rounded-full border border-[#93bfd3] bg-[#ecf9ff] px-2.5 py-[2px] text-[11px] text-[#2d647f]">
         {node.status}
       </span>
-    )}
+    ) : null}
   </article>
 )
