@@ -22,9 +22,10 @@ const mapNodeStatusToTreeStatus = (status: HydrationNode['status']): TreeStatus 
       return 'Approved'
     case 'merged':
       return 'Merged'
+    case 'closed':
+      return 'Closed'
     case 'needs_approval':
     case 'deferred':
-    case 'closed':
       return 'Open'
     default: {
       const rawStatus = status as string

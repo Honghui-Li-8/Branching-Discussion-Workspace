@@ -1,6 +1,6 @@
 import type { MessageMetadata } from '@branching/shared'
 
-export type TreeStatus = 'Open' | 'Exploring' | 'Approved' | 'Merged'
+export type TreeStatus = 'Open' | 'Exploring' | 'Approved' | 'Merged' | 'Closed'
 
 export type TreeMessage = {
   id: string

@@ -22,7 +22,7 @@ const applyLocalUiState = (
   const children = node.children?.map((child) => applyLocalUiState(child, foldedNodeIds))
 
   const folded =
-    node.status === 'Merged'
+    node.status === 'Merged' || node.status === 'Closed'
       ? foldedNodeIds[node.id] !== false
       : foldedNodeIds[node.id] === true
 
