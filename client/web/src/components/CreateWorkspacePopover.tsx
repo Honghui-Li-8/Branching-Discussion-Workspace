@@ -15,6 +15,11 @@ const EXAMPLES: { key: ExampleWorkspaceKey; title: string; description: string }
     title: 'Choose a Database',
     description: 'PostgreSQL vs MongoDB vs DynamoDB for a new service.',
   },
+  {
+    key: 'interview-prep',
+    title: 'Interview Walkthrough Prep',
+    description: 'Structure a 60-minute technical session with branched deep-dives.',
+  },
 ]
 
 type Props = {
