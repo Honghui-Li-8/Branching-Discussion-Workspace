@@ -1,12 +1,13 @@
-import { useState } from 'react'
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
 import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import { useAppDispatch, useAppSelector } from '../store/hooks'
 import {
   selectActiveWorkspaceId,
+  selectSidebarCollapsed,
   selectWorkspaces,
   selectWorkspacesLoading,
   setActiveWorkspaceId,
+  setSidebarCollapsed,
 } from '../store/slices/appShellSlice'
 import { useAuth } from './AuthProvider'
 import { trpc } from '../trpc'
@@ -69,7 +70,8 @@ export const AppSidebar = () => {
     })
   }
 
-  const [isCollapsed, setIsCollapsed] = useState(false)
+  const isCollapsed = useAppSelector(selectSidebarCollapsed)
+  const setIsCollapsed = (val: boolean) => dispatch(setSidebarCollapsed(val))
 
   const currentUserName = isAuthBootstrapPending ? '...' : (authUser?.displayName ?? 'Guest')
   const avatarInitial = currentUserName.trim().slice(0, 1).toUpperCase() || '?'
@@ -78,7 +80,7 @@ export const AppSidebar = () => {
 
   return (
     <aside
-      className={`flex min-h-0 flex-col border-b border-[#b8dced] bg-[linear-gradient(180deg,#d9f0fd_0%,#e9f7ff_100%)] transition-[width] duration-200 lg:min-h-screen lg:border-r lg:border-b-0 ${isCollapsed ? 'lg:w-10 lg:overflow-hidden' : 'lg:w-[240px]'}`}
+      className={`flex min-h-0 flex-col border-b border-[#b8dced] bg-[linear-gradient(180deg,#d9f0fd_0%,#e9f7ff_100%)] transition-[width] duration-300 ease-in-out lg:min-h-screen lg:border-r lg:border-b-0 ${isCollapsed ? 'lg:w-10 lg:overflow-hidden' : 'lg:w-[240px]'}`}
       aria-label="Workspace navigation"
     >
       {/* Collapsed strip — desktop only */}
@@ -110,7 +112,7 @@ export const AppSidebar = () => {
           <div className="flex items-center gap-1">
             <button
               type="button"
-              className="h-7 w-7 cursor-pointer rounded-xl border border-[#185270] bg-[#1f607d] text-xl leading-none text-white hover:bg-[#185270] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5da8d2]/50"
+              className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-xl border border-[#185270] bg-[#1f607d] text-xl text-white hover:bg-[#185270] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5da8d2]/50"
               onClick={createWorkspace}
               aria-label="Create workspace"
               disabled={!isAuthenticated || isAuthBootstrapPending || isCreateWorkspacePending}
