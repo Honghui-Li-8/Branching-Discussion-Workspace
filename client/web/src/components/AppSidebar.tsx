@@ -1,6 +1,8 @@
+import { useState } from 'react'
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
 import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import { useAppDispatch, useAppSelector } from '../store/hooks'
+import { WorkspaceContextMenu } from './WorkspaceContextMenu'
 import {
   selectActiveWorkspaceId,
   selectSidebarCollapsed,
@@ -73,12 +75,39 @@ export const AppSidebar = () => {
   const isCollapsed = useAppSelector(selectSidebarCollapsed)
   const setIsCollapsed = (val: boolean) => dispatch(setSidebarCollapsed(val))
 
+  const [contextMenu, setContextMenu] = useState<{
+    workspaceId: string
+    workspaceTitle: string
+    x: number
+    y: number
+  } | null>(null)
+  const [renamingId, setRenamingId] = useState<string | null>(null)
+  const [renameValue, setRenameValue] = useState('')
+
+  const startRename = (id: string, title: string) => {
+    setRenamingId(id)
+    setRenameValue(title)
+  }
+
+  const saveRename = () => {
+    if (renamingId && renameValue.trim()) {
+      updateWorkspaceMutation.mutate({ id: renamingId, title: renameValue.trim() })
+    }
+    setRenamingId(null)
+  }
+
+  const handleDelete = (workspaceId: string) => {
+    deleteWorkspaceMutation.mutate({ id: workspaceId })
+    setContextMenu(null)
+  }
+
   const currentUserName = isAuthBootstrapPending ? '...' : (authUser?.displayName ?? 'Guest')
   const avatarInitial = currentUserName.trim().slice(0, 1).toUpperCase() || '?'
   const isCreateWorkspacePending = workspaceMutations.create.isPending
   const workspaceActionError = workspaceMutations.create.error?.message ?? null
 
   return (
+    <>
     <aside
       className={`flex min-h-0 flex-col border-b border-[#b8dced] bg-[linear-gradient(180deg,#d9f0fd_0%,#e9f7ff_100%)] transition-[width] duration-300 ease-in-out lg:min-h-screen lg:border-r lg:border-b-0 ${isCollapsed ? 'lg:w-10 lg:overflow-hidden' : 'lg:w-[240px]'}`}
       aria-label="Workspace navigation"
@@ -144,23 +173,42 @@ export const AppSidebar = () => {
             workspaces.map((workspace) => {
               const isActive = workspace.id === activeWorkspaceId
               const workspaceSummary = workspace.summary?.trim() || 'No summary yet.'
+              const isRenaming = renamingId === workspace.id
 
               return (
                 <li key={workspace.id}>
-                  <button
-                    type="button"
-                    className={`flex w-full cursor-pointer flex-col gap-1.5 rounded-xl border px-2.5 py-2.5 text-left transition ${
-                      isActive
-                        ? 'border-[#ffbe62] bg-[#fff8eb]'
-                        : 'border-[#a6cee1] bg-[#fbfeff] hover:border-[#7eb9d5] hover:bg-[#f2fbff]'
-                    }`}
-                    onClick={() => dispatch(setActiveWorkspaceId(workspace.id))}
-                  >
-                    <span className="text-[13px] font-semibold text-[#12384c]">
-                      {workspace.title}
-                    </span>
-                    <small className="text-[11px] text-[#40718a]">{workspaceSummary}</small>
-                  </button>
+                  {isRenaming ? (
+                    <input
+                      autoFocus
+                      value={renameValue}
+                      onChange={(e) => setRenameValue(e.target.value)}
+                      onBlur={saveRename}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') e.currentTarget.blur()
+                        if (e.key === 'Escape') setRenamingId(null)
+                      }}
+                      className="w-full rounded-xl border border-[#ffbe62] bg-[#fff8eb] px-2.5 py-2.5 text-[13px] font-semibold text-[#12384c] outline-none ring-2 ring-[#ffbe62]/30"
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      className={`flex w-full cursor-pointer flex-col gap-1.5 rounded-xl border px-2.5 py-2.5 text-left transition ${
+                        isActive
+                          ? 'border-[#ffbe62] bg-[#fff8eb]'
+                          : 'border-[#a6cee1] bg-[#fbfeff] hover:border-[#7eb9d5] hover:bg-[#f2fbff]'
+                      }`}
+                      onClick={() => dispatch(setActiveWorkspaceId(workspace.id))}
+                      onContextMenu={(e) => {
+                        e.preventDefault()
+                        setContextMenu({ workspaceId: workspace.id, workspaceTitle: workspace.title, x: e.clientX, y: e.clientY })
+                      }}
+                    >
+                      <span className="text-[13px] font-semibold text-[#12384c]">
+                        {workspace.title}
+                      </span>
+                      <small className="text-[11px] text-[#40718a]">{workspaceSummary}</small>
+                    </button>
+                  )}
                 </li>
               )
             })
@@ -201,5 +249,18 @@ export const AppSidebar = () => {
         ) : null}
       </section>
     </aside>
+
+    {contextMenu && (
+      <WorkspaceContextMenu
+        workspaceTitle={contextMenu.workspaceTitle}
+        x={contextMenu.x}
+        y={contextMenu.y}
+        onRename={() => startRename(contextMenu.workspaceId, contextMenu.workspaceTitle)}
+        onDelete={() => handleDelete(contextMenu.workspaceId)}
+        onClose={() => setContextMenu(null)}
+        isDeletePending={deleteWorkspaceMutation.isPending}
+      />
+    )}
+    </>
   )
 }
