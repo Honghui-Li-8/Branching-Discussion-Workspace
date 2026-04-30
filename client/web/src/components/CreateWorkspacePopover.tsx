@@ -25,12 +25,14 @@ type Props = {
 
 export const CreateWorkspacePopover = ({ anchorRef, onCreateBlank, onClose }: Props) => {
   const dispatch = useAppDispatch()
+  const utils = trpc.useUtils()
   const popoverRef = useRef<HTMLDivElement>(null)
   const [creatingKey, setCreatingKey] = useState<ExampleWorkspaceKey | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const createFromExample = trpc.workspaceCreateFromExample.useMutation({
-    onSuccess: (workspace) => {
+    onSuccess: async (workspace) => {
+      await utils.workspacesList.invalidate()
       dispatch(setActiveWorkspaceId(workspace.id))
       onClose()
     },
