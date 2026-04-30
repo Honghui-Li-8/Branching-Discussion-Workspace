@@ -1,5 +1,5 @@
-import { dirname, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { existsSync } from 'node:fs'
+import { resolve } from 'node:path'
 import type { ExampleWorkspaceKey } from '@branching/shared/router/schemas/core'
 import {
   createWorkspaceFromRestoredData,
@@ -7,11 +7,17 @@ import {
   type WorkspaceExportPayload,
 } from '../../utils/workspace/importExport.js'
 
-const dir = dirname(fileURLToPath(import.meta.url))
+const resolveSeedPath = (fileName: string): string => {
+  const candidates = [
+    resolve(process.cwd(), 'server/src/db/seeds', fileName),
+    resolve(process.cwd(), 'src/db/seeds', fileName),
+  ]
+  return candidates.find((path) => existsSync(path)) ?? candidates[0]
+}
 
 const EXAMPLE_PATHS: Record<ExampleWorkspaceKey, string> = {
-  'project-decision': resolve(dir, '../seeds/introWorkspace.json'),
-  'database-selection': resolve(dir, '../seeds/database-selection.json'),
+  'project-decision': resolveSeedPath('introWorkspace.json'),
+  'database-selection': resolveSeedPath('database-selection.json'),
 }
 
 const cache = new Map<ExampleWorkspaceKey, Promise<WorkspaceExportPayload>>()

@@ -316,7 +316,12 @@ describe('regression: non-branch conversation paths unaffected by follow-up addi
       // User message with metadata that is NOT a branch_event
       { id: 'u2', role: 'user', content: 'Another message', metadata: { someKey: 'someValue' } },
       // User message with partial metadata (no eventType)
-      { id: 'u3', role: 'user', content: 'Yet another', metadata: { eventType: 'something_else' } },
+      {
+        id: 'u3',
+        role: 'user',
+        content: 'Yet another',
+        metadata: { eventType: 'something_else' } as unknown as TreeMessage['metadata'],
+      },
     ]
 
     for (const message of regularMessages) {

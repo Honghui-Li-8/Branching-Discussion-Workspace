@@ -412,7 +412,7 @@ describe('buildConversationContext — branch-node context assembly', () => {
     expect(result.node.parentNodeId).toBe('n-parent')
   })
 
-  test('retains branch event when currentTurnId filters the current turn's messages', async () => {
+  test("retains branch event when currentTurnId filters the current turn's messages", async () => {
     // When building context for the first child turn, currentTurnId is set to exclude
     // in-flight messages. The branch event has turnId=null so it is never filtered out —
     // it must remain in the context as the sole carrier of parent-node history.
