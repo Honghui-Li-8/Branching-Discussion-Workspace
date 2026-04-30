@@ -17,11 +17,11 @@ export const DiscussionTreeShell = ({ workspaceTitle, children }: DiscussionTree
       aria-label="Discussion tree view"
     >
       <header
-        className="relative border-b border-[#c3e0ef] bg-[linear-gradient(90deg,#ebf7ff_0%,#f8fdff_100%)] px-5 py-4"
+        className="relative border-b border-[#c3e0ef] bg-[linear-gradient(90deg,#ebf7ff_0%,#f8fdff_100%)] px-5 py-2"
         style={{ zIndex: zIndex.discussionHeader }}
       >
-        <p className="m-0 text-[11px] uppercase tracking-[0.11em] text-[#40718a]">Workspace</p>
-        <h1 className="mb-0 mt-1 text-[26px] font-medium leading-[1.2] text-[#12384c]">{workspaceTitle}</h1>
+         {/* <p className="m-0 text-[11px] uppercase tracking-[0.11em] text-[#40718a]">Workspace</p> */}
+        <h1 className="m-0 text-[18px] font-medium leading-snug text-[#12384c]">{workspaceTitle}</h1>
       </header>
 
       {children}
