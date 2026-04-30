@@ -21,7 +21,7 @@ export const DiscussionTreeShell = ({ workspaceTitle, children }: DiscussionTree
         style={{ zIndex: zIndex.discussionHeader }}
       >
         <p className="m-0 text-[11px] uppercase tracking-[0.11em] text-[#40718a]">Workspace</p>
-        <h1 className="mb-0 mt-1 text-[26px] leading-[1.2] text-[#12384c]">{workspaceTitle}</h1>
+        <h1 className="mb-0 mt-1 text-[26px] font-medium leading-[1.2] text-[#12384c]">{workspaceTitle}</h1>
       </header>
 
       {children}

@@ -192,6 +192,7 @@ export const AssistantSelectionMenu = ({
   isBranchActionPending = false,
 }: AssistantSelectionMenuProps) => {
   const [inputText, setInputText] = useState('')
+  const [suggestionConflictError, setSuggestionConflictError] = useState<string | null>(null)
   // const [hintText, setHintText] = useState(() => selectHintText(440))
   const [containerWidth, setContainerWidth] = useState(560)
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -234,19 +235,21 @@ export const AssistantSelectionMenu = ({
     return () => document.removeEventListener('mouseup', handleMouseUp)
   }, [])
 
+  const handleInputChange = (value: string) => {
+    setInputText(value)
+    setSuggestionConflictError(null)
+  }
+
   const handleBranchClick = () => {
     if (isBranchActionPending) return
-    console.log('[branch-menu] branch click, input:', inputText)
     onBranch(inputText)
   }
 
   const handleSuggestLongPress = () => {
-    console.log('[branch-menu] long-press suggest (2 s), input:', inputText)
     onSuggest(inputText)
   }
 
   const handleDeleteLongPress = () => {
-    console.log('[branch-menu] long-press delete (5 s)')
     onDelete()
   }
 
@@ -254,9 +257,8 @@ export const AssistantSelectionMenu = ({
     useLongPress(handleBranchClick, handleSuggestLongPress, handleDeleteLongPress)
 
   const handleSuggestionClick = (suggestion: string) => {
-    console.log('[branch-menu] suggestion clicked:', suggestion)
     if (inputText.trim()) {
-      alert(`Input already has content:\n"${inputText.trim()}"\n\nSuggestion not applied.`)
+      setSuggestionConflictError('Clear your input first to use a suggestion.')
       return
     }
     setInputText(suggestion)
@@ -300,7 +302,6 @@ export const AssistantSelectionMenu = ({
         </p> */}
 
         {/* 3. Suggestions row — horizontal scroll, narrower than input */}
-        <style>{`.sugg-row::-webkit-scrollbar{height:0.5px}.sugg-row::-webkit-scrollbar-track{background:transparent}.sugg-row::-webkit-scrollbar-thumb{background:#b9d6e8;border-radius:9999px}`}</style>
         <div className="sugg-row mx-1 mb-2 flex gap-1.5 overflow-x-auto rounded-md px-2 py-1.5" style={{ scrollbarWidth: 'thin', scrollbarColor: '#b9d6e8 transparent' }}>
           {BRANCH_SUGGESTIONS.map((suggestion) => (
             <button
@@ -322,12 +323,15 @@ export const AssistantSelectionMenu = ({
             </button>
           ))}
         </div>
+        {suggestionConflictError ? (
+          <p className="m-0 mt-1 text-[11px] text-[#8a3f2b]">{suggestionConflictError}</p>
+        ) : null}
 
         {/* 4 + 5. Input area + Branch button inline (send-button layout) */}
         <div className="flex items-end gap-2 rounded-lg border border-[#a7d2e8] bg-white px-2 py-2 transition-colors focus-within:border-[#5da8d2]">
           <AutoResizeTextarea
             value={inputText}
-            onChange={setInputText}
+            onChange={handleInputChange}
             placeholder="Ask a follow-up question to explore this further…"
           />
           {/* Branch button — aligned to bottom of last text line */}

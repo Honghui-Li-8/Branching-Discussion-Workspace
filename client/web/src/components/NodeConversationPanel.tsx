@@ -584,7 +584,7 @@ export const NodeConversationPanel = ({
 
   return (
     <aside
-      className="absolute inset-y-0 right-0 z-[80] flex h-full min-h-0 w-full flex-col overflow-hidden border-l border-[#8bb8cd] bg-[#fefefe] shadow-[-20px_0_38px_rgba(22,57,74,0.12)]"
+      className="absolute inset-y-0 right-0 flex h-full min-h-0 w-full flex-col overflow-hidden border-l border-[#8bb8cd] bg-[#fefefe] shadow-[-20px_0_38px_rgba(22,57,74,0.12)]"
       style={{ width: `${width}px`, zIndex: zIndex.conversationPanel }}
     >
       <div

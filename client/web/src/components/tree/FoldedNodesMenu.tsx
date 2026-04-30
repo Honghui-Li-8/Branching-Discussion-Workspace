@@ -61,7 +61,7 @@ export const FoldedNodesMenu = ({
           aria-label="Close folded nodes menu"
           onClick={onClose}
         >
-          x
+          ×
         </button>
       </div>
 

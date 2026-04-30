@@ -277,9 +277,10 @@ export const ConversationMessageList = ({
             )}
           </>
         ) : (
-          <p className="m-0 self-stretch rounded-lg border border-dashed border-[#bdd7eb] bg-white p-3 text-sm text-[#40657d]">
-            No messages yet for this node. Start with your first thought below.
-          </p>
+          <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+            <span className="text-3xl opacity-30" aria-hidden="true">✦</span>
+            <p className="m-0 text-sm text-[#40718a]">What would you like to explore?</p>
+          </div>
         )}
         <div ref={bottomAnchorRef} className="h-px w-full shrink-0" aria-hidden="true" />
       </div>
