@@ -25,8 +25,9 @@ const mapNodeStatusToTreeStatus = (status: HydrationNode['status']): TreeStatus 
     case 'closed':
       return 'Closed'
     case 'needs_approval':
+      return 'Needs Approval'
     case 'deferred':
-      return 'Open'
+      return 'Deferred'
     default: {
       const rawStatus = status as string
       if (!loggedUnknownStatuses.has(rawStatus)) {

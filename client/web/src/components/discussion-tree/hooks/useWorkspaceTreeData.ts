@@ -21,10 +21,11 @@ const applyLocalUiState = (
 ): TreeNode => {
   const children = node.children?.map((child) => applyLocalUiState(child, foldedNodeIds))
 
-  const folded =
-    node.status === 'Merged' || node.status === 'Closed'
-      ? foldedNodeIds[node.id] !== false
-      : foldedNodeIds[node.id] === true
+  const defaultFolded =
+    node.status === 'Merged' || node.status === 'Closed' || node.status === 'Deferred'
+  const folded = defaultFolded
+    ? foldedNodeIds[node.id] !== false
+    : foldedNodeIds[node.id] === true
 
   return {
     ...node,
