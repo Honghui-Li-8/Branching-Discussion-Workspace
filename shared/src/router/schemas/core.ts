@@ -156,3 +156,10 @@ export type CreateMessageInput = z.infer<typeof createMessageInputSchema>
 export type UpdateMessageInput = z.infer<typeof updateMessageInputSchema>
 export type ParentMessagesUpToSourceInput = z.infer<typeof parentMessagesUpToSourceInputSchema>
 export type InheritedMessagesByNodeInput = z.infer<typeof inheritedMessagesByNodeInputSchema>
+
+export const EXAMPLE_WORKSPACE_KEYS = ['project-decision', 'database-selection'] as const
+export type ExampleWorkspaceKey = (typeof EXAMPLE_WORKSPACE_KEYS)[number]
+
+export const exampleWorkspaceCreateInputSchema = z.object({
+  key: z.enum(EXAMPLE_WORKSPACE_KEYS),
+})

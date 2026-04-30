@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
 import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import { useAppDispatch, useAppSelector } from '../store/hooks'
 import { WorkspaceContextMenu } from './WorkspaceContextMenu'
+import { CreateWorkspacePopover } from './CreateWorkspacePopover'
 import {
   selectActiveWorkspaceId,
   selectSidebarCollapsed,
@@ -75,6 +76,9 @@ export const AppSidebar = () => {
   const isCollapsed = useAppSelector(selectSidebarCollapsed)
   const setIsCollapsed = (val: boolean) => dispatch(setSidebarCollapsed(val))
 
+  const [isPopoverOpen, setIsPopoverOpen] = useState(false)
+  const createButtonRef = useRef<HTMLButtonElement>(null)
+
   const [contextMenu, setContextMenu] = useState<{
     workspaceId: string
     workspaceTitle: string
@@ -103,7 +107,6 @@ export const AppSidebar = () => {
 
   const currentUserName = isAuthBootstrapPending ? '...' : (authUser?.displayName ?? 'Guest')
   const avatarInitial = currentUserName.trim().slice(0, 1).toUpperCase() || '?'
-  const isCreateWorkspacePending = workspaceMutations.create.isPending
   const workspaceActionError = workspaceMutations.create.error?.message ?? null
 
   return (
@@ -140,11 +143,12 @@ export const AppSidebar = () => {
           </h2>
           <div className="flex items-center gap-1">
             <button
+              ref={createButtonRef}
               type="button"
               className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-xl border border-[#185270] bg-[#1f607d] text-xl text-white hover:bg-[#185270] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5da8d2]/50"
-              onClick={createWorkspace}
+              onClick={() => setIsPopoverOpen((v) => !v)}
               aria-label="Create workspace"
-              disabled={!isAuthenticated || isAuthBootstrapPending || isCreateWorkspacePending}
+              disabled={!isAuthenticated || isAuthBootstrapPending}
             >
               +
             </button>
@@ -259,6 +263,13 @@ export const AppSidebar = () => {
         onDelete={() => handleDelete(contextMenu.workspaceId)}
         onClose={() => setContextMenu(null)}
         isDeletePending={deleteWorkspaceMutation.isPending}
+      />
+    )}
+    {isPopoverOpen && (
+      <CreateWorkspacePopover
+        anchorRef={createButtonRef}
+        onCreateBlank={createWorkspace}
+        onClose={() => setIsPopoverOpen(false)}
       />
     )}
     </>
