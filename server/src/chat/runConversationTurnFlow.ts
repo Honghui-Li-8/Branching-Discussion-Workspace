@@ -1,3 +1,4 @@
+import { TRPCError } from '@trpc/server'
 import type { SendConversationTurnInput, SendConversationTurnResult } from './types.js'
 import { createLogger } from '../logging/logger.js'
 import {
@@ -11,6 +12,7 @@ import {
   executeTurnPipeline,
   persistUserMessageWithFailureHandling,
 } from './turnExecutionPipeline.js'
+import { getCreditBalance } from '../db/index.js'
 
 type RunConversationTurnFlowParams = {
   input: SendConversationTurnInput
@@ -73,6 +75,13 @@ export const runConversationTurnFlow = async ({
   })
   if (idempotentReplay) {
     return idempotentReplay
+  }
+  // #endregion
+
+  // #region: Credit guard
+  const balance = await getCreditBalance(currentUserId)
+  if (balance <= 0) {
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'INSUFFICIENT_CREDITS' })
   }
   // #endregion
 

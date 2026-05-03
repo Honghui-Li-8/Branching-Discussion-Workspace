@@ -108,6 +108,27 @@ export const createUser = async (input: CreateUserInput): Promise<UserRecord> =>
   return mapUserRow(result.rows[0])
 }
 
+export const getCreditBalance = async (userId: string): Promise<number> => {
+  const result = await query<{ credit_balance: string }>(
+    'SELECT credit_balance FROM users WHERE id = $1',
+    [userId],
+  )
+  return result.rows.length > 0 ? Number(result.rows[0].credit_balance) : 0
+}
+
+export const insertCreditTransaction = async (input: {
+  userId: string
+  amount: number
+  type: 'grant' | 'usage' | 'refund' | 'adjustment'
+  reason: string | null
+}): Promise<void> => {
+  await query(
+    `INSERT INTO credit_transactions (user_id, amount, type, reason)
+     VALUES ($1, $2, $3, $4)`,
+    [input.userId, input.amount, input.type, input.reason],
+  )
+}
+
 export const getOrCreateUserByAuthIdentity = async (
   input: CreateUserInput,
 ): Promise<UserRecord> => {

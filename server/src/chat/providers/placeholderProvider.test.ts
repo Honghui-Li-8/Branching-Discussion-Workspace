@@ -20,6 +20,7 @@ describe('createPlaceholderProvider', () => {
       content: 'echo - hello world',
       finishReason: 'stop',
       providerResponseId: null,
+      usage: { inputTokens: null, outputTokens: null, totalTokens: null },
     })
   })
 })

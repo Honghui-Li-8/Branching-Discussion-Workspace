@@ -12,6 +12,10 @@ import {
 import type { TurnFlowRuntime, TurnFailureHandler } from './turnFlowRuntime.js'
 import type { MarkTurnFailedOnce } from './turnFailure.js'
 import type { SendConversationTurnResult } from './types.js'
+import { insertCreditTransaction } from '../db/index.js'
+import { createLogger } from '../logging/logger.js'
+
+const logger = createLogger('chat-turn-pipeline')
 
 export const persistUserMessageWithFailureHandling = async ({
   runtime,
@@ -70,6 +74,20 @@ export const executeTurnPipeline = async ({
       runtime,
       retrievalState: budgetedState,
     })
+
+    const tokenCount = assistantOutput.usage.totalTokens
+    if (tokenCount != null && tokenCount > 0) {
+      await insertCreditTransaction({
+        userId: runtime.currentUserId,
+        amount: -tokenCount,
+        type: 'usage',
+        reason: 'chat_turn',
+      })
+    } else {
+      logger.warn('[chat-flow] Token counts unavailable; skipping deduction.', {
+        turn_id: runtime.turn.id,
+      })
+    }
 
     pipelineStage = 'persisting_assistant_message'
     const assistantMessage = await persistAssistantMessageStage({
