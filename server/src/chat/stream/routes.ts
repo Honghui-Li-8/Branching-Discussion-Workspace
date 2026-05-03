@@ -1,4 +1,4 @@
-import type { Express, Request, Response } from 'express'
+import type { Express, Request, Response, RequestHandler } from 'express'
 import { getSessionIdFromCookieHeader } from '../../auth/cookies.js'
 import { getSessionUser } from '../../auth/sessionStore.js'
 import {
@@ -256,8 +256,8 @@ export const handleConversationTurnStream = async (
   res.on('close', closeStream)
 }
 
-export const registerConversationStreamRoutes = (app: Express): void => {
-  app.get(CONVERSATION_TURN_STREAM_ROUTE, (req, res) => {
+export const registerConversationStreamRoutes = (app: Express, streamLimiter: RequestHandler): void => {
+  app.get(CONVERSATION_TURN_STREAM_ROUTE, streamLimiter, (req, res) => {
     handleConversationTurnStream(req, res)
       .catch((error) => {
         logger.error('[chat-stream] Failed to open turn stream.', { error })
