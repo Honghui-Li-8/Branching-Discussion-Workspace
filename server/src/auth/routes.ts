@@ -1,5 +1,11 @@
 import type { Express, Request, Response } from 'express'
-import { getOrCreateUserByAuthIdentity, seedIntroWorkspace } from '../db/index.js'
+import {
+  getOrCreateUserByAuthIdentity,
+  getUserById,
+  hasGrantTransaction,
+  insertCreditTransaction,
+  seedIntroWorkspace,
+} from '../db/index.js'
 import { getDevAuthToken } from './constants.js'
 import {
   getSessionIdFromCookieHeader,
@@ -112,19 +118,35 @@ export const handleLogin = async (req: Request, res: Response): Promise<void> =>
     logger.warn('[auth] Intro workspace seeding failed; continuing login.', { error })
   }
 
+  const alreadyGranted = await hasGrantTransaction(user.id)
+  if (!alreadyGranted) {
+    await insertCreditTransaction({
+      userId: user.id,
+      amount: 100_000,
+      type: 'grant',
+      reason: 'initial_grant',
+    })
+  }
+
   const sessionId = createSession(user)
   res.setHeader('Set-Cookie', serializeSessionCookie(sessionId))
   res.json({ authenticated: true, user })
 }
 
-export const handleMe = (req: Request, res: Response): void => {
+export const handleMe = async (req: Request, res: Response): Promise<void> => {
   const sessionId = getSessionIdFromCookieHeader(req.headers.cookie)
   if (!sessionId) {
     res.status(401).json({ authenticated: false })
     return
   }
 
-  const user = getSessionUser(sessionId)
+  const sessionUser = getSessionUser(sessionId)
+  if (!sessionUser) {
+    res.status(401).json({ authenticated: false })
+    return
+  }
+
+  const user = await getUserById(sessionUser.id)
   if (!user) {
     res.status(401).json({ authenticated: false })
     return

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globals'
 import type { Request, Response } from 'express'
-import { getOrCreateUserByAuthIdentity, seedIntroWorkspace } from '../db/index.js'
+import { getOrCreateUserByAuthIdentity, getUserById, seedIntroWorkspace } from '../db/index.js'
 import { clearAllSessions } from './sessionStore'
 import { handleLogin, handleLogout, handleMe } from './routes'
 
@@ -12,16 +12,21 @@ jest.mock('node:crypto', () => {
   }
 })
 
+const mockUserRecord = {
+  id: '00000000-0000-4000-8000-000000000001',
+  authUserId: 'local:dev-user',
+  email: 'dev@example.com',
+  displayName: 'Local Dev',
+  creditBalance: 100_000,
+  createdAt: '2026-03-19T00:00:00.000Z',
+  updatedAt: '2026-03-19T00:00:00.000Z',
+}
+
 jest.mock('../db/index.js', () => ({
-  getOrCreateUserByAuthIdentity: jest.fn(async () => ({
-    id: '00000000-0000-4000-8000-000000000001',
-    authUserId: 'local:dev-user',
-    email: 'dev@example.com',
-    displayName: 'Local Dev',
-    creditBalance: 0,
-    createdAt: '2026-03-19T00:00:00.000Z',
-    updatedAt: '2026-03-19T00:00:00.000Z',
-  })),
+  getOrCreateUserByAuthIdentity: jest.fn(async () => mockUserRecord),
+  getUserById: jest.fn(async () => mockUserRecord),
+  hasGrantTransaction: jest.fn(async () => false),
+  insertCreditTransaction: jest.fn(async () => undefined),
   seedIntroWorkspace: jest.fn(async () => ({
     id: '10000000-0000-4000-8000-000000000001',
     title: 'Project Decision (dummy example)',
@@ -36,6 +41,7 @@ jest.mock('../db/index.js', () => ({
 const getOrCreateUserByAuthIdentityMock = getOrCreateUserByAuthIdentity as jest.MockedFunction<
   typeof getOrCreateUserByAuthIdentity
 >
+const getUserByIdMock = getUserById as jest.MockedFunction<typeof getUserById>
 const seedIntroWorkspaceMock = seedIntroWorkspace as jest.MockedFunction<typeof seedIntroWorkspace>
 
 type AuthResponseBody = {
@@ -91,6 +97,7 @@ describe('auth handlers', () => {
     process.env.DEV_AUTH_TOKEN = 'dev-token-123'
     clearAllSessions()
     getOrCreateUserByAuthIdentityMock.mockClear()
+    getUserByIdMock.mockClear()
     seedIntroWorkspaceMock.mockClear()
   })
 
@@ -129,18 +136,18 @@ describe('auth handlers', () => {
     const meReq = requestWithCookie(cookieHeader)
     const meRes = createMockResponse()
 
-    handleMe(meReq, meRes as unknown as Response)
+    await handleMe(meReq, meRes as unknown as Response)
 
     expect(meRes.statusCode).toBe(200)
     expect(meRes.body?.authenticated).toBe(true)
     expect(meRes.body?.user?.id).toBe('00000000-0000-4000-8000-000000000001')
   })
 
-  test('handleMe returns 401 when session cookie is missing', () => {
+  test('handleMe returns 401 when session cookie is missing', async () => {
     const req = requestWithCookie('')
     const res = createMockResponse()
 
-    handleMe(req, res as unknown as Response)
+    await handleMe(req, res as unknown as Response)
 
     expect(res.statusCode).toBe(401)
     expect(res.body?.authenticated).toBe(false)
@@ -177,7 +184,7 @@ describe('auth handlers', () => {
 
     const meReq = requestWithCookie(cookieHeader)
     const meRes = createMockResponse()
-    handleMe(meReq, meRes as unknown as Response)
+    await handleMe(meReq, meRes as unknown as Response)
 
     expect(meRes.statusCode).toBe(401)
     expect(meRes.body?.authenticated).toBe(false)
