@@ -8,6 +8,7 @@ export type AuthUser = {
   authUserId: string
   email: string | null
   displayName: string | null
+  creditBalance: number
 }
 
 type AuthState = {

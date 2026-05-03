@@ -46,6 +46,11 @@ export const trpcClient = trpc.createClient({
         return fetch(url, {
           ...(options ?? {}),
           credentials: 'include',
+        }).then((response) => {
+          if (response.status === 429) {
+            throw new Error('RATE_LIMITED')
+          }
+          return response
         })
       },
     }),

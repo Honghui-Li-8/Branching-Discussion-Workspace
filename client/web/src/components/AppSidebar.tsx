@@ -7,6 +7,7 @@ import {
 } from '../store/slices/appShellSlice'
 import { useAuth } from './AuthProvider'
 import { trpc } from '../trpc'
+import { CreditBalanceIndicator } from './CreditBalanceIndicator'
 
 export const AppSidebar = () => {
   const dispatch = useAppDispatch()
@@ -155,6 +156,7 @@ export const AppSidebar = () => {
                   : 'Login'}
           </button>
         </div>
+        <CreditBalanceIndicator />
         {authError && !isAuthBootstrapPending ? (
           <p className="mt-2 mb-0 text-[11px] text-[#8a3f2b]">{authError}</p>
         ) : workspaceActionError ? (

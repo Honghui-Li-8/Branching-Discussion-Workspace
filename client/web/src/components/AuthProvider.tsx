@@ -25,6 +25,7 @@ type AuthContextValue = {
   authError: string | null
   login: () => Promise<void>
   logout: () => Promise<void>
+  refreshBalance: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -43,7 +44,8 @@ const isAuthUser = (value: unknown): value is AuthUser => {
     typeof candidate.id === 'string' &&
     typeof candidate.authUserId === 'string' &&
     emailIsValid &&
-    displayNameIsValid
+    displayNameIsValid &&
+    typeof candidate.creditBalance === 'number'
   )
 }
 
@@ -184,6 +186,24 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
   }, [apiBaseUrl, dispatch, isAuthActionPending, isAuthBootstrapPending])
 
+  const refreshBalance = useCallback(async (): Promise<void> => {
+    try {
+      const response = await fetch(`${apiBaseUrl}/auth/me`, {
+        method: 'GET',
+        credentials: 'include',
+      })
+      const payload = (await response.json().catch(() => ({}))) as {
+        authenticated?: unknown
+        user?: unknown
+      }
+      if (response.ok && payload.authenticated === true && isAuthUser(payload.user)) {
+        dispatch(setAuthState({ status: 'authenticated', user: payload.user }))
+      }
+    } catch {
+      // silent — balance will update on next successful /auth/me
+    }
+  }, [apiBaseUrl, dispatch])
+
   const value = useMemo<AuthContextValue>(
     () => ({
       authUser,
@@ -193,6 +213,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       authError,
       login,
       logout,
+      refreshBalance,
     }),
     [
       authUser,
@@ -202,6 +223,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       authError,
       login,
       logout,
+      refreshBalance,
     ],
   )
 
