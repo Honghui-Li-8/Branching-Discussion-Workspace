@@ -128,9 +128,15 @@ export const handleLogin = async (req: Request, res: Response): Promise<void> =>
     })
   }
 
+  const fullUser = await getUserById(user.id)
+  if (!fullUser) {
+    res.status(500).json({ error: 'Failed to load user after login.' })
+    return
+  }
+
   const sessionId = createSession(user)
   res.setHeader('Set-Cookie', serializeSessionCookie(sessionId))
-  res.json({ authenticated: true, user })
+  res.json({ authenticated: true, user: fullUser })
 }
 
 export const handleMe = async (req: Request, res: Response): Promise<void> => {

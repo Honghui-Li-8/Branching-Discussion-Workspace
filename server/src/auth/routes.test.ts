@@ -115,12 +115,7 @@ describe('auth handlers', () => {
 
     expect(res.statusCode).toBe(200)
     expect(res.body?.authenticated).toBe(true)
-    expect(res.body?.user).toEqual({
-      id: '00000000-0000-4000-8000-000000000001',
-      authUserId: 'local:dev-user',
-      email: 'dev@example.com',
-      displayName: 'Local Dev',
-    })
+    expect(res.body?.user).toEqual(mockUserRecord)
     expect(getOrCreateUserByAuthIdentityMock).toHaveBeenCalledTimes(1)
     expect(seedIntroWorkspaceMock).toHaveBeenCalledWith('00000000-0000-4000-8000-000000000001')
     expect(res.headers['set-cookie']).toContain('bdw_session=mocked-session-id')
