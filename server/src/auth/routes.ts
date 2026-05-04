@@ -58,6 +58,9 @@ const resolveDevSessionUser = (inputUser: LoginRequestBody['user']): SessionUser
 const isThirdPartyAuthNotImplementedError = (error: unknown): boolean =>
   error instanceof Error && error.message === 'THIRD_PARTY_AUTH_NOT_IMPLEMENTED'
 
+const isSupabaseUnavailableError = (error: unknown): boolean =>
+  error instanceof Error && error.message === 'SUPABASE_UNAVAILABLE'
+
 const normalizeProvider = (provider: unknown): string =>
   typeof provider === 'string' && provider.trim().length > 0 ? provider.trim() : 'google'
 
@@ -101,6 +104,11 @@ export const handleLogin = async (req: Request, res: Response): Promise<void> =>
   } catch (error) {
     if (isThirdPartyAuthNotImplementedError(error)) {
       res.status(501).json({ error: 'Third-party auth flow is not implemented yet.' })
+      return
+    }
+
+    if (isSupabaseUnavailableError(error)) {
+      res.status(503).json({ error: 'Authentication service unavailable. Please try again.' })
       return
     }
 

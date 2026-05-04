@@ -1,18 +1,52 @@
+import { createClient, type User } from '@supabase/supabase-js'
 import type { VerifiedExternalIdentity } from './types.js'
-import { createLogger } from '../logging/logger.js'
+import { getOrCreateUserByAuthIdentity } from '../db/index.js'
 
-const logger = createLogger('auth-provider')
+let supabaseClient: ReturnType<typeof createClient> | null = null
+
+const getSupabaseClient = (): ReturnType<typeof createClient> => {
+  if (!supabaseClient) {
+    supabaseClient = createClient(
+      process.env.SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    )
+  }
+
+  return supabaseClient
+}
 
 export const verifyThirdPartyToken = async (
   token: string,
   provider: string,
 ): Promise<VerifiedExternalIdentity> => {
-  void token
+  if (provider !== 'supabase') {
+    throw new Error('THIRD_PARTY_AUTH_NOT_IMPLEMENTED')
+  }
 
-  logger.error(
-    `[auth] Third-party token verification is not implemented yet for provider "${provider}".`,
-  )
-  throw new Error('THIRD_PARTY_AUTH_NOT_IMPLEMENTED')
+  let user: User
+  try {
+    const { data, error } = await getSupabaseClient().auth.getUser(token)
+    if (error || !data.user) {
+      throw new Error('INVALID_TOKEN')
+    }
+    user = data.user
+  } catch (error) {
+    if (error instanceof Error && error.message === 'INVALID_TOKEN') {
+      throw error
+    }
+
+    throw new Error('SUPABASE_UNAVAILABLE')
+  }
+
+  return {
+    provider: 'supabase',
+    externalUserId: user.id,
+    email: user.email ?? null,
+    displayName:
+      typeof user.user_metadata?.full_name === 'string'
+        ? user.user_metadata.full_name
+        : null,
+  }
 }
 
 export const getOrCreateUserFromVerifiedIdentity = async (
@@ -23,8 +57,9 @@ export const getOrCreateUserFromVerifiedIdentity = async (
   email: string | null
   displayName: string | null
 }> => {
-  logger.error(
-    `[auth] User lookup/provisioning is not implemented yet for provider "${identity.provider}".`,
-  )
-  throw new Error('THIRD_PARTY_AUTH_NOT_IMPLEMENTED')
+  return getOrCreateUserByAuthIdentity({
+    authUserId: `${identity.provider}:${identity.externalUserId}`,
+    email: identity.email,
+    displayName: identity.displayName,
+  })
 }

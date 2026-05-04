@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@branching/shared": "workspace:*",
+    "@supabase/supabase-js": "^2.105.1",
     "@trpc/server": "latest",
     "cors": "latest",
     "express": "^5.2.1",

@@ -148,8 +148,7 @@ describe('auth handlers', () => {
     expect(res.body?.authenticated).toBe(false)
   })
 
-  test('handleLogin with non-dev token follows third-party shell and returns 501', async () => {
-    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {})
+  test('handleLogin with unsupported third-party provider returns 501', async () => {
     const req = requestWithBody({ token: 'google-token-placeholder', provider: 'google' })
     const res = createMockResponse()
 
@@ -157,7 +156,6 @@ describe('auth handlers', () => {
 
     expect(res.statusCode).toBe(501)
     expect(res.body?.error).toBe('Third-party auth flow is not implemented yet.')
-    expect(consoleErrorSpy).toHaveBeenCalled()
     expect(getOrCreateUserByAuthIdentityMock).not.toHaveBeenCalled()
     expect(seedIntroWorkspaceMock).not.toHaveBeenCalled()
   })
