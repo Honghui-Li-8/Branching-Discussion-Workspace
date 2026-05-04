@@ -7,7 +7,7 @@ import {
   selectAuthUser,
   type AuthUser,
 } from '../store/slices/authSlice'
-import { supabase } from '../lib/supabaseClient'
+import { getSupabaseClient } from '../lib/supabaseClient'
 import { AuthContext, type AuthContextValue } from './authContext'
 
 const isAuthUser = (value: unknown): value is AuthUser => {
@@ -99,7 +99,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     setAuthError(null)
 
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
+      const { error } = await getSupabaseClient().auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
@@ -111,7 +111,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         throw error
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to sign in.'
+      const message =
+        error instanceof Error && error.message === 'Supabase is not configured.'
+          ? 'Sign-in is not configured yet.'
+          : error instanceof Error
+            ? error.message
+            : 'Unable to sign in.'
       setAuthError(message)
       throw error
     }

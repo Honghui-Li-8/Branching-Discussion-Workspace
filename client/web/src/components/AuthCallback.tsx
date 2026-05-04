@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { supabase } from '../lib/supabaseClient'
+import { getSupabaseClient } from '../lib/supabaseClient'
 import { useAppDispatch } from '../store/hooks'
 import { setAuthenticatedUser, type AuthUser } from '../store/slices/authSlice'
 import { useAuth } from './useAuth'
@@ -43,7 +43,7 @@ export const AuthCallback = () => {
         const {
           data: { session },
           error: sessionError,
-        } = await supabase.auth.getSession()
+        } = await getSupabaseClient().auth.getSession()
 
         if (sessionError || !session?.access_token) {
           throw new Error('Sign-in failed. Please try again.')
@@ -80,7 +80,12 @@ export const AuthCallback = () => {
         setAuthError(null)
         navigate('/', { replace: true })
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Sign-in failed. Please try again.'
+        const message =
+          error instanceof Error && error.message === 'Supabase is not configured.'
+            ? 'Sign-in is not configured yet.'
+            : error instanceof Error
+              ? error.message
+              : 'Sign-in failed. Please try again.'
         setAuthError(message)
         navigate('/', { replace: true })
       }
