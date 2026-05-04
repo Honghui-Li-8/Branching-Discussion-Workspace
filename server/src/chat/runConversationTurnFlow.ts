@@ -67,6 +67,13 @@ export const runConversationTurnFlow = async ({
 
   logger.info('[chat-flow] runConversationTurnFlow started.', flowContext)
 
+  // #region: Credit guard — checked before any DB writes so zero-credit users never create turn records
+  const balance = await getCreditBalance(currentUserId)
+  if (balance <= 0) {
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'INSUFFICIENT_CREDITS' })
+  }
+  // #endregion
+
   // #region: Validation and Idempotent Replay
   const { resolvedTurn, idempotentReplay } = await runConversationTurnPreflight({
     input,
@@ -75,13 +82,6 @@ export const runConversationTurnFlow = async ({
   })
   if (idempotentReplay) {
     return idempotentReplay
-  }
-  // #endregion
-
-  // #region: Credit guard
-  const balance = await getCreditBalance(currentUserId)
-  if (balance <= 0) {
-    throw new TRPCError({ code: 'FORBIDDEN', message: 'INSUFFICIENT_CREDITS' })
   }
   // #endregion
 

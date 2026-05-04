@@ -238,4 +238,14 @@ describe('runConversationTurnFlow', () => {
     })
     expect(result).toEqual(completedResult)
   })
+
+  test('throws FORBIDDEN when credit balance is zero or negative', async () => {
+    getCreditBalanceMock.mockResolvedValueOnce(0)
+
+    await expect(
+      runConversationTurnFlow({ input, currentUserId: 'user-1' }),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN', message: 'INSUFFICIENT_CREDITS' })
+
+    expect(runConversationTurnPreflightMock).not.toHaveBeenCalled()
+  })
 })
