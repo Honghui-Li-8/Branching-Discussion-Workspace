@@ -118,10 +118,10 @@ export const AppSidebar = () => {
                     }`}
                     onClick={() => dispatch(setActiveWorkspaceId(workspace.id))}
                   >
-                    <span className="text-[13px] font-semibold text-[#12384c]">
+                    <span className="truncate text-[13px] font-semibold text-[#12384c]">
                       {workspace.title}
                     </span>
-                    <small className="text-[11px] text-[#40718a]">{workspaceSummary}</small>
+                    <small className="line-clamp-2 text-[11px] text-[#40718a]">{workspaceSummary}</small>
                   </button>
                 </li>
               )
