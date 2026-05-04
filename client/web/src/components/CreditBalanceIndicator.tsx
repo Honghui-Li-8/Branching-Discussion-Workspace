@@ -1,4 +1,4 @@
-import { useAuth } from './AuthProvider'
+import { useAuth } from './useAuth'
 
 const TOKENS_PER_TURN_ESTIMATE = 1333
 

@@ -5,7 +5,7 @@ import {
   selectWorkspacesLoading,
   setActiveWorkspaceId,
 } from '../store/slices/appShellSlice'
-import { useAuth } from './AuthProvider'
+import { useAuth } from './useAuth'
 import { trpc } from '../trpc'
 import { CreditBalanceIndicator } from './CreditBalanceIndicator'
 

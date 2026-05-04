@@ -9933,6 +9933,7 @@ __metadata:
     "@recogito/react-text-annotator": "npm:^3.4.9"
     "@recogito/text-annotator": "npm:^3.4.9"
     "@reduxjs/toolkit": "npm:^2.9.1"
+    "@supabase/supabase-js": "npm:^2.105.1"
     "@tailwindcss/postcss": "npm:^4.2.1"
     "@tanstack/react-query": "npm:latest"
     "@trpc/client": "npm:latest"

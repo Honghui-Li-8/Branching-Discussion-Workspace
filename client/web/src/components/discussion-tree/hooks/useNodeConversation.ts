@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
-import { useAuth } from '../../AuthProvider'
+import { useAuth } from '../../useAuth'
 import type { inferRouterOutputs } from '@trpc/server'
 import type { AppRouter } from '@branching/shared'
 import { parseMessageMetadata } from '@branching/shared/metadata'

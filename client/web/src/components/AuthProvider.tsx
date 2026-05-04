@@ -1,34 +1,14 @@
-import {
-  createContext,
-  useCallback,
-  useEffect,
-  useContext,
-  useMemo,
-  useState,
-  type ReactNode,
-} from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useAppDispatch, useAppSelector } from '../store/hooks'
 import {
   clearAuthenticatedUser,
   setAuthState,
   selectAuthStatus,
   selectAuthUser,
-  setAuthenticatedUser,
   type AuthUser,
 } from '../store/slices/authSlice'
-
-type AuthContextValue = {
-  authUser: AuthUser | null
-  isAuthenticated: boolean
-  isAuthBootstrapPending: boolean
-  isAuthActionPending: boolean
-  authError: string | null
-  login: () => Promise<void>
-  logout: () => Promise<void>
-  refreshBalance: () => Promise<void>
-}
-
-const AuthContext = createContext<AuthContextValue | null>(null)
+import { supabase } from '../lib/supabaseClient'
+import { AuthContext, type AuthContextValue } from './authContext'
 
 const isAuthUser = (value: unknown): value is AuthUser => {
   if (!value || typeof value !== 'object') {
@@ -62,8 +42,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [authError, setAuthError] = useState<string | null>(null)
 
   const apiBaseUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:3001'
-  const devToken =
-    import.meta.env.VITE_DEV_AUTH_TOKEN ?? import.meta.env.VITE_BACKDOOR_AUTH_TOKEN ?? ''
 
   const isAuthenticated = authStatus === 'authenticated' && authUser !== null
   const isAuthBootstrapPending = authStatus === 'unknown'
@@ -114,50 +92,30 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   }, [apiBaseUrl, authStatus, dispatch])
 
   const login = useCallback(async (): Promise<void> => {
-    if (isAuthActionPending || isAuthBootstrapPending) {
+    if (isAuthBootstrapPending) {
       return
     }
 
     setAuthError(null)
-    setIsAuthActionPending(true)
 
     try {
-      if (!devToken) {
-        throw new Error('VITE_DEV_AUTH_TOKEN is missing.')
-      }
-
-      const response = await fetch(`${apiBaseUrl}/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
         },
-        credentials: 'include',
-        body: JSON.stringify({ token: devToken }),
       })
 
-      const payload = (await response.json().catch(() => ({}))) as {
-        authenticated?: unknown
-        user?: unknown
-        error?: unknown
+      if (error) {
+        setAuthError(error.message || 'Unable to sign in.')
+        throw error
       }
-
-      if (!response.ok) {
-        const serverError = typeof payload.error === 'string' ? payload.error : 'Unable to sign in.'
-        throw new Error(serverError)
-      }
-
-      if (payload.authenticated !== true || !isAuthUser(payload.user)) {
-        throw new Error('Unexpected login response.')
-      }
-
-      dispatch(setAuthenticatedUser(payload.user))
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to sign in.'
       setAuthError(message)
-    } finally {
-      setIsAuthActionPending(false)
+      throw error
     }
-  }, [apiBaseUrl, devToken, dispatch, isAuthActionPending, isAuthBootstrapPending])
+  }, [isAuthBootstrapPending])
 
   const logout = useCallback(async (): Promise<void> => {
     if (isAuthActionPending || isAuthBootstrapPending) {
@@ -211,6 +169,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       isAuthBootstrapPending,
       isAuthActionPending,
       authError,
+      setAuthError,
       login,
       logout,
       refreshBalance,
@@ -221,6 +180,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       isAuthBootstrapPending,
       isAuthActionPending,
       authError,
+      setAuthError,
       login,
       logout,
       refreshBalance,
@@ -228,12 +188,4 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
-}
-
-export const useAuth = (): AuthContextValue => {
-  const context = useContext(AuthContext)
-  if (!context) {
-    throw new Error('useAuth must be used within AuthProvider.')
-  }
-  return context
 }
