@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { DiscussionTreeView } from './components/DiscussionTreeView'
 import { AppSidebar } from './components/AppSidebar'
+import { AuthCallback } from './components/AuthCallback'
 
 const WorkspaceLayout = () => {
   return (
@@ -14,19 +15,11 @@ const WorkspaceLayout = () => {
   )
 }
 
-const AuthCallbackPlaceholder = () => {
-  return (
-    <div className="grid min-h-screen place-items-center bg-[#f3fbff] px-4 text-sm text-[#456579]">
-      Completing sign-in...
-    </div>
-  )
-}
-
 const App = () => {
   return (
     <Routes>
       <Route path="/" element={<WorkspaceLayout />} />
-      <Route path="/auth/callback" element={<AuthCallbackPlaceholder />} />
+      <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
