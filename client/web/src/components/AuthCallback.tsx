@@ -2,29 +2,11 @@ import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getSupabaseClient } from '../lib/supabaseClient'
 import { useAppDispatch } from '../store/hooks'
-import { setAuthenticatedUser, type AuthUser } from '../store/slices/authSlice'
+import { setAuthenticatedUser } from '../store/slices/authSlice'
 import { useAuth } from './useAuth'
+import { runAuthExchange } from './authCallbackLogic'
 
 const apiBaseUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:3001'
-
-const isAuthUser = (value: unknown): value is AuthUser => {
-  if (!value || typeof value !== 'object') {
-    return false
-  }
-
-  const candidate = value as Partial<AuthUser>
-  const emailIsValid = typeof candidate.email === 'string' || candidate.email === null
-  const displayNameIsValid =
-    typeof candidate.displayName === 'string' || candidate.displayName === null
-
-  return (
-    typeof candidate.id === 'string' &&
-    typeof candidate.authUserId === 'string' &&
-    emailIsValid &&
-    displayNameIsValid &&
-    typeof candidate.creditBalance === 'number'
-  )
-}
 
 export const AuthCallback = () => {
   const dispatch = useAppDispatch()
@@ -38,60 +20,26 @@ export const AuthCallback = () => {
     }
     hasRunRef.current = true
 
-    const exchangeSession = async (): Promise<void> => {
-      try {
-        const {
-          data: { session },
-          error: sessionError,
-        } = await getSupabaseClient().auth.getSession()
-
-        if (sessionError || !session?.access_token) {
-          throw new Error('Sign-in failed. Please try again.')
-        }
-
+    void runAuthExchange({
+      getSession: () => getSupabaseClient().auth.getSession(),
+      postLogin: async (token) => {
         const response = await fetch(`${apiBaseUrl}/auth/login`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({
-            token: session.access_token,
-            provider: 'supabase',
-          }),
+          body: JSON.stringify({ token, provider: 'supabase' }),
         })
-
         const payload = (await response.json().catch(() => ({}))) as {
           authenticated?: unknown
           user?: unknown
           error?: unknown
         }
-
-        if (!response.ok) {
-          const serverError = typeof payload.error === 'string' ? payload.error : null
-          throw new Error(serverError ?? 'Sign-in failed. Please try again.')
-        }
-
-        if (payload.authenticated !== true || !isAuthUser(payload.user)) {
-          throw new Error('Unexpected sign-in response.')
-        }
-
-        dispatch(setAuthenticatedUser(payload.user))
-        setAuthError(null)
-        navigate('/', { replace: true })
-      } catch (error) {
-        const message =
-          error instanceof Error && error.message === 'Supabase is not configured.'
-            ? 'Sign-in is not configured yet.'
-            : error instanceof Error
-              ? error.message
-              : 'Sign-in failed. Please try again.'
-        setAuthError(message)
-        navigate('/', { replace: true })
-      }
-    }
-
-    void exchangeSession()
+        return { ok: response.ok, payload }
+      },
+      dispatchAuthUser: (user) => dispatch(setAuthenticatedUser(user)),
+      setAuthError,
+      navigate,
+    })
   }, [dispatch, navigate, setAuthError])
 
   return (
