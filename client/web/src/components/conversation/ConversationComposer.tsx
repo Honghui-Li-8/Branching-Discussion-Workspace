@@ -34,7 +34,7 @@ export const ConversationComposer = ({
 
   return (
     <form
-      className="shrink-0 border-t border-[#c2dfef] bg-white px-4 py-3"
+      className="shrink-0 border-t border-slate-200 bg-white px-4 py-3"
       onSubmit={onConversationSubmit}
     >
       {/*
@@ -65,7 +65,7 @@ export const ConversationComposer = ({
           onChange={(event) => onConversationInputChange(event.target.value)}
           onInput={onInputResize}
           onKeyDown={onConversationKeyDown}
-          className="w-full resize-none rounded-lg border border-[#a7d2e8] bg-white px-3 py-2 text-sm leading-6 text-[#12384c] focus:border-[#5da8d2] focus:outline-none"
+          className="w-full resize-none rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm leading-6 text-slate-900 transition focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-500/10"
           placeholder="Message..."
           rows={1}
           style={{
@@ -76,7 +76,7 @@ export const ConversationComposer = ({
         />
         <button
           type="submit"
-          className="h-9 rounded-lg border border-[#185270] bg-[#1f607d] px-4 text-sm font-semibold text-white hover:bg-[#185270] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5da8d2]/50 disabled:cursor-not-allowed disabled:opacity-50"
+          className="h-9 rounded-lg border border-slate-950 bg-slate-950 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-200 disabled:text-slate-400"
           disabled={!conversationInputText.trim().length}
         >
           Send

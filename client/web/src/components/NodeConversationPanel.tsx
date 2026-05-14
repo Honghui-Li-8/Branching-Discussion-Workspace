@@ -577,14 +577,14 @@ export const NodeConversationPanel = ({
                   : null
 
   const statusBarClass: Record<StatusSeverity, string> = {
-    error: 'border-[#f1cabd] bg-[#fff6f3] text-[#8a3f2b]',
-    merge: 'border-[#b8d9c8] bg-[#f0f9f4] text-[#3a7a5a]',
-    info:  'border-[#c2dfef] bg-[#f4fbff] text-[#2f6688]',
+    error: 'border-red-200 bg-red-50 text-red-700',
+    merge: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    info:  'border-blue-100 bg-blue-50 text-blue-700',
   }
 
   return (
     <aside
-      className="absolute inset-y-0 right-0 flex h-full min-h-0 w-full flex-col overflow-hidden border-l border-[#8bb8cd] bg-[#fefefe] shadow-[-20px_0_38px_rgba(22,57,74,0.12)]"
+      className="absolute inset-y-0 right-0 flex h-full min-h-0 w-full flex-col overflow-hidden border-l border-slate-200 bg-white shadow-[-24px_0_48px_rgba(15,23,42,0.12)]"
       style={{ width: `${width}px`, zIndex: zIndex.conversationPanel }}
     >
       <div
@@ -641,11 +641,11 @@ export const NodeConversationPanel = ({
         </p>
       ) : null}
       {runtimeSummary ? (
-        <details className="shrink-0 border-t border-[#d8ebf6]">
-          <summary className="cursor-pointer px-4 py-1.5 text-[11px] text-[#4d7086] transition-colors duration-150 hover:bg-[#f4fbff]">
+        <details className="shrink-0 border-t border-slate-200 bg-slate-50">
+          <summary className="cursor-pointer px-4 py-1.5 text-[11px] text-slate-500 transition-colors duration-150 hover:bg-slate-100">
             Runtime
           </summary>
-          <p className="m-0 px-4 pb-2 text-[11px] text-[#4d7086]">{runtimeSummary}</p>
+          <p className="m-0 px-4 pb-2 text-[11px] text-slate-500">{runtimeSummary}</p>
         </details>
       ) : null}
       {!isMerged ? (

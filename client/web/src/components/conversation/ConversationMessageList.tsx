@@ -113,17 +113,17 @@ const renderMessageRow = ({
 
 const BranchDividerRow = ({ label }: { label: string | null }) => (
   <div className="my-2 flex items-center gap-3 px-1" aria-label="Branch divider">
-    <div className="h-px flex-1 bg-[#c6ddea]" />
-    <p className="m-0 max-w-[70%] text-center text-[11px] font-semibold uppercase tracking-[0.08em] text-[#4d7186]">
+    <div className="h-px flex-1 bg-slate-200" />
+    <p className="m-0 max-w-[70%] text-center text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
       {label ? `Branch from ${label}` : 'Branch point'}
     </p>
-    <div className="h-px flex-1 bg-[#c6ddea]" />
+    <div className="h-px flex-1 bg-slate-200" />
   </div>
 )
 
 const BranchEventRow = ({ label }: { label: string | null }) => (
   <div className="flex justify-center">
-    <div className="max-w-[88%] rounded-full border border-[#d8e7f0] bg-[#f4f9fc] px-4 py-2 text-center text-[12px] text-[#55798e] shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
+    <div className="max-w-[88%] rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-center text-[12px] text-slate-600">
       {label ? `Branched from: ${label}` : 'Branched from selected context'}
     </div>
   </div>
@@ -156,8 +156,8 @@ const InheritedHistorySection = ({
   if (messages.length === 0) {
     if (errorMessage) {
       return (
-        <section className="mb-3 rounded-3xl border border-[#d8e8f2] bg-white/55 p-3 text-[#45697e]">
-          <div className="rounded-lg border border-[#f1cabd] bg-[#fff6f3] p-3 text-sm text-[#8a3f2b]">
+        <section className="mb-3 rounded-xl border border-slate-200 bg-white p-3 text-slate-600">
+          <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
             Failed to load inherited history: {errorMessage}
           </div>
         </section>
@@ -168,10 +168,10 @@ const InheritedHistorySection = ({
   }
 
   return (
-    <section className="mb-3 rounded-3xl border border-[#d8e8f2] bg-white/55 p-3 text-[#45697e]">
+    <section className="mb-3 rounded-xl border border-slate-200 bg-white p-3 text-slate-600">
       <button
         type="button"
-        className="flex w-full items-center justify-between rounded-md border border-transparent bg-transparent px-1 py-0 text-left text-[12px] font-semibold uppercase tracking-[0.08em] text-[#53798f] hover:border-[#d8e8f2] hover:bg-white/60 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5da8d2]/50"
+        className="flex w-full items-center justify-between rounded-md border border-transparent bg-transparent px-1 py-0 text-left text-[12px] font-semibold uppercase tracking-[0.08em] text-slate-500 transition-colors duration-150 hover:border-slate-200 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
         onClick={() => setIsExpanded((current) => !current)}
         aria-expanded={isExpanded}
       >
@@ -182,7 +182,7 @@ const InheritedHistorySection = ({
       {isExpanded ? (
         <div className="mt-3 flex flex-col gap-2 opacity-75">
           {errorMessage ? (
-            <div className="rounded-lg border border-[#f1cabd] bg-[#fff6f3] p-3 text-sm text-[#8a3f2b] opacity-100">
+            <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 opacity-100">
               Failed to load inherited history: {errorMessage}
             </div>
           ) : null}
@@ -229,16 +229,16 @@ export const ConversationMessageList = ({
   return (
     <div
       ref={conversationScrollRef}
-      className="min-h-0 flex-1 overflow-y-auto bg-[linear-gradient(180deg,#fdfefe_0%,#f8fdff_100%)] px-4 py-3"
+      className="min-h-0 flex-1 overflow-y-auto bg-slate-50 px-4 py-3"
       style={{ minHeight: 0 }}
     >
       <div className="flex min-h-full flex-col justify-end gap-2">
         {isLoading ? (
-          <p className="m-0 self-stretch rounded-lg border border-dashed border-[#bdd7eb] bg-white p-3 text-sm text-[#40657d]">
+          <p className="m-0 self-stretch rounded-lg border border-dashed border-slate-300 bg-white p-3 text-sm text-slate-500">
             Loading messages...
           </p>
         ) : errorMessage ? (
-          <p className="m-0 self-stretch rounded-lg border border-[#f1cabd] bg-[#fff6f3] p-3 text-sm text-[#8a3f2b]">
+          <p className="m-0 self-stretch rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
             Failed to load messages: {errorMessage}
           </p>
         ) : messages.length || inheritedMessages.length || branchEventMessage ? (
@@ -279,7 +279,7 @@ export const ConversationMessageList = ({
         ) : (
           <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
             <span className="text-3xl opacity-30" aria-hidden="true">✦</span>
-            <p className="m-0 text-sm text-[#40718a]">What would you like to explore?</p>
+            <p className="m-0 text-sm text-slate-500">What would you like to explore?</p>
           </div>
         )}
         <div ref={bottomAnchorRef} className="h-px w-full shrink-0" aria-hidden="true" />

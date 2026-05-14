@@ -104,16 +104,16 @@ export const buildTreeLayout = (root: TreeNode): TreeLayout => {
 
 export const statusCardClass = (status: TreeNode['status']) => {
   if (status === 'Approved') {
-    return 'border-[#79c89d]'
+    return 'border-emerald-300'
   }
 
   if (status === 'Exploring') {
-    return 'border-[#ffbe62]'
+    return 'border-amber-300'
   }
 
   if (status === 'Merged') {
-    return 'border-[#b8d9c8] opacity-60'
+    return 'border-slate-200 opacity-65'
   }
 
-  return 'border-[#8bb8cd]'
+  return 'border-slate-200'
 }
