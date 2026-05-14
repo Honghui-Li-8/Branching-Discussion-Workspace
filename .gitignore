@@ -28,7 +28,7 @@ dist-ssr
 # Environment
 .env
 .env.*
-!.env.example
+!**/.env.example
 
 # Local planning docs
 plan.md

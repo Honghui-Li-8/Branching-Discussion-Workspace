@@ -41,32 +41,41 @@ This app treats the discussion tree as part of the product:
 ```bash
 corepack enable
 yarn install
-cp .env.example .env
+cp server/.env.example server/.env.local
+cp client/web/.env.example client/web/.env.local
 ```
 
-### Configure `.env`
+### Configure env files
 
-For the easiest local setup, point both `DATABASE_URL` and `DATABASE_URL_DEV` at the same local Postgres database.
+Runtime env is split by app:
+
+- `server/.env.local` holds backend-only secrets and database settings.
+- `client/web/.env.local` holds public Vite browser config.
+
+For the easiest local setup, point both `DATABASE_URL` and `DATABASE_URL_DEV` in
+`server/.env.local` at the same local Postgres database.
 
 Make sure these values are set:
 
 - `DATABASE_URL`
 - `DATABASE_URL_DEV`
 - `DEV_AUTH_TOKEN`
-- `VITE_DEV_AUTH_TOKEN`
-
-Keep `DEV_AUTH_TOKEN` and `VITE_DEV_AUTH_TOKEN` identical so the local dev login path works.
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `OPENAI_API_KEY`
+- `VITE_API_URL`
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
 
 Optional:
 
-- `OPENAI_API_KEY` for provider-backed model calls
 - `SERVER_LOG_LEVEL`
 - `CHAT_ALLOWED_MODELS`
 - `RAG_*` settings if you want to exercise retrieval paths
 
 ### Initialize the database
 
-Create the database(s) referenced in `.env`, then run:
+Create the database(s) referenced in `server/.env.local`, then run:
 
 ```bash
 yarn db:init

@@ -9,8 +9,11 @@ import { createLogger } from '../logging/logger.js'
 
 const loadEnvFiles = (): void => {
   const candidates = [
-    resolve(process.cwd(), '.env'),
+    resolve(process.cwd(), 'server/.env.local'),
     resolve(process.cwd(), 'server/.env'),
+    resolve(process.cwd(), '.env.local'),
+    resolve(process.cwd(), '.env'),
+    resolve(process.cwd(), '../.env.local'),
     resolve(process.cwd(), '../.env'),
   ]
 
