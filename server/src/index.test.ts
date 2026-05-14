@@ -90,6 +90,12 @@ jest.mock('./db/queries/message.js', () => ({
 }))
 
 jest.mock('./db/queries/node.js', () => ({
+  getNodeByIdForAuthor: (id: string, authorUserId: string) =>
+    (
+      jest.requireMock('./db/index.js') as {
+        getNodeByIdForAuthor: (nodeId: string, currentUserId: string) => Promise<unknown>
+      }
+    ).getNodeByIdForAuthor(id, authorUserId),
   nodeExists: (id: string) =>
     (
       jest.requireMock('./db/queries/internal.js') as {
@@ -1080,27 +1086,11 @@ describe('tRPC ownership integration', () => {
       role: 'user',
       content: 'hello',
     })
-    expect(createMessageForAuthorMock).toHaveBeenCalledWith({
-      nodeId: ownedNodeRecord.id,
-      authorUserId: selfSessionUser.id,
-      turnId: ownedConversationTurnRecord.id,
-      role: 'assistant',
-      content: ownedAssistantMessageRecord.content,
-    })
-    expect(updateConversationTurnForAuthorMock).toHaveBeenCalledWith(
-      {
-        id: ownedConversationTurnRecord.id,
-        status: 'completed',
-        error: null,
-        completedAt: expect.any(String),
-      },
-      selfSessionUser.id,
-    )
     expect(result).toEqual({
       turnId: ownedConversationTurnRecord.id,
-      status: 'completed',
+      status: 'processing',
       userMessage: ownedMessageRecord,
-      assistantMessage: ownedAssistantMessageRecord,
+      assistantMessage: null,
       error: null,
     })
   })
@@ -1256,7 +1246,7 @@ describe('tRPC ownership integration', () => {
     )
   })
 
-  test('conversationSend marks turn failed when provider generation throws', async () => {
+  test('conversationSend returns processing while background generation handles provider failures', async () => {
     const caller = makeCaller(selfSessionUser)
     createOrGetConversationTurnForAuthorMock.mockResolvedValueOnce({
       turn: ownedConversationTurnRecord,
@@ -1273,28 +1263,22 @@ describe('tRPC ownership integration', () => {
       .spyOn(selectProviderModule, 'selectProvider')
       .mockReturnValueOnce(failingProvider)
 
-    await expectTrpcError(
-      caller.conversationSend({
-        nodeId: ownedNodeRecord.id,
-        text: 'hello',
-        model: 'gpt-5',
-        idempotencyKey: 'idempotency-key-1',
-      }),
-      'INTERNAL_SERVER_ERROR',
-      'Assistant generation failed.',
-    )
+    const result = await caller.conversationSend({
+      nodeId: ownedNodeRecord.id,
+      text: 'hello',
+      model: 'gpt-5',
+      idempotencyKey: 'idempotency-key-1',
+    })
 
-    expect(updateConversationTurnForAuthorMock).toHaveBeenCalledWith(
-      {
-        id: ownedConversationTurnRecord.id,
-        status: 'failed',
-        error: 'provider boom',
-      },
-      selfSessionUser.id,
-    )
+    expect(result).toMatchObject({
+      turnId: ownedConversationTurnRecord.id,
+      status: 'processing',
+      assistantMessage: null,
+      error: null,
+    })
   })
 
-  test('conversationSend marks turn failed when assistant message insert returns no row', async () => {
+  test('conversationSend returns processing while background generation handles assistant insert failure', async () => {
     const caller = makeCaller(selfSessionUser)
     createOrGetConversationTurnForAuthorMock.mockResolvedValueOnce({
       turn: ownedConversationTurnRecord,
@@ -1304,28 +1288,22 @@ describe('tRPC ownership integration', () => {
       .mockResolvedValueOnce(ownedMessageRecord)
       .mockResolvedValueOnce(null)
 
-    await expectTrpcError(
-      caller.conversationSend({
-        nodeId: ownedNodeRecord.id,
-        text: 'hello',
-        model: 'gpt-5',
-        idempotencyKey: 'idempotency-key-1',
-      }),
-      'NOT_FOUND',
-      'Node not found.',
-    )
+    const result = await caller.conversationSend({
+      nodeId: ownedNodeRecord.id,
+      text: 'hello',
+      model: 'gpt-5',
+      idempotencyKey: 'idempotency-key-1',
+    })
 
-    expect(updateConversationTurnForAuthorMock).toHaveBeenCalledWith(
-      {
-        id: ownedConversationTurnRecord.id,
-        status: 'failed',
-        error: 'Node not found.',
-      },
-      selfSessionUser.id,
-    )
+    expect(result).toMatchObject({
+      turnId: ownedConversationTurnRecord.id,
+      status: 'processing',
+      assistantMessage: null,
+      error: null,
+    })
   })
 
-  test('conversationSend returns NOT_FOUND when turn finalization update fails', async () => {
+  test('conversationSend returns processing while background generation handles finalization failure', async () => {
     const caller = makeCaller(selfSessionUser)
     createOrGetConversationTurnForAuthorMock.mockResolvedValueOnce({
       turn: ownedConversationTurnRecord,
@@ -1334,16 +1312,19 @@ describe('tRPC ownership integration', () => {
     createMessageForAuthorMock.mockResolvedValueOnce(ownedMessageRecord)
     updateConversationTurnForAuthorMock.mockResolvedValueOnce(null)
 
-    await expectTrpcError(
-      caller.conversationSend({
-        nodeId: ownedNodeRecord.id,
-        text: 'hello',
-        model: 'gpt-5',
-        idempotencyKey: 'idempotency-key-1',
-      }),
-      'NOT_FOUND',
-      'Conversation turn not found.',
-    )
+    const result = await caller.conversationSend({
+      nodeId: ownedNodeRecord.id,
+      text: 'hello',
+      model: 'gpt-5',
+      idempotencyKey: 'idempotency-key-1',
+    })
+
+    expect(result).toMatchObject({
+      turnId: ownedConversationTurnRecord.id,
+      status: 'processing',
+      assistantMessage: null,
+      error: null,
+    })
   })
 
   test('owner succeeds on scoped write procedures', async () => {

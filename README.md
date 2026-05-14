@@ -1,131 +1,144 @@
-# Branching-Discussion-Workspace
+# Branching Discussion Workspace
 
-This is not a todo app, a static ADR tool, or a generic chatbot with a canvas.
+Branching Discussion Workspace is a full-stack MVP for structured reasoning. Instead of forcing every subtopic into one linear chat thread, it lets you branch a focused child discussion from a specific span of assistant output and keep the branch origin attached to the data model.
 
-It is a tool for branching deliberation, local resolution, and upward decision composition.
+I built it to practice the kinds of problems that do not show up in tutorial apps: workflow orchestration, streaming, persistence, branching provenance, shared contracts, and frontend state that has to stay aligned with backend events.
 
----
+## Why branching?
 
-## Running Locally
+Linear chat is weak for structured reasoning. Once a subtopic appears, you either derail the main thread or lose the idea entirely.
+
+This app treats the discussion tree as part of the product:
+
+- Each workspace contains a tree of decision nodes.
+- Each node owns its own scoped conversation.
+- A branch can originate from selected assistant text.
+- The child branch keeps durable provenance back to its source.
+
+## Core flows
+
+1. Load a workspace, hydrate the node tree, and open a node-scoped conversation.
+2. Send a message, run a backend turn pipeline, stream SSE events, and persist the final assistant reply.
+3. Select assistant text, create a branch node, and bootstrap a child follow-up conversation.
+
+## Architecture at a glance
+
+- `client/web`: React + Vite frontend for workspace sync, tree rendering, node conversations, and annotation-driven branch UX.
+- `server`: Express + tRPC backend for auth, turn orchestration, SSE streaming, branch services, database access, and async post-processing jobs.
+- `shared`: Shared schemas, metadata contracts, and common types that keep the frontend and backend boundary aligned.
+
+## Local setup
 
 ### Prerequisites
 
-- **Node.js** ≥ 18
-- **Yarn** 4.12.0 (`corepack enable` then `corepack prepare yarn@4.12.0 --activate`)
-- **PostgreSQL** running locally (default: `localhost:5432`)
-- An **OpenAI API key**
+- Node.js 20+
+- Corepack
+- Yarn 4.12.0
+- PostgreSQL
 
-### 1. Install dependencies
+### Install
 
 ```bash
+corepack enable
 yarn install
-```
-
-### 2. Configure environment
-
-```bash
 cp .env.example .env
 ```
 
-Open `.env` and fill in the required values:
+### Configure `.env`
 
-```env
-# Database — two separate DBs: one for prod-like use, one for dev/seed data
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/bdw
-DATABASE_URL_DEV=postgresql://postgres:postgres@localhost:5432/bdw_dev
+For the easiest local setup, point both `DATABASE_URL` and `DATABASE_URL_DEV` at the same local Postgres database.
 
-# Which DB target the server uses at runtime (keep "dev" for local work)
-DB_ENV=dev
+Make sure these values are set:
 
-# Dev auth bypass — set both to the same arbitrary string
-DEV_AUTH_TOKEN=replace-with-dev-token
-VITE_DEV_AUTH_TOKEN=replace-with-dev-token
+- `DATABASE_URL`
+- `DATABASE_URL_DEV`
+- `DEV_AUTH_TOKEN`
+- `VITE_DEV_AUTH_TOKEN`
 
-# OpenAI
-OPENAI_API_KEY=sk-...
+Keep `DEV_AUTH_TOKEN` and `VITE_DEV_AUTH_TOKEN` identical so the local dev login path works.
 
-# Optional
-SERVER_LOG_LEVEL=info
-```
+Optional:
 
-Create both databases in Postgres before continuing:
+- `OPENAI_API_KEY` for provider-backed model calls
+- `SERVER_LOG_LEVEL`
+- `CHAT_ALLOWED_MODELS`
+- `RAG_*` settings if you want to exercise retrieval paths
 
-```sql
-CREATE DATABASE bdw;
-CREATE DATABASE bdw_dev;
-```
+### Initialize the database
 
-### 3. Run migrations
+Create the database(s) referenced in `.env`, then run:
 
 ```bash
-yarn db:init        # applies all migrations to the dev DB
+yarn db:init
+yarn db:seed
 ```
 
-To check migration status:
+`db:init` migrates the app database target. `db:seed` seeds the dev database target, so using the same local database for both env vars is the simplest way to get a working demo dataset.
+
+### Run the app
+
+Start the backend:
 
 ```bash
-yarn workspace server db:migrate:status
-```
-
-### 4. Seed dev data (optional)
-
-```bash
-yarn db:seed        # loads introductory workspace and demo data into bdw_dev
-```
-
-To wipe and start fresh:
-
-```bash
-yarn db:reset       # drops schema → re-migrates → re-seeds (dev only)
-```
-
-### 5. Start the app
-
-Run both processes in separate terminals:
-
-```bash
-# Terminal 1 — API server (http://localhost:3001)
 yarn dev:server
+```
 
-# Terminal 2 — Web client (http://localhost:5173)
+Start the frontend in a second terminal:
+
+```bash
 yarn dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173). The `DEV_AUTH_TOKEN` value you set in `.env` is used to authenticate in development — no separate login flow is needed.
-
-### Background jobs worker (optional)
-
-Some postprocessing tasks (summarization, importance scoring) run through a job queue. Start the worker if you want those to process:
+Optional background worker for post-processing jobs:
 
 ```bash
 yarn workspace server jobs:worker
 ```
 
----
+Open [http://localhost:5173](http://localhost:5173).
 
-## Scripts Reference
+On first local sign-in, the server seeds an intro workspace for the dev user if needed.
 
-| Command | What it does |
-|---|---|
-| `yarn dev` | Vite dev server for the web client |
-| `yarn dev:server` | Express API server with file watching |
-| `yarn build` | Production build of the web client |
-| `yarn preview` | Serve the production build locally |
-| `yarn db:init` | Run pending migrations |
-| `yarn db:seed` | Seed dev data |
-| `yarn db:reset` | Drop + migrate + seed (dev only) |
-| `yarn test` | Full test suite (unit + type check + boundary) |
-| `yarn test:unit` | Unit tests only |
-| `yarn test:e2e` | Playwright end-to-end tests |
-| `yarn check:type` | TypeScript type check across all packages |
-| `yarn lint` | ESLint |
+## Useful commands
 
----
+- `yarn dev` - run the web client
+- `yarn dev:server` - run the backend
+- `yarn test` - run unit tests, boundary checks, type checks, and optional deprecation/spell checks
+- `yarn test:unit`
+- `yarn test:e2e`
+- `yarn check:type`
+- `yarn lint`
+- `yarn check:ownership-boundary`
 
-## Server Query Import Contract
+## Current status
+
+- Serious MVP, not a production-ready product.
+- Local auth is dev-oriented and session storage is in-memory.
+- The app is configured for localhost-first development.
+- Some retrieval and provider seams are still evolving.
+
+## Current caveat
+
+Assistant generation is temporarily in a debug echo mode in `server/src/chat/generateAssistantReplyForTurn.ts`. That override is useful for deterministic prompt and context validation, but it means the assistant may echo prompt-context input instead of calling the real model.
+
+The rest of the path is still real:
+
+- turn orchestration
+- SSE event streaming
+- event persistence and replay
+- node and message persistence
+- branching and follow-up bootstrapping
+
+## Engineering notes
+
+### Server query import contract
 
 - Request-path server modules must use scoped query exports from `server/src/db/index.ts`.
-- Request-path server modules must not import unscoped resource query modules directly (`server/src/db/queries/workspace.ts`, `node.ts`, `message.ts`).
-- `server/src/db/queries/internal.ts` is restricted to explicitly allowlisted internal usage (currently `trpcContext` and workspace import/export utilities).
-- Boundary enforcement check:
-  - `yarn check:ownership-boundary`
+- Request-path server modules must not import unscoped resource query modules directly such as `workspace.ts`, `node.ts`, or `message.ts`.
+- `server/src/db/queries/internal.ts` is restricted to explicitly allowlisted internal usage.
+- Boundary enforcement check: `yarn check:ownership-boundary`
+
+## More context
+
+- Product scope and timeline notes: `docs/0-timeline.md`
+- Architecture and implementation notes: `docs/`

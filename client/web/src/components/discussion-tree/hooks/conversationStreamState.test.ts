@@ -515,7 +515,8 @@ describe('regression: normal conversationSend flow unaffected by branch follow-u
         payload: { status: 'loading_context' },
       },
     })
-    expect(state.phase).toBe('generating')
+    expect(state.phase).toBe('sending')
+    expect(state.stage).toBe('loading_context')
 
     state = conversationStreamReducer(state, {
       type: 'eventReceived',
@@ -593,7 +594,7 @@ describe('regression: normal conversationSend flow unaffected by branch follow-u
     for (const [label, buildPriorState] of scenarios) {
       const stateBeforeReset = buildPriorState()
       const stateAfterReset = conversationStreamReducer(stateBeforeReset, { type: 'reset' })
-      expect(stateAfterReset, `reset from ${label}`).toEqual(initialConversationStreamState)
+      expect(stateAfterReset).toEqual(initialConversationStreamState)
     }
   })
 })
