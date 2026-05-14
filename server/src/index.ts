@@ -1,7 +1,8 @@
 import cors from 'cors'
 import express from 'express'
+import rateLimit, { type Options as RateLimitOptions } from 'express-rate-limit'
 import { createExpressMiddleware } from '@trpc/server/adapters/express'
-import type { Request, Response } from 'express'
+import type { Request, Response, RequestHandler } from 'express'
 import { appRouter } from './router.js'
 import { registerAuthRoutes } from './auth/routes.js'
 import { startSessionCleanup } from './auth/sessionStore.js'
@@ -14,13 +15,52 @@ const app = express()
 const PORT = Number(process.env.PORT) || 3001
 const logger = createLogger('server')
 
+const jsonRateLimitHandler: RateLimitOptions['handler'] = (_req, res) => {
+  res.status(429).json({ error: 'RATE_LIMITED' })
+}
+
+const authLoginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  handler: jsonRateLimitHandler,
+})
+
+const authLogoutLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  handler: jsonRateLimitHandler,
+})
+
+const trpcLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 60,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  handler: jsonRateLimitHandler,
+})
+
+export const streamLimiter: RequestHandler = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 20,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  handler: jsonRateLimitHandler,
+})
+
 app.use(
   cors({
-    origin: 'http://localhost:5173',
+    origin: process.env.CORS_ORIGIN ?? 'http://localhost:5173',
     credentials: true,
   }),
 )
 app.use(express.json())
+app.post('/auth/login', authLoginLimiter)
+app.post('/auth/logout', authLogoutLimiter)
+app.use('/trpc', trpcLimiter)
 app.use((req, res, next) => {
   const startedAt = Date.now()
   logger.info('[http] request started.', {
@@ -50,7 +90,7 @@ app.use((req, res, next) => {
   next()
 })
 registerAuthRoutes(app)
-registerConversationStreamRoutes(app)
+registerConversationStreamRoutes(app, streamLimiter)
 
 const sessionCleanupTimer = startSessionCleanup()
 

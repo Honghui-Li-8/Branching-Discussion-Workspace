@@ -35,6 +35,7 @@ describe('trpc client auth handling', () => {
           authUserId: 'auth:u1',
           email: 'u1@example.com',
           displayName: 'User One',
+          creditBalance: 100_000,
         },
       }),
     )

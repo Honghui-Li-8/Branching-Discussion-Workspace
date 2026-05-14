@@ -435,6 +435,11 @@ export const createOpenAIProvider = (
         content,
         finishReason: mapFinishReason(payload.finish_reason),
         providerResponseId: payload.id ?? null,
+        usage: {
+          inputTokens: payload.usage?.input_tokens ?? null,
+          outputTokens: payload.usage?.output_tokens ?? null,
+          totalTokens: payload.usage?.total_tokens ?? null,
+        },
       }
     },
   }

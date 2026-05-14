@@ -12,8 +12,9 @@ import {
   setActiveWorkspaceId,
   setSidebarCollapsed,
 } from '../store/slices/appShellSlice'
-import { useAuth } from './AuthProvider'
+import { useAuth } from './useAuth'
 import { trpc } from '../trpc'
+import { CreditBalanceIndicator } from './CreditBalanceIndicator'
 
 export const AppSidebar = () => {
   const dispatch = useAppDispatch()
@@ -191,12 +192,12 @@ export const AppSidebar = () => {
                         if (e.key === 'Enter') e.currentTarget.blur()
                         if (e.key === 'Escape') setRenamingId(null)
                       }}
-                      className="w-full rounded-xl border border-[#ffbe62] bg-[#fff8eb] px-2.5 py-2.5 text-[13px] font-semibold text-[#12384c] outline-none ring-2 ring-[#ffbe62]/30"
+                      className="w-full rounded-[10px] border border-[#ffbe62] bg-[#fff8eb] px-2.5 py-2.5 text-[13px] font-semibold text-[#12384c] outline-none ring-2 ring-[#ffbe62]/30"
                     />
                   ) : (
                     <button
                       type="button"
-                      className={`flex w-full cursor-pointer flex-col gap-1.5 rounded-xl border px-2.5 py-2.5 text-left transition ${
+                      className={`flex w-full cursor-pointer flex-col gap-1.5 rounded-[10px] border px-2.5 py-2.5 text-left transition ${
                         isActive
                           ? 'border-[#ffbe62] bg-[#fff8eb]'
                           : 'border-[#a6cee1] bg-[#fbfeff] hover:border-[#7eb9d5] hover:bg-[#f2fbff]'
@@ -207,10 +208,10 @@ export const AppSidebar = () => {
                         setContextMenu({ workspaceId: workspace.id, workspaceTitle: workspace.title, x: e.clientX, y: e.clientY })
                       }}
                     >
-                      <span className="text-[13px] font-semibold text-[#12384c]">
+                      <span className="truncate text-[13px] font-semibold text-[#12384c]">
                         {workspace.title}
                       </span>
-                      <small className="text-[11px] text-[#40718a]">{workspaceSummary}</small>
+                      <small className="line-clamp-2 text-[11px] text-[#40718a]">{workspaceSummary}</small>
                     </button>
                   )}
                 </li>
@@ -246,6 +247,7 @@ export const AppSidebar = () => {
                   : 'Login'}
           </button>
         </div>
+        <CreditBalanceIndicator />
         {authError && !isAuthBootstrapPending ? (
           <p className="mt-2 mb-0 text-[11px] text-[#8a3f2b]">{authError}</p>
         ) : workspaceActionError ? (

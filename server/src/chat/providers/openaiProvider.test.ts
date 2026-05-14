@@ -145,6 +145,7 @@ describe('createOpenAIProvider', () => {
       content: 'assistant text',
       finishReason: 'stop',
       providerResponseId: 'resp_1',
+      usage: { inputTokens: null, outputTokens: null, totalTokens: null },
     })
   })
 
@@ -295,6 +296,7 @@ describe('createOpenAIProvider', () => {
       content: 'hello world',
       finishReason: 'stop',
       providerResponseId: 'resp_stream',
+      usage: { inputTokens: null, outputTokens: null, totalTokens: null },
     })
   })
 })

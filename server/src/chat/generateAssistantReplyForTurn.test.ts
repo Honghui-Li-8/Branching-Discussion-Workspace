@@ -85,6 +85,7 @@ describe('generateAssistantReplyForTurn', () => {
           content: 'assistant reply',
           finishReason: 'stop',
           providerResponseId: 'resp-1',
+          usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
         }
       }),
     )
@@ -99,6 +100,7 @@ describe('generateAssistantReplyForTurn', () => {
       content: 'assistant reply',
       finishReason: 'stop',
       providerResponseId: 'resp-1',
+      usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
     })
     expect(publishedEvents).toEqual([
       {
@@ -148,6 +150,7 @@ describe('generateAssistantReplyForTurn', () => {
           content: 'abc',
           finishReason: 'stop',
           providerResponseId: 'resp-2',
+          usage: { inputTokens: null, outputTokens: null, totalTokens: null },
         }
       }),
     )
@@ -186,6 +189,7 @@ describe('generateAssistantReplyForTurn', () => {
           content: 'assistant reply',
           finishReason: 'stop',
           providerResponseId: 'resp-3',
+          usage: { inputTokens: null, outputTokens: null, totalTokens: null },
         }
       }),
     )

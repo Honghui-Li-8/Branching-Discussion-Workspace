@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
+import { useAuth } from '../../useAuth'
 import type { inferRouterOutputs } from '@trpc/server'
 import type { AppRouter } from '@branching/shared'
 import { parseMessageMetadata } from '@branching/shared/metadata'
@@ -123,6 +124,7 @@ export const useNodeConversation = ({
   branchFollowupBootstrap = null,
 }: UseNodeConversationParams) => {
   const utils = trpc.useUtils()
+  const { refreshBalance } = useAuth()
   const [pendingMessages, setPendingMessages] = useState<PendingMessage[]>([])
   const [hiddenPersistedMessageIds, setHiddenPersistedMessageIds] = useState<string[]>([])
   const [streamState, dispatchStreamAction] = useReducer(
@@ -683,12 +685,20 @@ export const useNodeConversation = ({
           }
 
           await invalidateNodeMessages(input.nodeId)
+          void refreshBalance()
         },
         onError: (error) => {
           closeTurnStream()
+          let errorMessage = error.message
+          if (error.message === 'INSUFFICIENT_CREDITS') {
+            errorMessage = "You've used your token allowance. Contact us to request more."
+            void refreshBalance()
+          } else if (error.message === 'RATE_LIMITED') {
+            errorMessage = 'Too many requests — please slow down.'
+          }
           dispatchStreamAction({
             type: 'sendFailed',
-            errorMessage: error.message,
+            errorMessage,
           })
           setPendingMessages((current) =>
             current.map((message) =>

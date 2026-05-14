@@ -82,6 +82,7 @@ const generateTempEchoAssistantReply = async ({
     content: echoedContent,
     finishReason: 'stop',
     providerResponseId: null,
+    usage: { inputTokens: null, outputTokens: null, totalTokens: null },
   }
 }
 

@@ -10,6 +10,7 @@ import {
   executeTurnPipeline,
   persistUserMessageWithFailureHandling,
 } from './turnExecutionPipeline.js'
+import { getCreditBalance } from '../db/index.js'
 
 jest.mock('./turnFlowPreflight.js', () => ({
   buildTurnFlowContext: jest.fn(),
@@ -22,6 +23,9 @@ jest.mock('./turnFlowRuntime.js', () => ({
 jest.mock('./turnExecutionPipeline.js', () => ({
   persistUserMessageWithFailureHandling: jest.fn(),
   executeTurnPipeline: jest.fn(),
+}))
+jest.mock('../db/index.js', () => ({
+  getCreditBalance: jest.fn(),
 }))
 
 const buildTurnFlowContextMock =
@@ -46,6 +50,7 @@ const persistUserMessageWithFailureHandlingMock =
 const executeTurnPipelineMock = executeTurnPipeline as jest.MockedFunction<
   typeof executeTurnPipeline
 >
+const getCreditBalanceMock = getCreditBalance as jest.MockedFunction<typeof getCreditBalance>
 
 const input = {
   nodeId: 'node-1',
@@ -123,6 +128,7 @@ describe('runConversationTurnFlow', () => {
   beforeEach(() => {
     jest.clearAllMocks()
 
+    getCreditBalanceMock.mockResolvedValue(100_000)
     buildTurnFlowContextMock.mockReturnValue(flowContext)
     runConversationTurnPreflightMock.mockResolvedValue({
       resolvedTurn,
@@ -231,5 +237,15 @@ describe('runConversationTurnFlow', () => {
       handleFailure,
     })
     expect(result).toEqual(completedResult)
+  })
+
+  test('throws FORBIDDEN when credit balance is zero or negative', async () => {
+    getCreditBalanceMock.mockResolvedValueOnce(0)
+
+    await expect(
+      runConversationTurnFlow({ input, currentUserId: 'user-1' }),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN', message: 'INSUFFICIENT_CREDITS' })
+
+    expect(runConversationTurnPreflightMock).not.toHaveBeenCalled()
   })
 })

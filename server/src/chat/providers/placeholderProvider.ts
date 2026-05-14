@@ -12,6 +12,7 @@ export const createPlaceholderProvider = (): AssistantProvider => ({
       content,
       finishReason: 'stop',
       providerResponseId: null,
+      usage: { inputTokens: null, outputTokens: null, totalTokens: null },
     }
   },
 })

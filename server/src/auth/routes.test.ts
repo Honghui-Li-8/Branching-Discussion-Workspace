@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globals'
 import type { Request, Response } from 'express'
-import { getOrCreateUserByAuthIdentity, seedIntroWorkspace } from '../db/index.js'
+import { createClient } from '@supabase/supabase-js'
+import { getOrCreateUserByAuthIdentity, getUserById, seedIntroWorkspace } from '../db/index.js'
 import { clearAllSessions } from './sessionStore'
 import { handleLogin, handleLogout, handleMe } from './routes'
 
@@ -12,16 +13,31 @@ jest.mock('node:crypto', () => {
   }
 })
 
+jest.mock('@supabase/supabase-js')
+
+const mockGetUser = jest.fn<(token: string) => Promise<unknown>>()
+
+;(createClient as jest.Mock).mockReturnValue({
+  auth: {
+    getUser: mockGetUser,
+  },
+})
+
+const mockUserRecord = {
+  id: '00000000-0000-4000-8000-000000000001',
+  authUserId: 'local:dev-user',
+  email: 'dev@example.com',
+  displayName: 'Local Dev',
+  creditBalance: 100_000,
+  createdAt: '2026-03-19T00:00:00.000Z',
+  updatedAt: '2026-03-19T00:00:00.000Z',
+}
+
 jest.mock('../db/index.js', () => ({
-  getOrCreateUserByAuthIdentity: jest.fn(async () => ({
-    id: '00000000-0000-4000-8000-000000000001',
-    authUserId: 'local:dev-user',
-    email: 'dev@example.com',
-    displayName: 'Local Dev',
-    creditBalance: 0,
-    createdAt: '2026-03-19T00:00:00.000Z',
-    updatedAt: '2026-03-19T00:00:00.000Z',
-  })),
+  getOrCreateUserByAuthIdentity: jest.fn(async () => mockUserRecord),
+  getUserById: jest.fn(async () => mockUserRecord),
+  hasGrantTransaction: jest.fn(async () => false),
+  insertCreditTransaction: jest.fn(async () => undefined),
   seedIntroWorkspace: jest.fn(async () => ({
     id: '10000000-0000-4000-8000-000000000001',
     title: 'Project Decision (dummy example)',
@@ -36,6 +52,7 @@ jest.mock('../db/index.js', () => ({
 const getOrCreateUserByAuthIdentityMock = getOrCreateUserByAuthIdentity as jest.MockedFunction<
   typeof getOrCreateUserByAuthIdentity
 >
+const getUserByIdMock = getUserById as jest.MockedFunction<typeof getUserById>
 const seedIntroWorkspaceMock = seedIntroWorkspace as jest.MockedFunction<typeof seedIntroWorkspace>
 
 type AuthResponseBody = {
@@ -91,7 +108,9 @@ describe('auth handlers', () => {
     process.env.DEV_AUTH_TOKEN = 'dev-token-123'
     clearAllSessions()
     getOrCreateUserByAuthIdentityMock.mockClear()
+    getUserByIdMock.mockClear()
     seedIntroWorkspaceMock.mockClear()
+    mockGetUser.mockReset()
   })
 
   afterEach(() => {
@@ -108,12 +127,7 @@ describe('auth handlers', () => {
 
     expect(res.statusCode).toBe(200)
     expect(res.body?.authenticated).toBe(true)
-    expect(res.body?.user).toEqual({
-      id: '00000000-0000-4000-8000-000000000001',
-      authUserId: 'local:dev-user',
-      email: 'dev@example.com',
-      displayName: 'Local Dev',
-    })
+    expect(res.body?.user).toEqual(mockUserRecord)
     expect(getOrCreateUserByAuthIdentityMock).toHaveBeenCalledTimes(1)
     expect(seedIntroWorkspaceMock).toHaveBeenCalledWith('00000000-0000-4000-8000-000000000001')
     expect(res.headers['set-cookie']).toContain('bdw_session=mocked-session-id')
@@ -129,25 +143,24 @@ describe('auth handlers', () => {
     const meReq = requestWithCookie(cookieHeader)
     const meRes = createMockResponse()
 
-    handleMe(meReq, meRes as unknown as Response)
+    await handleMe(meReq, meRes as unknown as Response)
 
     expect(meRes.statusCode).toBe(200)
     expect(meRes.body?.authenticated).toBe(true)
     expect(meRes.body?.user?.id).toBe('00000000-0000-4000-8000-000000000001')
   })
 
-  test('handleMe returns 401 when session cookie is missing', () => {
+  test('handleMe returns 401 when session cookie is missing', async () => {
     const req = requestWithCookie('')
     const res = createMockResponse()
 
-    handleMe(req, res as unknown as Response)
+    await handleMe(req, res as unknown as Response)
 
     expect(res.statusCode).toBe(401)
     expect(res.body?.authenticated).toBe(false)
   })
 
-  test('handleLogin with non-dev token follows third-party shell and returns 501', async () => {
-    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {})
+  test('handleLogin with unsupported third-party provider returns 501', async () => {
     const req = requestWithBody({ token: 'google-token-placeholder', provider: 'google' })
     const res = createMockResponse()
 
@@ -155,7 +168,19 @@ describe('auth handlers', () => {
 
     expect(res.statusCode).toBe(501)
     expect(res.body?.error).toBe('Third-party auth flow is not implemented yet.')
-    expect(consoleErrorSpy).toHaveBeenCalled()
+    expect(getOrCreateUserByAuthIdentityMock).not.toHaveBeenCalled()
+    expect(seedIntroWorkspaceMock).not.toHaveBeenCalled()
+  })
+
+  test('handleLogin returns 503 when Supabase verification is unavailable', async () => {
+    mockGetUser.mockRejectedValue(new Error('network failure'))
+    const req = requestWithBody({ token: 'supabase-token', provider: 'supabase' })
+    const res = createMockResponse()
+
+    await handleLogin(req, res as unknown as Response)
+
+    expect(res.statusCode).toBe(503)
+    expect(res.body?.error).toBe('Authentication service unavailable. Please try again.')
     expect(getOrCreateUserByAuthIdentityMock).not.toHaveBeenCalled()
     expect(seedIntroWorkspaceMock).not.toHaveBeenCalled()
   })
@@ -177,7 +202,7 @@ describe('auth handlers', () => {
 
     const meReq = requestWithCookie(cookieHeader)
     const meRes = createMockResponse()
-    handleMe(meReq, meRes as unknown as Response)
+    await handleMe(meReq, meRes as unknown as Response)
 
     expect(meRes.statusCode).toBe(401)
     expect(meRes.body?.authenticated).toBe(false)

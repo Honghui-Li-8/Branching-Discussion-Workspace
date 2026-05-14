@@ -1,5 +1,11 @@
 import type { Express, Request, Response } from 'express'
-import { getOrCreateUserByAuthIdentity, seedIntroWorkspace } from '../db/index.js'
+import {
+  getOrCreateUserByAuthIdentity,
+  getUserById,
+  hasGrantTransaction,
+  insertCreditTransaction,
+  seedIntroWorkspace,
+} from '../db/index.js'
 import { getDevAuthToken } from './constants.js'
 import {
   getSessionIdFromCookieHeader,
@@ -52,6 +58,9 @@ const resolveDevSessionUser = (inputUser: LoginRequestBody['user']): SessionUser
 const isThirdPartyAuthNotImplementedError = (error: unknown): boolean =>
   error instanceof Error && error.message === 'THIRD_PARTY_AUTH_NOT_IMPLEMENTED'
 
+const isSupabaseUnavailableError = (error: unknown): boolean =>
+  error instanceof Error && error.message === 'SUPABASE_UNAVAILABLE'
+
 const normalizeProvider = (provider: unknown): string =>
   typeof provider === 'string' && provider.trim().length > 0 ? provider.trim() : 'google'
 
@@ -98,6 +107,11 @@ export const handleLogin = async (req: Request, res: Response): Promise<void> =>
       return
     }
 
+    if (isSupabaseUnavailableError(error)) {
+      res.status(503).json({ error: 'Authentication service unavailable. Please try again.' })
+      return
+    }
+
     logger.error('[auth] Unexpected login verification error.', { error })
     res.status(401).json({ error: 'Invalid credential.' })
     return
@@ -112,19 +126,41 @@ export const handleLogin = async (req: Request, res: Response): Promise<void> =>
     logger.warn('[auth] Intro workspace seeding failed; continuing login.', { error })
   }
 
+  const alreadyGranted = await hasGrantTransaction(user.id)
+  if (!alreadyGranted) {
+    await insertCreditTransaction({
+      userId: user.id,
+      amount: 100_000,
+      type: 'grant',
+      reason: 'initial_grant',
+    })
+  }
+
+  const fullUser = await getUserById(user.id)
+  if (!fullUser) {
+    res.status(500).json({ error: 'Failed to load user after login.' })
+    return
+  }
+
   const sessionId = createSession(user)
   res.setHeader('Set-Cookie', serializeSessionCookie(sessionId))
-  res.json({ authenticated: true, user })
+  res.json({ authenticated: true, user: fullUser })
 }
 
-export const handleMe = (req: Request, res: Response): void => {
+export const handleMe = async (req: Request, res: Response): Promise<void> => {
   const sessionId = getSessionIdFromCookieHeader(req.headers.cookie)
   if (!sessionId) {
     res.status(401).json({ authenticated: false })
     return
   }
 
-  const user = getSessionUser(sessionId)
+  const sessionUser = getSessionUser(sessionId)
+  if (!sessionUser) {
+    res.status(401).json({ authenticated: false })
+    return
+  }
+
+  const user = await getUserById(sessionUser.id)
   if (!user) {
     res.status(401).json({ authenticated: false })
     return

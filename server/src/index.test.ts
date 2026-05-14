@@ -47,6 +47,7 @@ import {
 jest.mock('./db/index.js', () => ({
   createOrGetConversationPostprocessJobForAuthor: jest.fn(),
   createOrGetConversationTurnForAuthor: jest.fn(),
+  getCreditBalance: jest.fn(async () => 100_000),
   createMessageForAuthor: jest.fn(),
   createMessageAnnotationForAuthor: jest.fn(),
   createNodeForAuthor: jest.fn(),
@@ -525,6 +526,7 @@ describe('tRPC ownership integration', () => {
         content: ownedAssistantMessageRecord.content,
         finishReason: 'stop' as const,
         providerResponseId: 'mock-response-id',
+        usage: { inputTokens: null, outputTokens: null, totalTokens: null },
       })),
     })
   })

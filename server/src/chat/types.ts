@@ -61,6 +61,11 @@ export interface GenerateAssistantResult {
   content: string
   finishReason: 'stop' | 'length' | 'content_filter' | 'error'
   providerResponseId?: string | null
+  usage: {
+    inputTokens: number | null
+    outputTokens: number | null
+    totalTokens: number | null
+  }
 }
 
 export interface SendConversationTurnResult {
