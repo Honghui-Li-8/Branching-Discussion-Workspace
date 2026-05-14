@@ -18,15 +18,15 @@ export const LoginPage = () => {
   }
 
   return (
-    <main className="grid min-h-screen place-items-center bg-[linear-gradient(165deg,#e9f6ff_0%,#f3fbff_55%,#fffdf5_100%)] px-5 py-8">
-      <section className="flex w-full max-w-[560px] flex-col items-center text-center">
-        <p className="m-0 text-xs uppercase tracking-[0.14em] text-[#4b7f99]">
+    <main className="grid min-h-screen place-items-center bg-[#f5f7fb] px-5 py-8">
+      <section className="flex w-full max-w-[560px] flex-col items-center rounded-xl border border-slate-200 bg-white px-6 py-10 text-center shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+        <p className="m-0 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
           Branching Decision Workspace
         </p>
-        <h1 className="my-[14px] text-[clamp(30px,5vw,48px)] leading-[1.12] text-[#12384c]">
+        <h1 className="my-[14px] text-[clamp(30px,5vw,46px)] font-semibold leading-[1.08] text-slate-950">
           Sign in to continue
         </h1>
-        <p className="m-0 max-w-[520px] text-base leading-7 text-[#3f6c81]">
+        <p className="m-0 max-w-[520px] text-base leading-7 text-slate-600">
           Use your Google account to open your workspaces and keep your discussion tree
           history in one place.
         </p>
@@ -37,10 +37,10 @@ export const LoginPage = () => {
             void handleLogin()
           }}
           disabled={isLoginPending}
-          className="mt-8 inline-flex min-h-12 items-center justify-center gap-3 rounded-md border border-[#93bed4] bg-white px-5 text-sm font-semibold text-[#12384c] shadow-sm transition hover:border-[#5d9dbc] hover:bg-[#f7fcff] disabled:cursor-not-allowed disabled:opacity-70"
+          className="mt-8 inline-flex min-h-12 items-center justify-center gap-3 rounded-lg border border-slate-200 bg-slate-950 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
         >
           {isLoginPending ? (
-            <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#8fbad1] border-t-[#12384c]" />
+            <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
           ) : (
             <GoogleIcon fontSize="small" aria-hidden="true" />
           )}
@@ -48,7 +48,7 @@ export const LoginPage = () => {
         </button>
 
         {authError ? (
-          <p className="mt-4 max-w-[440px] text-sm leading-6 text-[#9a3f3f]" role="alert">
+          <p className="mt-4 max-w-[440px] text-sm leading-6 text-red-700" role="alert">
             {authError}
           </p>
         ) : null}

@@ -43,7 +43,7 @@ export const CardOptionsMenu = ({
     >
       <button
         type="button"
-        className="inline-flex h-5 items-center justify-center px-1 text-sm font-semibold tracking-wide text-[#2f6d88] hover:text-[#1d516a]"
+        className="inline-flex h-6 w-7 items-center justify-center rounded-md text-sm font-semibold tracking-wide text-slate-400 hover:bg-slate-100 hover:text-slate-700"
         aria-label="Card options"
         onClick={() => onOpenChange(!isOpen)}
       >
@@ -52,12 +52,12 @@ export const CardOptionsMenu = ({
 
       {isOpen ? (
         <div
-          className="absolute bottom-0 left-full h-12 w-32 overflow-hidden rounded-lg border border-[#8ab8cd] bg-white shadow-[0_8px_18px_rgba(38,90,114,0.2)]"
+          className="absolute bottom-0 left-full h-12 w-32 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-[0_14px_30px_rgba(15,23,42,0.16)]"
           style={{ zIndex: zIndex.popoverMenu }}
         >
           <button
             type="button"
-            className="flex h-full w-full items-center px-3 text-left text-xs text-[#1d516a] hover:bg-[#f3fbff] disabled:cursor-not-allowed disabled:text-[#94aeb9]"
+            className="flex h-full w-full items-center px-3 text-left text-xs text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
             onClick={() => {
               if (!canCollapse) {
                 return

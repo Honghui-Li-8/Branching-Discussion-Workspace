@@ -78,6 +78,7 @@ export const AppSidebar = () => {
   const setIsCollapsed = (val: boolean) => dispatch(setSidebarCollapsed(val))
 
   const [isPopoverOpen, setIsPopoverOpen] = useState(false)
+  const [popoverPosition, setPopoverPosition] = useState({ top: 0, left: 0 })
   const createButtonRef = useRef<HTMLButtonElement>(null)
 
   const [contextMenu, setContextMenu] = useState<{
@@ -106,6 +107,14 @@ export const AppSidebar = () => {
     setContextMenu(null)
   }
 
+  const toggleCreatePopover = () => {
+    const anchorRect = createButtonRef.current?.getBoundingClientRect()
+    if (anchorRect) {
+      setPopoverPosition({ top: anchorRect.bottom + 6, left: anchorRect.left })
+    }
+    setIsPopoverOpen((current) => !current)
+  }
+
   const currentUserName = isAuthBootstrapPending ? '...' : (authUser?.displayName ?? 'Guest')
   const avatarInitial = currentUserName.trim().slice(0, 1).toUpperCase() || '?'
   const workspaceActionError = workspaceMutations.create.error?.message ?? null
@@ -113,14 +122,14 @@ export const AppSidebar = () => {
   return (
     <>
     <aside
-      className={`flex min-h-0 flex-col border-b border-[#b8dced] bg-[linear-gradient(180deg,#d9f0fd_0%,#e9f7ff_100%)] transition-[width] duration-300 ease-in-out lg:min-h-screen lg:border-r lg:border-b-0 ${isCollapsed ? 'lg:w-10 lg:overflow-hidden' : 'lg:w-[240px]'}`}
+      className={`flex min-h-0 flex-col border-b border-slate-200 bg-white transition-[width] duration-300 ease-in-out lg:min-h-screen lg:border-r lg:border-b-0 ${isCollapsed ? 'lg:w-10 lg:overflow-hidden' : 'lg:w-[272px]'}`}
       aria-label="Workspace navigation"
     >
       {/* Collapsed strip — desktop only */}
       <div className={`hidden flex-1 flex-col items-center justify-between py-2.5 ${isCollapsed ? 'lg:flex' : ''}`}>
         <button
           type="button"
-          className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-xl border border-[#6ea9c7] bg-white/70 text-[#1f607d] hover:bg-white hover:border-[#185270] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5da8d2]/50"
+          className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
           onClick={() => setIsCollapsed(false)}
           aria-label="Expand sidebar"
           title="Expand sidebar"
@@ -129,7 +138,7 @@ export const AppSidebar = () => {
         </button>
 
         <span
-          className="inline-flex h-[26px] w-[26px] cursor-default items-center justify-center rounded-full border border-[#97c2d8] bg-white text-[13px] font-bold text-[#225c79] shadow-sm"
+          className="inline-flex h-8 w-8 cursor-default items-center justify-center rounded-full bg-slate-900 text-[13px] font-bold text-white shadow-sm"
           title={currentUserName}
           aria-label={currentUserName}
         >
@@ -138,16 +147,16 @@ export const AppSidebar = () => {
       </div>
 
       <section className={`flex min-h-0 flex-1 flex-col ${isCollapsed ? 'lg:hidden' : ''}`}>
-        <header className="flex items-center justify-between gap-2.5 border-b border-[#b8dced] px-2.5 pt-2.5 pb-2">
-          <h2 className="m-0 text-[11px] uppercase tracking-[0.1em] text-[#1f607d]">
+        <header className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+          <h2 className="m-0 text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">
             Workspaces
           </h2>
           <div className="flex items-center gap-1">
             <button
               ref={createButtonRef}
               type="button"
-              className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-xl border border-[#185270] bg-[#1f607d] text-xl text-white hover:bg-[#185270] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5da8d2]/50"
-              onClick={() => setIsPopoverOpen((v) => !v)}
+              className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-slate-950 bg-slate-950 text-xl text-white shadow-sm transition-colors duration-150 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={toggleCreatePopover}
               aria-label="Create workspace"
               disabled={!isAuthenticated || isAuthBootstrapPending}
             >
@@ -155,7 +164,7 @@ export const AppSidebar = () => {
             </button>
             <button
               type="button"
-              className="hidden h-7 w-7 cursor-pointer items-center justify-center rounded-xl border border-[#6ea9c7] bg-white text-sm leading-none text-[#1f607d] hover:bg-[#eef9ff] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5da8d2]/50 lg:flex"
+              className="hidden h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white text-sm leading-none text-slate-600 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 lg:flex"
               onClick={() => setIsCollapsed(true)}
               aria-label="Collapse sidebar"
               title="Collapse sidebar"
@@ -165,13 +174,13 @@ export const AppSidebar = () => {
           </div>
         </header>
 
-        <ul className="m-0 flex max-h-[220px] list-none flex-col gap-[7px] overflow-y-auto p-2 lg:max-h-none">
+        <ul className="m-0 flex max-h-[220px] list-none flex-col gap-2 overflow-y-auto p-3 lg:max-h-none">
           {isWorkspacesLoading && workspaces.length === 0 ? (
-            <li className="rounded-xl border border-[#a6cee1] bg-[#fbfeff] px-2.5 py-2.5 text-[12px] text-[#40718a]">
+            <li className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-[12px] text-slate-500">
               Loading workspaces...
             </li>
           ) : workspaces.length === 0 ? (
-            <li className="rounded-xl border border-dashed border-[#a6cee1] bg-[#fbfeff] px-2.5 py-2.5 text-[12px] text-[#40718a]">
+            <li className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-2.5 text-[12px] text-slate-500">
               No workspaces yet.
             </li>
           ) : (
@@ -192,15 +201,15 @@ export const AppSidebar = () => {
                         if (e.key === 'Enter') e.currentTarget.blur()
                         if (e.key === 'Escape') setRenamingId(null)
                       }}
-                      className="w-full rounded-[10px] border border-[#ffbe62] bg-[#fff8eb] px-2.5 py-2.5 text-[13px] font-semibold text-[#12384c] outline-none ring-2 ring-[#ffbe62]/30"
+                      className="w-full rounded-lg border border-blue-300 bg-blue-50 px-3 py-2.5 text-[13px] font-semibold text-slate-900 outline-none ring-4 ring-blue-500/10"
                     />
                   ) : (
                     <button
                       type="button"
-                      className={`flex w-full cursor-pointer flex-col gap-1.5 rounded-[10px] border px-2.5 py-2.5 text-left transition ${
+                      className={`flex w-full cursor-pointer flex-col gap-1.5 rounded-lg border px-3 py-2.5 text-left transition ${
                         isActive
-                          ? 'border-[#ffbe62] bg-[#fff8eb]'
-                          : 'border-[#a6cee1] bg-[#fbfeff] hover:border-[#7eb9d5] hover:bg-[#f2fbff]'
+                          ? 'border-blue-200 bg-blue-50 shadow-sm'
+                          : 'border-transparent bg-transparent hover:border-slate-200 hover:bg-slate-50'
                       }`}
                       onClick={() => dispatch(setActiveWorkspaceId(workspace.id))}
                       onContextMenu={(e) => {
@@ -208,10 +217,10 @@ export const AppSidebar = () => {
                         setContextMenu({ workspaceId: workspace.id, workspaceTitle: workspace.title, x: e.clientX, y: e.clientY })
                       }}
                     >
-                      <span className="truncate text-[13px] font-semibold text-[#12384c]">
+                      <span className="truncate text-[13px] font-semibold text-slate-900">
                         {workspace.title}
                       </span>
-                      <small className="line-clamp-2 text-[11px] text-[#40718a]">{workspaceSummary}</small>
+                      <small className="line-clamp-2 text-[11px] leading-snug text-slate-500">{workspaceSummary}</small>
                     </button>
                   )}
                 </li>
@@ -221,20 +230,20 @@ export const AppSidebar = () => {
         </ul>
       </section>
 
-      <section className={`border-t border-[#b8dced] px-3 py-3 ${isCollapsed ? 'lg:hidden' : ''}`}>
+      <section className={`border-t border-slate-200 px-4 py-3 ${isCollapsed ? 'lg:hidden' : ''}`}>
         <div className="flex items-center justify-between gap-2.5">
-          <div className="flex items-center gap-2.5">
+          <div className="flex min-w-0 items-center gap-2.5">
             <span
-              className="inline-flex h-[26px] w-[26px] items-center justify-center rounded-full border border-[#97c2d8] bg-white text-[13px] font-bold text-[#225c79]"
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-900 text-[13px] font-bold text-white"
               aria-hidden="true"
             >
               {avatarInitial}
             </span>
-            <p className="m-0 text-sm font-semibold text-[#164760]">{currentUserName}</p>
+            <p className="m-0 truncate text-sm font-semibold text-slate-900">{currentUserName}</p>
           </div>
           <button
             type="button"
-            className="cursor-pointer rounded-xl border border-[#6ea9c7] bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.04em] text-[#1f607d] hover:bg-[#eef9ff] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5da8d2]/50 disabled:cursor-not-allowed disabled:opacity-60"
+            className="cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.04em] text-slate-600 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 disabled:cursor-not-allowed disabled:opacity-60"
             onClick={isAuthenticated ? () => void logout() : () => void login()}
             disabled={isAuthActionPending || isAuthBootstrapPending}
           >
@@ -249,9 +258,9 @@ export const AppSidebar = () => {
         </div>
         <CreditBalanceIndicator />
         {authError && !isAuthBootstrapPending ? (
-          <p className="mt-2 mb-0 text-[11px] text-[#8a3f2b]">{authError}</p>
+          <p className="mt-2 mb-0 text-[11px] text-red-700">{authError}</p>
         ) : workspaceActionError ? (
-          <p className="mt-2 mb-0 text-[11px] text-[#8a3f2b]">{workspaceActionError}</p>
+          <p className="mt-2 mb-0 text-[11px] text-red-700">{workspaceActionError}</p>
         ) : null}
       </section>
     </aside>
@@ -270,6 +279,7 @@ export const AppSidebar = () => {
     {isPopoverOpen && (
       <CreateWorkspacePopover
         anchorRef={createButtonRef}
+        position={popoverPosition}
         onCreateBlank={createWorkspace}
         onClose={() => setIsPopoverOpen(false)}
       />

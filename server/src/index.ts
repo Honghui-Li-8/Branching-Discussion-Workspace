@@ -15,6 +15,28 @@ const app = express()
 const PORT = Number(process.env.PORT) || 3001
 const logger = createLogger('server')
 
+process.stdout.on('error', (error: NodeJS.ErrnoException) => {
+  if (error.code !== 'EPIPE') {
+    throw error
+  }
+})
+
+process.stderr.on('error', (error: NodeJS.ErrnoException) => {
+  if (error.code !== 'EPIPE') {
+    throw error
+  }
+})
+
+process.on('uncaughtException', (error) => {
+  logger.error('Uncaught exception; shutting down.', { error })
+  process.exit(1)
+})
+
+process.on('unhandledRejection', (reason) => {
+  logger.error('Unhandled promise rejection; shutting down.', { reason })
+  process.exit(1)
+})
+
 const jsonRateLimitHandler: RateLimitOptions['handler'] = (_req, res) => {
   res.status(429).json({ error: 'RATE_LIMITED' })
 }
@@ -51,9 +73,38 @@ export const streamLimiter: RequestHandler = rateLimit({
   handler: jsonRateLimitHandler,
 })
 
+const defaultAllowedOrigins = new Set([
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://localhost:5175',
+  'http://localhost:5176',
+])
+
+const configuredAllowedOrigins = new Set(
+  (process.env.CORS_ORIGIN ?? '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean),
+)
+
+const isAllowedCorsOrigin = (origin: string): boolean => {
+  if (configuredAllowedOrigins.size > 0) {
+    return configuredAllowedOrigins.has(origin)
+  }
+
+  return defaultAllowedOrigins.has(origin) || /^http:\/\/localhost:51\d{2}$/.test(origin)
+}
+
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN ?? 'http://localhost:5173',
+    origin: (origin, callback) => {
+      if (!origin || isAllowedCorsOrigin(origin)) {
+        callback(null, true)
+        return
+      }
+
+      callback(new Error(`CORS origin not allowed: ${origin}`))
+    },
     credentials: true,
   }),
 )

@@ -24,11 +24,20 @@ const EXAMPLES: { key: ExampleWorkspaceKey; title: string; description: string }
 
 type Props = {
   anchorRef: React.RefObject<HTMLButtonElement | null>
+  position: {
+    top: number
+    left: number
+  }
   onCreateBlank: () => void
   onClose: () => void
 }
 
-export const CreateWorkspacePopover = ({ anchorRef, onCreateBlank, onClose }: Props) => {
+export const CreateWorkspacePopover = ({
+  anchorRef,
+  position,
+  onCreateBlank,
+  onClose,
+}: Props) => {
   const dispatch = useAppDispatch()
   const utils = trpc.useUtils()
   const popoverRef = useRef<HTMLDivElement>(null)
@@ -70,10 +79,6 @@ export const CreateWorkspacePopover = ({ anchorRef, onCreateBlank, onClose }: Pr
     }
   }, [onClose, anchorRef])
 
-  const anchorRect = anchorRef.current?.getBoundingClientRect()
-  const top = anchorRect ? anchorRect.bottom + 6 : 0
-  const left = anchorRect ? anchorRect.left : 0
-
   const handleExample = (key: ExampleWorkspaceKey) => {
     if (creatingKey) return
     setError(null)
@@ -89,24 +94,24 @@ export const CreateWorkspacePopover = ({ anchorRef, onCreateBlank, onClose }: Pr
   return (
     <div
       ref={popoverRef}
-      style={{ position: 'fixed', top, left, zIndex: 9000 }}
-      className="min-w-[210px] rounded-xl border border-[#b8dced] bg-white py-1.5 shadow-[0_4px_20px_rgba(0,40,80,0.12)]"
+      style={{ position: 'fixed', top: position.top, left: position.left, zIndex: 9000 }}
+      className="min-w-[230px] rounded-lg border border-slate-200 bg-white py-1.5 shadow-[0_14px_30px_rgba(15,23,42,0.16)]"
     >
       <button
         type="button"
-        className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] text-[#12384c] transition-colors duration-100 hover:bg-[#f0f9ff] disabled:opacity-50"
+        className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] text-slate-800 transition-colors duration-100 hover:bg-slate-50 disabled:opacity-50"
         onClick={handleBlank}
         disabled={!!creatingKey}
       >
-        <span className="flex h-5 w-5 items-center justify-center rounded-md border border-[#b8dced] text-[14px] font-light leading-none text-[#40718a]">
+        <span className="flex h-5 w-5 items-center justify-center rounded-md border border-slate-200 text-[14px] font-light leading-none text-slate-500">
           +
         </span>
         New blank workspace
       </button>
 
-      <div className="mx-3 my-1.5 border-t border-[#e5f3fb]" />
+      <div className="mx-3 my-1.5 border-t border-slate-100" />
 
-      <p className="px-3 pb-1 text-[10px] uppercase tracking-[0.1em] text-[#7ab3cc]">
+      <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">
         Start from example
       </p>
 
@@ -118,23 +123,23 @@ export const CreateWorkspacePopover = ({ anchorRef, onCreateBlank, onClose }: Pr
           <button
             key={key}
             type="button"
-            className="flex w-full flex-col px-3 py-1.5 text-left transition-colors duration-100 hover:bg-[#f0f9ff] disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex w-full flex-col px-3 py-1.5 text-left transition-colors duration-100 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
             onClick={() => handleExample(key)}
             disabled={isDisabled}
           >
-            <span className="flex items-center gap-1.5 text-[13px] font-medium text-[#12384c]">
+            <span className="flex items-center gap-1.5 text-[13px] font-semibold text-slate-900">
               {title}
               {isLoading && (
-                <span className="inline-block h-3 w-3 animate-spin rounded-full border border-[#b8dced] border-t-[#1f607d]" />
+                <span className="inline-block h-3 w-3 animate-spin rounded-full border border-slate-200 border-t-slate-900" />
               )}
             </span>
-            <span className="text-[11px] text-[#40718a]">{description}</span>
+            <span className="text-[11px] text-slate-500">{description}</span>
           </button>
         )
       })}
 
       {error && (
-        <p className="px-3 pt-1 pb-0.5 text-[11px] text-[#b93b2a]">{error}</p>
+        <p className="px-3 pt-1 pb-0.5 text-[11px] text-red-700">{error}</p>
       )}
     </div>
   )
