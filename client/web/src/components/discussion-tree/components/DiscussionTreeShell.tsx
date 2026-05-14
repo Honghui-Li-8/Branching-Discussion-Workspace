@@ -17,14 +17,14 @@ export const DiscussionTreeShell = ({ workspaceTitle, children }: DiscussionTree
 
   return (
     <section
-      className={`relative flex h-auto min-h-[430px] flex-col overflow-hidden border bg-[linear-gradient(180deg,#f5fbff_0%,#f8fdff_100%)] transition-all duration-300 ease-in-out lg:min-h-0 ${isSidebarCollapsed ? 'rounded-none border-transparent lg:h-screen' : 'rounded-3xl border-[#a8d1e5] lg:h-[calc(100vh-40px)]'}`}
+      className={`relative flex h-auto min-h-[430px] flex-col overflow-hidden border bg-white transition-all duration-300 ease-in-out lg:min-h-0 ${isSidebarCollapsed ? 'rounded-none border-transparent lg:h-screen' : 'rounded-xl border-slate-200 shadow-[0_18px_50px_rgba(15,23,42,0.08)] lg:h-[calc(100vh-32px)]'}`}
       aria-label="Discussion tree view"
     >
       <header
-        className="relative border-b border-[#c3e0ef] bg-[linear-gradient(90deg,#ebf7ff_0%,#f8fdff_100%)] px-5 py-2"
+        className="relative border-b border-slate-200 bg-white/95 px-5 py-3 backdrop-blur"
         style={{ zIndex: zIndex.discussionHeader }}
       >
-        <h1 className="m-0 text-[18px] font-medium leading-snug text-[#12384c]">{workspaceTitle}</h1>
+        <h1 className="m-0 text-[20px] font-semibold leading-snug text-slate-950">{workspaceTitle}</h1>
       </header>
 
       {children}

@@ -189,7 +189,14 @@ export const registerAuthRoutes = (app: Express): void => {
     })
   })
 
-  app.get('/auth/me', handleMe)
+  app.get('/auth/me', (req: Request, res: Response) => {
+    void handleMe(req, res).catch((error) => {
+      logger.error('[auth] Unhandled session lookup error.', { error })
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Internal server error.' })
+      }
+    })
+  })
 
   app.post('/auth/logout', handleLogout)
 }

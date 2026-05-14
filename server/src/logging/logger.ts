@@ -45,6 +45,57 @@ export const getServerLogLevel = (): LogLevel =>
 const shouldLog = (level: LogLevel, configuredLevel: LogLevel): boolean =>
   LOG_LEVEL_PRIORITY[level] >= LOG_LEVEL_PRIORITY[configuredLevel]
 
+const writeConsole = (
+  level: LogLevel,
+  message: string,
+  context?: Record<string, unknown>,
+): void => {
+  try {
+    if (level === 'error') {
+      if (context) {
+        console.error(message, context)
+        return
+      }
+      console.error(message)
+      return
+    }
+
+    if (level === 'warn') {
+      if (context) {
+        console.warn(message, context)
+        return
+      }
+      console.warn(message)
+      return
+    }
+
+    if (level === 'debug') {
+      if (context) {
+        console.debug(message, context)
+        return
+      }
+      console.debug(message)
+      return
+    }
+
+    if (context) {
+      console.info(message, context)
+      return
+    }
+    console.info(message)
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      'code' in error &&
+      (error as NodeJS.ErrnoException).code === 'EPIPE'
+    ) {
+      return
+    }
+
+    throw error
+  }
+}
+
 const writeLog = (
   level: LogLevel,
   _scope: string | undefined,
@@ -56,38 +107,7 @@ const writeLog = (
     return
   }
 
-  if (level === 'error') {
-    if (context) {
-      console.error(message, context)
-      return
-    }
-    console.error(message)
-    return
-  }
-
-  if (level === 'warn') {
-    if (context) {
-      console.warn(message, context)
-      return
-    }
-    console.warn(message)
-    return
-  }
-
-  if (level === 'debug') {
-    if (context) {
-      console.debug(message, context)
-      return
-    }
-    console.debug(message)
-    return
-  }
-
-  if (context) {
-    console.info(message, context)
-    return
-  }
-  console.info(message)
+  writeConsole(level, message, context)
 }
 
 export const createLogger = (scope?: string): AppLogger => ({

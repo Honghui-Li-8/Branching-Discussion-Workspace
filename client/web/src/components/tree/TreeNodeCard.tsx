@@ -33,9 +33,9 @@ export const TreeNodeCard = ({
   style,
 }: TreeNodeCardProps) => (
   <article
-    className={`absolute flex min-h-[72px] max-h-[104px] w-[230px] -translate-y-1/2 flex-col gap-2 overflow-visible rounded-2xl border bg-white p-2.5 shadow-[0_8px_20px_rgba(47,104,130,0.12)] ${statusCardClass(
+    className={`absolute flex min-h-[72px] max-h-[104px] w-[230px] -translate-y-1/2 flex-col gap-2 overflow-visible rounded-xl border bg-white p-3 shadow-[0_10px_28px_rgba(15,23,42,0.1)] transition-shadow hover:shadow-[0_16px_38px_rgba(15,23,42,0.14)] ${statusCardClass(
       node.status,
-    )} ${isConversationSelected ? 'ring-2 ring-[#4b90ac]' : ''}`}
+    )} ${isConversationSelected ? 'ring-2 ring-blue-500 ring-offset-2 ring-offset-white' : ''}`}
     style={{
       left: `${node.x}px`,
       top: `${node.y}px`,
@@ -60,7 +60,7 @@ export const TreeNodeCard = ({
       >
         <button
           type="button"
-          className="inline-flex h-6 min-w-8 items-center justify-center rounded-full border border-[#6ea9c7] bg-white px-1.5 text-[11px] font-semibold text-[#1f607d] hover:bg-[#eef9ff] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5da8d2]/50"
+          className="inline-flex h-6 min-w-8 items-center justify-center rounded-full border border-slate-200 bg-white px-1.5 text-[11px] font-semibold text-slate-600 shadow-sm transition-colors duration-150 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
           aria-label={`${foldedCount} folded nodes`}
           onClick={(event) => {
             event.stopPropagation()
@@ -83,17 +83,17 @@ export const TreeNodeCard = ({
     ) : null}
 
     <h3
-      className="m-0 min-h-[1.35em] max-h-[calc(1.35em*3)] overflow-y-auto pr-1 text-sm leading-[1.35] text-[#12384c]"
+      className="m-0 min-h-[1.35em] max-h-[calc(1.35em*3)] overflow-y-auto pr-1 text-sm font-semibold leading-[1.35] text-slate-950"
       style={{ overflowWrap: 'anywhere' }}
     >
       {node.title}
     </h3>
     {node.isMerged ? (
-      <span className="inline-flex self-start rounded-full border border-[#b8d9c8] bg-[#f0f9f4] px-2.5 py-[2px] text-[11px] text-[#3a7a5a]">
+      <span className="inline-flex self-start rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-[2px] text-[11px] font-medium text-emerald-700">
         ↩ Merged
       </span>
     ) : node.status !== 'Open' ? (
-      <span className="inline-flex self-start rounded-full border border-[#93bfd3] bg-[#ecf9ff] px-2.5 py-[2px] text-[11px] text-[#2d647f]">
+      <span className="inline-flex self-start rounded-full border border-slate-200 bg-slate-50 px-2.5 py-[2px] text-[11px] font-medium text-slate-600">
         {node.status}
       </span>
     ) : null}
