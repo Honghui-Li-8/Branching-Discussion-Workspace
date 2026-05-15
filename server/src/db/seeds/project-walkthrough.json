@@ -91,6 +91,22 @@
       "updatedAt": "2026-05-15T00:00:12.000Z"
     },
     {
+      "sourceNodeId": "8f3d60f0-9a1f-4a10-9b71-000000000045",
+      "sourceParentNodeId": "8f3d60f0-9a1f-4a10-9b71-000000000030",
+      "workspaceSourceId": "8f3d60f0-9a1f-4a10-9b71-000000000001",
+      "authorUserId": "8f3d60f0-9a1f-4a10-9b71-000000000002",
+      "depth": 2,
+      "type": "question",
+      "title": "Message flow",
+      "status": "approved",
+      "confidence": "high",
+      "summary": "Scan-friendly diagram of the send-message path: React UI, tRPC API, turn workflow, context build, Postgres, LLM provider, SSE stream, and React stream state.",
+      "conclusion": null,
+      "rationale": null,
+      "createdAt": "2026-05-15T00:00:13.000Z",
+      "updatedAt": "2026-05-15T00:00:13.000Z"
+    },
+    {
       "sourceNodeId": "8f3d60f0-9a1f-4a10-9b71-000000000060",
       "sourceParentNodeId": "8f3d60f0-9a1f-4a10-9b71-000000000010",
       "workspaceSourceId": "8f3d60f0-9a1f-4a10-9b71-000000000001",
@@ -171,6 +187,22 @@
       "role": "assistant",
       "content": "The hard part is that a model response is **not a normal request/response**. It is a durable workflow with failure windows.\n\nThe failure modes are concrete:\n\n- a browser retry can create duplicate user messages or assistant turns\n- a stream disconnect can hide progress that already happened\n- generation can fail after the user message is already persisted\n- reconnects need a way to recover the current turn state\n\nThis implementation handles the first version with:\n\n- client-generated idempotency keys\n- staged persistence: user message first, assistant message after generation\n- persisted turn events for status and token output\n- SSE replay so reconnects can recover emitted events\n\n**Conclusion:** The technical center of the project is making an AI turn behave like a reliable workflow, not just calling a model from an API route.",
       "createdAt": "2026-05-15T00:03:06.000Z"
+    },
+    {
+      "sourceMessageId": "8f3d60f0-9a1f-4a10-9b71-000000003101",
+      "nodeSourceId": "8f3d60f0-9a1f-4a10-9b71-000000000045",
+      "authorUserId": "8f3d60f0-9a1f-4a10-9b71-000000000002",
+      "role": "user",
+      "content": "Show the message flow as a compact diagram I can explain quickly.",
+      "createdAt": "2026-05-15T00:03:12.000Z"
+    },
+    {
+      "sourceMessageId": "8f3d60f0-9a1f-4a10-9b71-000000003102",
+      "nodeSourceId": "8f3d60f0-9a1f-4a10-9b71-000000000045",
+      "authorUserId": "8f3d60f0-9a1f-4a10-9b71-000000000002",
+      "role": "assistant",
+      "content": "**Message flow:**\n\n```text\n+----------------+   +----------------+   +----------------+   +----------------+\n| React UI       |-->| tRPC API       |-->| Turn workflow  |-->| Context build  |\n| - submit msg   |   | - validate     |   | - resolve turn |   | - node history |\n| - idem key     |   | - ownership    |   | - persist user |   | - prompt budget|\n+----------------+   +----------------+   +-------+--------+   +-------+--------+\n                                                   |                    |\n                                                   | writes/reads       | prompt\n                                                   v                    v\n                                           +----------------+   +----------------+\n                                           | Postgres       |   | LLM provider   |\n                                           | - messages     |   | - gen text     |\n                                           | - turn events  |   | - return text  |\n                                           +----------------+   +-------+--------+\n                                                                    |\n                                                                    | events\n                                                                    v\n+----------------+   +----------------+                              |\n| React stream   |<--| SSE route      |<-----------------------------+\n| - live status  |   | - publish      |\n| - replay state |   | - replay log   |\n+----------------+   +----------------+\n```\n\n**Conclusion:** This is the one-screen path from user intent to durable state, context assembly, model output, and streamed UI feedback.",
+      "createdAt": "2026-05-15T00:03:18.000Z"
     },
     {
       "sourceMessageId": "8f3d60f0-9a1f-4a10-9b71-000000004001",

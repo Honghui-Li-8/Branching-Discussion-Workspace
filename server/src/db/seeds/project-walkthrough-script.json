@@ -251,6 +251,22 @@
       "updatedAt": "2026-05-15T00:00:42.000Z"
     },
     {
+      "sourceNodeId": "9c4d70f0-7b2e-4c21-8c82-000000000044",
+      "sourceParentNodeId": "9c4d70f0-7b2e-4c21-8c82-000000000040",
+      "workspaceSourceId": "9c4d70f0-7b2e-4c21-8c82-000000000001",
+      "authorUserId": "9c4d70f0-7b2e-4c21-8c82-000000000002",
+      "depth": 2,
+      "type": "question",
+      "title": "Message flow",
+      "status": "approved",
+      "confidence": "high",
+      "summary": "Step through the full send-message path from React composer to tRPC, turn workflow, context assembly, provider call, SSE stream, persistence, and postprocess jobs.",
+      "conclusion": null,
+      "rationale": null,
+      "createdAt": "2026-05-15T00:00:43.000Z",
+      "updatedAt": "2026-05-15T00:00:43.000Z"
+    },
+    {
       "sourceNodeId": "9c4d70f0-7b2e-4c21-8c82-000000000050",
       "sourceParentNodeId": "9c4d70f0-7b2e-4c21-8c82-000000000040",
       "workspaceSourceId": "9c4d70f0-7b2e-4c21-8c82-000000000001",
@@ -356,7 +372,7 @@
       "title": "Hurdle and scaling close",
       "status": "deferred",
       "confidence": "high",
-      "summary": "Close honestly: reliable turn workflow was the hurdle; distributed operation is the first scaling boundary.",
+      "summary": "Close honestly: context/history management was the hurdle; longer conversations create cost, latency, and relevance tradeoffs.",
       "conclusion": null,
       "rationale": null,
       "createdAt": "2026-05-15T00:01:03.000Z",
@@ -372,7 +388,7 @@
       "title": "Hardest technical hurdle",
       "status": "closed",
       "confidence": "medium",
-      "summary": "Optional supporting detail for the close: reliable model turns under retries, reconnects, and partial failure.",
+      "summary": "Optional supporting detail for the close: context assembly across longer, deeper conversations while balancing relevance, latency, and token cost.",
       "conclusion": null,
       "rationale": null,
       "createdAt": "2026-05-15T00:01:06.000Z",
@@ -388,7 +404,7 @@
       "title": "First scaling boundary",
       "status": "closed",
       "confidence": "medium",
-      "summary": "Optional supporting detail for the close: distributed operation is the first real scaling boundary.",
+      "summary": "Optional supporting detail for the close: longer histories and deeper branches make context selection the first product-level scaling boundary.",
       "conclusion": null,
       "rationale": null,
       "createdAt": "2026-05-15T00:01:09.000Z",
@@ -537,7 +553,7 @@
       "nodeSourceId": "9c4d70f0-7b2e-4c21-8c82-000000000010",
       "authorUserId": "9c4d70f0-7b2e-4c21-8c82-000000000002",
       "role": "assistant",
-      "content": "Use this tree as the walkthrough map:\n\n- **Product opening** - explain the live workspace in one product sentence.\n- **Architecture overview** - name the major responsibilities and durable boundaries.\n- **Backend turn workflow** - show the strongest system-design code path.\n- **AI scope** - describe model-backed workflow orchestration without overclaiming agents.\n- **Hurdle and scaling close** - finish with the hard problem and the first production boundary.\n\n**Conclusion:** The walkthrough should prove architecture judgment: product model, workflow reliability, and honest tradeoffs.",
+      "content": "Use this tree as the walkthrough map:\n\n- **Product opening** - explain the live workspace in one product sentence.\n- **Architecture overview** - name the major responsibilities and durable boundaries.\n- **Backend turn workflow** - show the strongest system-design code path.\n- **AI scope** - describe model-backed workflow orchestration without overclaiming agents.\n- **Hurdle and scaling close** - finish with context/history management and the cost-performance tradeoff.\n\n**Conclusion:** The walkthrough should prove architecture judgment: product model, context workflow design, and honest tradeoffs.",
       "createdAt": "2026-05-15T00:01:05.000Z"
     },
     {
@@ -667,6 +683,22 @@
       "role": "assistant",
       "content": "**Show:**\n\n- `server/src/chat/runConversationTurnFlow.ts`\n- `server/src/chat/turnExecutionPipeline.ts`\n\n**Say:**\n\n> Before generation starts, the server validates the request and resolves or recovers the turn by idempotency key. Then the execution path is staged: context, retrieval gate, prompt budget, generation, assistant persistence, finalization.\n\n**Conclusion:** This is the strongest backend signal because it shows workflow orchestration beyond CRUD.",
       "createdAt": "2026-05-15T00:02:25.000Z"
+    },
+    {
+      "sourceMessageId": "9c4d70f0-7b2e-4c21-8c82-000000002015",
+      "nodeSourceId": "9c4d70f0-7b2e-4c21-8c82-000000000044",
+      "authorUserId": "9c4d70f0-7b2e-4c21-8c82-000000000002",
+      "role": "user",
+      "content": "What is the message flow diagram I should show?",
+      "createdAt": "2026-05-15T00:02:26.000Z"
+    },
+    {
+      "sourceMessageId": "9c4d70f0-7b2e-4c21-8c82-000000002016",
+      "nodeSourceId": "9c4d70f0-7b2e-4c21-8c82-000000000044",
+      "authorUserId": "9c4d70f0-7b2e-4c21-8c82-000000000002",
+      "role": "assistant",
+      "content": "**Message flow:**\n\n```text\n+----------------+   +----------------+   +----------------+   +----------------+\n| React UI       |-->| tRPC API       |-->| Turn workflow  |-->| Context build  |\n| - submit msg   |   | - validate     |   | - resolve turn |   | - node history |\n| - idem key     |   | - ownership    |   | - persist user |   | - prompt budget|\n+----------------+   +----------------+   +-------+--------+   +-------+--------+\n                                                   |                    |\n                                                   | writes/reads       | prompt\n                                                   v                    v\n                                           +----------------+   +----------------+\n                                           | Postgres       |   | LLM provider   |\n                                           | - messages     |   | - gen text     |\n                                           | - turn events  |   | - return text  |\n                                           +----------------+   +-------+--------+\n                                                                    |\n                                                                    | events\n                                                                    v\n+----------------+   +----------------+                              |\n| React stream   |<--| SSE route      |<-----------------------------+\n| - live status  |   | - publish      |\n| - replay state |   | - replay log   |\n+----------------+   +----------------+\n```\n\n**Show:**\n\n- `client/web/src/components/conversation/ConversationComposer.tsx`\n- `client/web/src/components/discussion-tree/hooks/useNodeConversation.ts`\n- `server/src/chat/runConversationTurnFlow.ts`\n- `server/src/chat/buildConversationContext.ts`\n- `server/src/chat/stream/routes.ts`\n\n**Conclusion:** The send path coordinates UI intent, typed API input, staged backend state, context assembly, model output, streaming feedback, and durable persistence.",
+      "createdAt": "2026-05-15T00:02:27.000Z"
     },
     {
       "sourceMessageId": "9c4d70f0-7b2e-4c21-8c82-000000001019",
@@ -873,7 +905,7 @@
       "nodeSourceId": "9c4d70f0-7b2e-4c21-8c82-000000000080",
       "authorUserId": "9c4d70f0-7b2e-4c21-8c82-000000000002",
       "role": "assistant",
-      "content": "**Close with the real hurdle:** making a model turn reliable under retries, streaming, and partial failure.\n\nThen name the first scaling boundary: distributed operation. A single instance can serve the MVP, but production needs shared sessions, shared event pub/sub, a real job queue, CI/CD, deployment, and observability.\n\n**Conclusion:** This is a serious MVP slice: the product model and workflow architecture are implemented; infrastructure hardening and deeper agent behavior are the next layers.",
+      "content": "**Close with the real hurdle:** context and history management.\n\nAs conversations get longer and the tree gets deeper, the system has to decide what context is actually useful for the next model call. Sending everything is simple, but it increases token cost, latency, and noise. Sending too little makes the assistant lose important history.\n\nThen name the first scaling boundary: context selection. The next production step is a stronger context system with summaries, scoring, retrieval, token budgeting, and observability around cost and answer quality.\n\n**Conclusion:** This is a serious MVP slice: the product model and workflow architecture are implemented; the next layer is making context assembly scale with longer, deeper workspaces.",
       "createdAt": "2026-05-15T00:04:35.000Z"
     },
     {
@@ -889,7 +921,7 @@
       "nodeSourceId": "9c4d70f0-7b2e-4c21-8c82-000000000081",
       "authorUserId": "9c4d70f0-7b2e-4c21-8c82-000000000002",
       "role": "assistant",
-      "content": "**Hardest hurdle:** turning chat generation into a recoverable workflow.\n\nThe challenge was coordinating:\n\n- user persistence\n- model generation\n- stream output\n- assistant persistence\n- failure states\n- reconnect/replay behavior\n\n**Conclusion:** The core problem was reliability at the AI workflow boundary, not rendering text on screen.",
+      "content": "**Hardest hurdle:** context/history management.\n\nThe challenge is balancing:\n\n- enough history for useful answers\n- low enough token cost to stay practical\n- low enough latency for an interactive product\n- relevant enough context to avoid confusing the model\n- branch-aware history as conversations split into subtopics\n\n**Conclusion:** The hard problem is not rendering chat. It is deciding what the model should know at each point in a growing workspace.",
       "createdAt": "2026-05-15T00:04:45.000Z"
     },
     {
@@ -905,7 +937,7 @@
       "nodeSourceId": "9c4d70f0-7b2e-4c21-8c82-000000000082",
       "authorUserId": "9c4d70f0-7b2e-4c21-8c82-000000000002",
       "role": "assistant",
-      "content": "**First scaling boundary:** distributed operation.\n\nThe weak points are clear:\n\n- process-local sessions\n- process-local event broker\n- DB-polled worker\n- local deployment assumptions\n- limited production observability\n\n**Conclusion:** Basic single-instance concurrency is not the issue; the first real break is coordinating state across multiple instances.",
+      "content": "**First scaling boundary:** context growth.\n\nThe weak points are clear:\n\n- longer chat history increases token cost\n- deeper branches make relevance harder to determine\n- naive full-history prompts add latency and noise\n- summaries/retrieval need quality measurement\n- cost and answer quality need observability\n\n**Conclusion:** Basic local concurrency is not the point; the first product-level scaling problem is keeping context useful, fast, and affordable as the workspace grows.",
       "createdAt": "2026-05-15T00:04:55.000Z"
     },
     {
