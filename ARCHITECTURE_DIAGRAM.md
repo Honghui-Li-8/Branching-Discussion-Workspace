@@ -4,23 +4,28 @@ Use the first diagram for the walkthrough. It is intentionally small enough to r
 
 ## Walkthrough Diagram
 
-```mermaid
-flowchart LR
-  UI["React UI<br/>workspace tree + conversation panel"]
-  API["tRPC API<br/>typed full-stack boundary"]
-  TURN["Turn Workflow<br/>idempotency + persistence + context"]
-  MODEL["Model Provider<br/>assistant generation"]
-  STORE[("Postgres<br/>nodes, messages, turns, events")]
-  STREAM["SSE Stream<br/>live updates + replay"]
-
-  UI -->|"send message / branch"| API
-  API --> TURN
-  TURN -->|"build prompt"| MODEL
-  MODEL -->|"tokens + final text"| TURN
-  TURN -->|"persist durable state"| STORE
-  STORE -->|"replay events"| STREAM
-  TURN -->|"publish live events"| STREAM
-  STREAM -->|"status + tokens"| UI
+```text
++----------------+   +----------------+   +----------------+   +----------------+
+| React UI       |-->| tRPC API       |-->| Turn workflow  |-->| Context build  |
+| - workspace    |   | - typed input  |   | - idempotency  |   | - node history |
+| - conversation |   | - ownership    |   | - persistence  |   | - budget guard |
++----------------+   +----------------+   +-------+--------+   +-------+--------+
+                                                   |                    |
+                                                   | writes/reads       | prompt
+                                                   v                    v
+                                           +----------------+   +----------------+
+                                           | Postgres       |   | Model provider |
+                                           | - nodes/msg    |   | - generation   |
+                                           | - turns/events |   | - final text   |
+                                           +----------------+   +-------+--------+
+                                                                    |
+                                                                    | events
+                                                                    v
++----------------+   +----------------+                              |
+| React stream   |<--| SSE route      |<-----------------------------+
+| - live status  |   | - live events  |
+| - replay state |   | - event replay |
++----------------+   +----------------+
 ```
 
 One-sentence narration:
@@ -33,21 +38,29 @@ The frontend owns interaction state; the backend owns turn workflow correctness;
 
 Use this only if you have time to show the branching path separately.
 
-```mermaid
-flowchart LR
-  SELECT["Select assistant text"]
-  BRANCH["Branch service"]
-  NODE["Child node"]
-  ANNO["Source annotation"]
-  EVENT["Branch event message"]
-  CHILD["Child conversation"]
-
-  SELECT --> BRANCH
-  BRANCH --> NODE
-  BRANCH --> ANNO
-  BRANCH --> EVENT
-  NODE --> CHILD
-  EVENT --> CHILD
+```text
++----------------+      +----------------+
+| User selection | ---> | Branch service |
+| - source msg   |      | - idempotency  |
+| - text span    |      | - ownership    |
++----------------+      +-------+--------+
+                                |
+              +-----------------+-----------------+
+              |                 |                 |
+              v                 v                 v
+      +----------------+ +----------------+ +----------------+
+      | Child node     | | Annotation     | | Branch event   |
+      | - tree record  | | - quote/span   | | - timeline msg |
+      | - focused ctx  | | - source link  | | - visible src  |
+      +-------+--------+ +----------------+ +-------+--------+
+              |                                   |
+              +-----------------+-----------------+
+                                v
+                       +----------------+
+                       | Child convo    |
+                       | - provenance   |
+                       | - follow-up    |
+                       +----------------+
 ```
 
 Narration:
@@ -93,4 +106,3 @@ Basic retrieval seams -> tested memory/retrieval policy with observability
 - no production distributed realtime
 - no mature long-term memory system
 - no cloud deployment topology yet
-

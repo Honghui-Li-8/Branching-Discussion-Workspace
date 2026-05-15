@@ -27,6 +27,30 @@ This app treats the discussion tree as part of the product:
 - `server`: Express + tRPC backend for auth, turn orchestration, SSE streaming, branch services, database access, and async post-processing jobs.
 - `shared`: Shared schemas, metadata contracts, and common types that keep the frontend and backend boundary aligned.
 
+```text
++----------------+   +----------------+   +----------------+   +----------------+
+| React UI       |-->| tRPC API       |-->| Turn workflow  |-->| Context build  |
+| - workspace    |   | - typed input  |   | - idempotency  |   | - node history |
+| - conversation |   | - ownership    |   | - persistence  |   | - prompt budget|
++----------------+   +----------------+   +-------+--------+   +-------+--------+
+                                                   |                    |
+                                                   | writes/reads       | prompt
+                                                   v                    v
+                                           +----------------+   +----------------+
+                                           | Postgres       |   | Model provider |
+                                           | - nodes/msg    |   | - generation   |
+                                           | - turns/events |   | - final text   |
+                                           +----------------+   +-------+--------+
+                                                                    |
+                                                                    | events
+                                                                    v
++----------------+   +----------------+                              |
+| React stream   |<--| SSE route      |<-----------------------------+
+| - live status  |   | - live events  |
+| - replay state |   | - event replay |
++----------------+   +----------------+
+```
+
 ## Local setup
 
 ### Prerequisites
@@ -156,7 +180,7 @@ The remaining gap to a production platform is mostly operational and AI-depth wo
 Prep files:
 
 - `ARCHITECTURE.md` - concise system architecture and production gap notes.
-- `ARCHITECTURE_DIAGRAM.md` - simple and advanced Mermaid diagrams for screen sharing.
+- `ARCHITECTURE_DIAGRAM.md` - simple 2D architecture diagrams for screen sharing.
 - `docs/PROJECT_WALKTHROUGH_WORKSPACE.md` - recommended demo workspace/storyboard and seed content.
 - `docs/PROJECT_WALKTHROUGH_SEED.json` - workspace-export seed object for the project walkthrough example.
 - `server/src/db/seeds/project-walkthrough.json` - registered example seed available through `workspaceCreateFromExample`.

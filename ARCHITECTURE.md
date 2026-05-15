@@ -22,18 +22,27 @@ The boundary is intentionally typed. The frontend calls tRPC procedures shaped b
 ## Main Runtime Flow
 
 ```text
-React workspace UI
-  -> tRPC conversationSend
-  -> turn preflight and idempotency check
-  -> persist user message
-  -> assemble node conversation context
-  -> optional retrieval gate
-  -> prompt budget policy
-  -> provider-backed assistant generation
-  -> persisted conversation_turn_event rows
-  -> SSE replay/live stream to client
-  -> persist assistant message
-  -> enqueue postprocess jobs
++----------------+   +----------------+   +----------------+   +----------------+
+| React UI       |-->| tRPC API       |-->| Turn workflow  |-->| Context build  |
+| - submit msg   |   | - validate     |   | - resolve turn |   | - node history |
+| - idem key     |   | - ownership    |   | - persist user |   | - prompt budget|
++----------------+   +----------------+   +-------+--------+   +-------+--------+
+                                                   |                    |
+                                                   | writes/reads       | prompt
+                                                   v                    v
+                                           +----------------+   +----------------+
+                                           | Postgres       |   | Model provider |
+                                           | - messages     |   | - gen text     |
+                                           | - turn events  |   | - return text  |
+                                           | - jobs/chunks  |   +-------+--------+
+                                           +----------------+           |
+                                                                    events
+                                                                       v
++----------------+   +----------------+                                |
+| React stream   |<--| SSE route      |<-------------------------------+
+| - live status  |   | - publish      |
+| - replay state |   | - replay log   |
++----------------+   +----------------+
 ```
 
 The most important design choice is treating a model response as a durable workflow, not a plain request/response. A browser retry, reconnect, or generation failure should not silently duplicate messages or lose streamed state.
@@ -109,4 +118,3 @@ The first scaling boundary is not basic single-server concurrency. It is distrib
 3. Replace DB-polled jobs with a real queue and lease/visibility semantics.
 4. Add deployment topology, health checks, and CI/CD.
 5. Mature the context layer from recent-history plus retrieval hooks into a tested memory/retrieval policy.
-
