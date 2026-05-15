@@ -23,7 +23,7 @@ const EXAMPLES: { key: ExampleWorkspaceKey; title: string; description: string }
   {
     key: 'project-walkthrough-script',
     title: 'Project Walkthrough Script',
-    description: 'Three-minute recording script embedded as node conversations.',
+    description: 'Reusable architecture walkthrough script embedded as node conversations.',
   },
 ]
 

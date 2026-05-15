@@ -160,7 +160,7 @@ Prep files:
 - `docs/PROJECT_WALKTHROUGH_WORKSPACE.md` - recommended demo workspace/storyboard and seed content.
 - `docs/PROJECT_WALKTHROUGH_SEED.json` - workspace-export seed object for the project walkthrough example.
 - `server/src/db/seeds/project-walkthrough.json` - registered example seed available through `workspaceCreateFromExample`.
-- `server/src/db/seeds/project-walkthrough-script.json` - registered example seed that embeds the 3-minute project walkthrough script as node conversations.
+- `server/src/db/seeds/project-walkthrough-script.json` - registered example seed that embeds a reusable walkthrough script as node conversations.
 
 ## Engineering notes
 
