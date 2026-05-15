@@ -107,6 +107,22 @@
       "updatedAt": "2026-05-15T00:00:13.000Z"
     },
     {
+      "sourceNodeId": "8f3d60f0-9a1f-4a10-9b71-000000000046",
+      "sourceParentNodeId": "8f3d60f0-9a1f-4a10-9b71-000000000045",
+      "workspaceSourceId": "8f3d60f0-9a1f-4a10-9b71-000000000001",
+      "authorUserId": "8f3d60f0-9a1f-4a10-9b71-000000000002",
+      "depth": 3,
+      "type": "question",
+      "title": "Context assembly path",
+      "status": "exploring",
+      "confidence": "medium",
+      "summary": "Current MVP context is full-history-until-cap; the next layer is scored memory/retrieval with diagnostics and cost awareness.",
+      "conclusion": null,
+      "rationale": null,
+      "createdAt": "2026-05-15T00:00:14.000Z",
+      "updatedAt": "2026-05-15T00:00:14.000Z"
+    },
+    {
       "sourceNodeId": "8f3d60f0-9a1f-4a10-9b71-000000000060",
       "sourceParentNodeId": "8f3d60f0-9a1f-4a10-9b71-000000000010",
       "workspaceSourceId": "8f3d60f0-9a1f-4a10-9b71-000000000001",
@@ -203,6 +219,22 @@
       "role": "assistant",
       "content": "**Message flow:**\n\n```text\n+----------------+   +----------------+   +----------------+   +----------------+\n| React UI       |-->| tRPC API       |-->| Turn workflow  |-->| Context build  |\n| - submit msg   |   | - validate     |   | - resolve turn |   | - node history |\n| - idem key     |   | - ownership    |   | - persist user |   | - prompt budget|\n+----------------+   +----------------+   +-------+--------+   +-------+--------+\n                                                   |                    |\n                                                   | writes/reads       | prompt\n                                                   v                    v\n                                           +----------------+   +----------------+\n                                           | Postgres       |   | LLM provider   |\n                                           | - messages     |   | - gen text     |\n                                           | - turn events  |   | - return text  |\n                                           +----------------+   +-------+--------+\n                                                                    |\n                                                                    | events\n                                                                    v\n+----------------+   +----------------+                              |\n| React stream   |<--| SSE route      |<-----------------------------+\n| - live status  |   | - publish      |\n| - replay state |   | - replay log   |\n+----------------+   +----------------+\n```\n\n**Conclusion:** This is the one-screen path from user intent to durable state, context assembly, model output, and streamed UI feedback.",
       "createdAt": "2026-05-15T00:03:18.000Z"
+    },
+    {
+      "sourceMessageId": "8f3d60f0-9a1f-4a10-9b71-000000003103",
+      "nodeSourceId": "8f3d60f0-9a1f-4a10-9b71-000000000046",
+      "authorUserId": "8f3d60f0-9a1f-4a10-9b71-000000000002",
+      "role": "user",
+      "content": "Add the context assembly detail as a work-in-progress subpoint.",
+      "createdAt": "2026-05-15T00:03:24.000Z"
+    },
+    {
+      "sourceMessageId": "8f3d60f0-9a1f-4a10-9b71-000000003104",
+      "nodeSourceId": "8f3d60f0-9a1f-4a10-9b71-000000000046",
+      "authorUserId": "8f3d60f0-9a1f-4a10-9b71-000000000002",
+      "role": "assistant",
+      "content": "**Context assembly is work in progress.**\n\nMVP 1 uses simple full-history-until-cap context. That is intentional because the first product proof is short, focused branch conversations. The next layer is scored memory/retrieval so longer workspaces stay coherent without sending everything to the model.\n\n```text\nMVP today\n+----------------+     +----------------+     +----------------+\n| Node messages  | --> | Budget guard   | --> | Prompt payload |\n| - local thread |     | - token cap    |     | - recent ctx   |\n| - branch event |     | - trim oldest  |     | - user input   |\n+----------------+     +----------------+     +----------------+\n\nNext context system\n+----------------+     +----------------+     +----------------+\n| Sources        | --> | Candidate form | --> | Filter pass    |\n| - node thread  |     | - full text    |     | - ownership    |\n| - branch event |     | - summary      |     | - depth/recency|\n| - memory blocks|     | - embedding ref|     | - relevance   |\n+----------------+     +----------------+     +-------+--------+\n                                                       |\n                                                       v\n+----------------+     +----------------+     +----------------+\n| Prompt payload | <-- | Budget select  | <-- | Score/rank     |\n| - ordered ctx  |     | - fit tokens   |     | - relevance    |\n| - citations    |     | - downgrade    |     | - importance   |\n| - diagnostics  |     | - drop lowest  |     | - cost/recency |\n+----------------+     +----------------+     +----------------+\n```\n\n**Conclusion:** Do not overclaim this as production memory. Present it as an implemented MVP context path with a clear next architecture layer: candidate forms, filters, scoring, budgeted selection, and diagnostics.",
+      "createdAt": "2026-05-15T00:03:30.000Z"
     },
     {
       "sourceMessageId": "8f3d60f0-9a1f-4a10-9b71-000000004001",

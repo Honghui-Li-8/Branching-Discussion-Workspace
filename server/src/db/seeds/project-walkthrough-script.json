@@ -267,6 +267,22 @@
       "updatedAt": "2026-05-15T00:00:43.000Z"
     },
     {
+      "sourceNodeId": "9c4d70f0-7b2e-4c21-8c82-000000000045",
+      "sourceParentNodeId": "9c4d70f0-7b2e-4c21-8c82-000000000044",
+      "workspaceSourceId": "9c4d70f0-7b2e-4c21-8c82-000000000001",
+      "authorUserId": "9c4d70f0-7b2e-4c21-8c82-000000000002",
+      "depth": 3,
+      "type": "question",
+      "title": "Context assembly path",
+      "status": "exploring",
+      "confidence": "medium",
+      "summary": "Explain the current MVP context path honestly: full history until cap today, with scored memory/retrieval as the next layer.",
+      "conclusion": null,
+      "rationale": null,
+      "createdAt": "2026-05-15T00:00:44.000Z",
+      "updatedAt": "2026-05-15T00:00:44.000Z"
+    },
+    {
       "sourceNodeId": "9c4d70f0-7b2e-4c21-8c82-000000000050",
       "sourceParentNodeId": "9c4d70f0-7b2e-4c21-8c82-000000000040",
       "workspaceSourceId": "9c4d70f0-7b2e-4c21-8c82-000000000001",
@@ -699,6 +715,22 @@
       "role": "assistant",
       "content": "**Message flow:**\n\n```text\n+----------------+   +----------------+   +----------------+   +----------------+\n| React UI       |-->| tRPC API       |-->| Turn workflow  |-->| Context build  |\n| - submit msg   |   | - validate     |   | - resolve turn |   | - node history |\n| - idem key     |   | - ownership    |   | - persist user |   | - prompt budget|\n+----------------+   +----------------+   +-------+--------+   +-------+--------+\n                                                   |                    |\n                                                   | writes/reads       | prompt\n                                                   v                    v\n                                           +----------------+   +----------------+\n                                           | Postgres       |   | LLM provider   |\n                                           | - messages     |   | - gen text     |\n                                           | - turn events  |   | - return text  |\n                                           +----------------+   +-------+--------+\n                                                                    |\n                                                                    | events\n                                                                    v\n+----------------+   +----------------+                              |\n| React stream   |<--| SSE route      |<-----------------------------+\n| - live status  |   | - publish      |\n| - replay state |   | - replay log   |\n+----------------+   +----------------+\n```\n\n**Show:**\n\n- `client/web/src/components/conversation/ConversationComposer.tsx`\n- `client/web/src/components/discussion-tree/hooks/useNodeConversation.ts`\n- `server/src/chat/runConversationTurnFlow.ts`\n- `server/src/chat/buildConversationContext.ts`\n- `server/src/chat/stream/routes.ts`\n\n**Conclusion:** The send path coordinates UI intent, typed API input, staged backend state, context assembly, model output, streaming feedback, and durable persistence.",
       "createdAt": "2026-05-15T00:02:27.000Z"
+    },
+    {
+      "sourceMessageId": "9c4d70f0-7b2e-4c21-8c82-000000002017",
+      "nodeSourceId": "9c4d70f0-7b2e-4c21-8c82-000000000045",
+      "authorUserId": "9c4d70f0-7b2e-4c21-8c82-000000000002",
+      "role": "user",
+      "content": "How should I explain context assembly as work in progress?",
+      "createdAt": "2026-05-15T00:02:28.000Z"
+    },
+    {
+      "sourceMessageId": "9c4d70f0-7b2e-4c21-8c82-000000002018",
+      "nodeSourceId": "9c4d70f0-7b2e-4c21-8c82-000000000045",
+      "authorUserId": "9c4d70f0-7b2e-4c21-8c82-000000000002",
+      "role": "assistant",
+      "content": "**Context assembly is work in progress.**\n\nThe MVP path is intentionally simple: use the active node's conversation history until a token/message cap, then trim older content. That is enough for short, focused branch conversations, but it does not solve long-workspace memory.\n\n```text\nMVP today\n+----------------+     +----------------+     +----------------+\n| Node messages  | --> | Budget guard   | --> | Prompt payload |\n| - local thread |     | - token cap    |     | - recent ctx   |\n| - branch event |     | - trim oldest  |     | - user input   |\n+----------------+     +----------------+     +----------------+\n\nNext context system\n+----------------+     +----------------+     +----------------+\n| Sources        | --> | Candidate form | --> | Filter pass    |\n| - node thread  |     | - full text    |     | - ownership    |\n| - branch event |     | - summary      |     | - depth/recency|\n| - memory blocks|     | - embedding ref|     | - relevance   |\n+----------------+     +----------------+     +-------+--------+\n                                                       |\n                                                       v\n+----------------+     +----------------+     +----------------+\n| Prompt payload | <-- | Budget select  | <-- | Score/rank     |\n| - ordered ctx  |     | - fit tokens   |     | - relevance    |\n| - citations    |     | - downgrade    |     | - importance   |\n| - diagnostics  |     | - drop lowest  |     | - cost/recency |\n+----------------+     +----------------+     +----------------+\n```\n\n**Conclusion:** The current system has a real context path, but the honest scaling story is that scored memory, retrieval, candidate forms, filtering, and diagnostics are the next layer.",
+      "createdAt": "2026-05-15T00:02:29.000Z"
     },
     {
       "sourceMessageId": "9c4d70f0-7b2e-4c21-8c82-000000001019",
