@@ -1,0 +1,248 @@
+{
+  "formatVersion": "workspace-export.v1",
+  "exportedAt": "2026-05-15T00:00:00.000Z",
+  "workspace": {
+    "sourceWorkspaceId": "8f3d60f0-9a1f-4a10-9b71-000000000001",
+    "title": "Project Architecture Walkthrough",
+    "authorUserId": "8f3d60f0-9a1f-4a10-9b71-000000000002",
+    "rootNodeSourceId": "8f3d60f0-9a1f-4a10-9b71-000000000010",
+    "createdAt": "2026-05-15T00:00:00.000Z",
+    "updatedAt": "2026-05-15T00:00:00.000Z"
+  },
+  "nodes": [
+    {
+      "sourceNodeId": "8f3d60f0-9a1f-4a10-9b71-000000000010",
+      "sourceParentNodeId": "8f3d60f0-9a1f-4a10-9b71-000000000010",
+      "workspaceSourceId": "8f3d60f0-9a1f-4a10-9b71-000000000001",
+      "authorUserId": "8f3d60f0-9a1f-4a10-9b71-000000000002",
+      "depth": 0,
+      "type": "decision",
+      "title": "Core system overview",
+      "status": "exploring",
+      "confidence": "medium",
+      "summary": "High-level map for the walkthrough: product loop, turn lifecycle, branching provenance, and honest production gaps.",
+      "conclusion": null,
+      "rationale": null,
+      "createdAt": "2026-05-15T00:00:00.000Z",
+      "updatedAt": "2026-05-15T00:00:00.000Z"
+    },
+    {
+      "sourceNodeId": "8f3d60f0-9a1f-4a10-9b71-000000000020",
+      "sourceParentNodeId": "8f3d60f0-9a1f-4a10-9b71-000000000010",
+      "workspaceSourceId": "8f3d60f0-9a1f-4a10-9b71-000000000001",
+      "authorUserId": "8f3d60f0-9a1f-4a10-9b71-000000000002",
+      "depth": 1,
+      "type": "question",
+      "title": "Flow 1: workspace tree -> node conversation",
+      "status": "exploring",
+      "confidence": "medium",
+      "summary": "Frontend loads a workspace, hydrates the flat node rows into a tree, and opens a scoped conversation panel.",
+      "conclusion": null,
+      "rationale": null,
+      "createdAt": "2026-05-15T00:00:03.000Z",
+      "updatedAt": "2026-05-15T00:00:03.000Z"
+    },
+    {
+      "sourceNodeId": "8f3d60f0-9a1f-4a10-9b71-000000000030",
+      "sourceParentNodeId": "8f3d60f0-9a1f-4a10-9b71-000000000010",
+      "workspaceSourceId": "8f3d60f0-9a1f-4a10-9b71-000000000001",
+      "authorUserId": "8f3d60f0-9a1f-4a10-9b71-000000000002",
+      "depth": 1,
+      "type": "question",
+      "title": "Flow 2: message -> turn lifecycle -> SSE stream",
+      "status": "exploring",
+      "confidence": "high",
+      "summary": "Strongest backend flow: idempotent turn creation, staged persistence, context assembly, provider dispatch, persisted events, and SSE replay.",
+      "conclusion": null,
+      "rationale": null,
+      "createdAt": "2026-05-15T00:00:06.000Z",
+      "updatedAt": "2026-05-15T00:00:06.000Z"
+    },
+    {
+      "sourceNodeId": "8f3d60f0-9a1f-4a10-9b71-000000000040",
+      "sourceParentNodeId": "8f3d60f0-9a1f-4a10-9b71-000000000030",
+      "workspaceSourceId": "8f3d60f0-9a1f-4a10-9b71-000000000001",
+      "authorUserId": "8f3d60f0-9a1f-4a10-9b71-000000000002",
+      "depth": 2,
+      "type": "question",
+      "title": "Idempotency and retries",
+      "status": "exploring",
+      "confidence": "high",
+      "summary": "Focused branch explaining why retries converge on one durable turn instead of duplicating messages.",
+      "conclusion": null,
+      "rationale": null,
+      "createdAt": "2026-05-15T00:00:09.000Z",
+      "updatedAt": "2026-05-15T00:00:09.000Z"
+    },
+    {
+      "sourceNodeId": "8f3d60f0-9a1f-4a10-9b71-000000000050",
+      "sourceParentNodeId": "8f3d60f0-9a1f-4a10-9b71-000000000030",
+      "workspaceSourceId": "8f3d60f0-9a1f-4a10-9b71-000000000001",
+      "authorUserId": "8f3d60f0-9a1f-4a10-9b71-000000000002",
+      "depth": 2,
+      "type": "question",
+      "title": "SSE replay and reconnect",
+      "status": "open",
+      "confidence": "medium",
+      "summary": "Why persisted turn events matter when the browser reconnects during generation.",
+      "conclusion": null,
+      "rationale": null,
+      "createdAt": "2026-05-15T00:00:12.000Z",
+      "updatedAt": "2026-05-15T00:00:12.000Z"
+    },
+    {
+      "sourceNodeId": "8f3d60f0-9a1f-4a10-9b71-000000000060",
+      "sourceParentNodeId": "8f3d60f0-9a1f-4a10-9b71-000000000010",
+      "workspaceSourceId": "8f3d60f0-9a1f-4a10-9b71-000000000001",
+      "authorUserId": "8f3d60f0-9a1f-4a10-9b71-000000000002",
+      "depth": 1,
+      "type": "question",
+      "title": "Flow 3: assistant selection -> durable branch",
+      "status": "exploring",
+      "confidence": "high",
+      "summary": "Branching is represented as child node plus source annotation plus branch event message, not just UI navigation.",
+      "conclusion": null,
+      "rationale": null,
+      "createdAt": "2026-05-15T00:00:15.000Z",
+      "updatedAt": "2026-05-15T00:00:15.000Z"
+    },
+    {
+      "sourceNodeId": "8f3d60f0-9a1f-4a10-9b71-000000000070",
+      "sourceParentNodeId": "8f3d60f0-9a1f-4a10-9b71-000000000060",
+      "workspaceSourceId": "8f3d60f0-9a1f-4a10-9b71-000000000001",
+      "authorUserId": "8f3d60f0-9a1f-4a10-9b71-000000000002",
+      "depth": 2,
+      "type": "question",
+      "title": "Why branch provenance is a timeline event",
+      "status": "exploring",
+      "confidence": "high",
+      "summary": "The branch origin is renderable and queryable inside the child conversation timeline.",
+      "conclusion": null,
+      "rationale": null,
+      "createdAt": "2026-05-15T00:00:18.000Z",
+      "updatedAt": "2026-05-15T00:00:18.000Z"
+    }
+  ],
+  "messages": [
+    {
+      "sourceMessageId": "8f3d60f0-9a1f-4a10-9b71-000000001001",
+      "nodeSourceId": "8f3d60f0-9a1f-4a10-9b71-000000000010",
+      "authorUserId": "8f3d60f0-9a1f-4a10-9b71-000000000002",
+      "role": "user",
+      "content": "Help me prepare a concise architecture walkthrough for this branching AI workspace. Focus on the core product loop, the backend turn lifecycle, and why branch provenance is durable product data rather than just UI state.",
+      "createdAt": "2026-05-15T00:01:00.000Z"
+    },
+    {
+      "sourceMessageId": "8f3d60f0-9a1f-4a10-9b71-000000001002",
+      "nodeSourceId": "8f3d60f0-9a1f-4a10-9b71-000000000010",
+      "authorUserId": "8f3d60f0-9a1f-4a10-9b71-000000000002",
+      "role": "assistant",
+      "content": "The clean walkthrough is three flows:\n\n1. **Workspace load** - the frontend loads a workspace, hydrates flat node rows into a discussion tree, and opens a node-scoped conversation.\n2. **Message turn** - sending a message starts a backend workflow: idempotency check, user-message persistence, context assembly, provider call, streamed events, assistant persistence, and postprocess enqueue.\n3. **Branching** - selected assistant text becomes durable product data: child node, source annotation, and a branch event message in the child timeline.\n\n**Conclusion:** The strongest architecture story is not \"chat UI.\" It is a tree-shaped workspace where the frontend owns interaction state and the backend owns workflow correctness.",
+      "createdAt": "2026-05-15T00:01:04.000Z"
+    },
+    {
+      "sourceMessageId": "8f3d60f0-9a1f-4a10-9b71-000000002001",
+      "nodeSourceId": "8f3d60f0-9a1f-4a10-9b71-000000000020",
+      "authorUserId": "8f3d60f0-9a1f-4a10-9b71-000000000002",
+      "role": "user",
+      "content": "What should I say when I first show the workspace tree and conversation panel?",
+      "createdAt": "2026-05-15T00:02:00.000Z"
+    },
+    {
+      "sourceMessageId": "8f3d60f0-9a1f-4a10-9b71-000000002002",
+      "nodeSourceId": "8f3d60f0-9a1f-4a10-9b71-000000000020",
+      "authorUserId": "8f3d60f0-9a1f-4a10-9b71-000000000002",
+      "role": "assistant",
+      "content": "Start with the product invariant: **each node owns a scoped conversation**.\n\nThat makes the tree more than a visual outline:\n\n- opening a node changes the active conversation context\n- folded nodes and active panels stay frontend interaction state\n- workspaces, nodes, messages, turns, and annotations stay backend durable state\n- the same UI pattern supports both exploration and focused branch follow-up\n\n**Conclusion:** The first screen should communicate that this is a structured workspace, not a linear chat with a decorative tree.",
+      "createdAt": "2026-05-15T00:02:05.000Z"
+    },
+    {
+      "sourceMessageId": "8f3d60f0-9a1f-4a10-9b71-000000003001",
+      "nodeSourceId": "8f3d60f0-9a1f-4a10-9b71-000000000030",
+      "authorUserId": "8f3d60f0-9a1f-4a10-9b71-000000000002",
+      "role": "user",
+      "content": "Explain the hardest backend part of sending a message in this app. Keep it focused on reliability rather than UI.",
+      "createdAt": "2026-05-15T00:03:00.000Z"
+    },
+    {
+      "sourceMessageId": "8f3d60f0-9a1f-4a10-9b71-000000003002",
+      "nodeSourceId": "8f3d60f0-9a1f-4a10-9b71-000000000030",
+      "authorUserId": "8f3d60f0-9a1f-4a10-9b71-000000000002",
+      "role": "assistant",
+      "content": "The hard part is that a model response is **not a normal request/response**. It is a durable workflow with failure windows.\n\nThe failure modes are concrete:\n\n- a browser retry can create duplicate user messages or assistant turns\n- a stream disconnect can hide progress that already happened\n- generation can fail after the user message is already persisted\n- reconnects need a way to recover the current turn state\n\nThis implementation handles the first version with:\n\n- client-generated idempotency keys\n- staged persistence: user message first, assistant message after generation\n- persisted turn events for status and token output\n- SSE replay so reconnects can recover emitted events\n\n**Conclusion:** The technical center of the project is making an AI turn behave like a reliable workflow, not just calling a model from an API route.",
+      "createdAt": "2026-05-15T00:03:06.000Z"
+    },
+    {
+      "sourceMessageId": "8f3d60f0-9a1f-4a10-9b71-000000004001",
+      "nodeSourceId": "8f3d60f0-9a1f-4a10-9b71-000000000040",
+      "authorUserId": "8f3d60f0-9a1f-4a10-9b71-000000000002",
+      "role": "system",
+      "content": "Branched from Flow 2: the selected text described the retry failure mode where duplicate delivery could create duplicate user messages or duplicate assistant turns.",
+      "createdAt": "2026-05-15T00:04:00.000Z"
+    },
+    {
+      "sourceMessageId": "8f3d60f0-9a1f-4a10-9b71-000000004002",
+      "nodeSourceId": "8f3d60f0-9a1f-4a10-9b71-000000000040",
+      "authorUserId": "8f3d60f0-9a1f-4a10-9b71-000000000002",
+      "role": "user",
+      "content": "How does the idempotency design prevent this failure mode?",
+      "createdAt": "2026-05-15T00:04:05.000Z"
+    },
+    {
+      "sourceMessageId": "8f3d60f0-9a1f-4a10-9b71-000000004003",
+      "nodeSourceId": "8f3d60f0-9a1f-4a10-9b71-000000000040",
+      "authorUserId": "8f3d60f0-9a1f-4a10-9b71-000000000002",
+      "role": "assistant",
+      "content": "The client generates an idempotency key before submitting the message. The server checks that key during turn preflight.\n\nThe invariant is simple:\n\n- first delivery creates the turn\n- duplicate delivery returns the existing turn\n- retries do not create a second user message\n- reconnects can reattach to the same durable workflow\n\nThis keeps the user's action atomic from the product's point of view, even if the network attempts delivery more than once.\n\n**Conclusion:** Idempotency turns an unreliable transport event into one logical conversation turn.",
+      "createdAt": "2026-05-15T00:04:10.000Z"
+    },
+    {
+      "sourceMessageId": "8f3d60f0-9a1f-4a10-9b71-000000005001",
+      "nodeSourceId": "8f3d60f0-9a1f-4a10-9b71-000000000050",
+      "authorUserId": "8f3d60f0-9a1f-4a10-9b71-000000000002",
+      "role": "user",
+      "content": "What is the honest scaling story for the stream layer?",
+      "createdAt": "2026-05-15T00:05:00.000Z"
+    },
+    {
+      "sourceMessageId": "8f3d60f0-9a1f-4a10-9b71-000000005002",
+      "nodeSourceId": "8f3d60f0-9a1f-4a10-9b71-000000000050",
+      "authorUserId": "8f3d60f0-9a1f-4a10-9b71-000000000002",
+      "role": "assistant",
+      "content": "The current stream layer is solid for a single server instance:\n\n- persisted turn events protect replay correctness\n- the live broker pushes updates to active clients\n- SSE keeps the transport simple because the stream is server-to-client only\n- catch-up polling covers the replay/subscription race\n\nThe first production boundary is distributed operation. With more than one backend instance, the process-local broker is not enough.\n\n**Conclusion:** The persisted event log is the right recovery source of truth, but production scale needs shared pub/sub, deployment health checks, and a real multi-instance realtime story.",
+      "createdAt": "2026-05-15T00:05:06.000Z"
+    },
+    {
+      "sourceMessageId": "8f3d60f0-9a1f-4a10-9b71-000000006001",
+      "nodeSourceId": "8f3d60f0-9a1f-4a10-9b71-000000000060",
+      "authorUserId": "8f3d60f0-9a1f-4a10-9b71-000000000002",
+      "role": "user",
+      "content": "Explain the branch model without overclaiming the AI layer.",
+      "createdAt": "2026-05-15T00:06:00.000Z"
+    },
+    {
+      "sourceMessageId": "8f3d60f0-9a1f-4a10-9b71-000000006002",
+      "nodeSourceId": "8f3d60f0-9a1f-4a10-9b71-000000000060",
+      "authorUserId": "8f3d60f0-9a1f-4a10-9b71-000000000002",
+      "role": "assistant",
+      "content": "The branch model is **product architecture**, not agent architecture.\n\nWhen selected assistant text becomes a branch, the system creates durable product data:\n\n- a child node in the workspace tree\n- source selection data stored through the annotation path\n- a branch event message in the child conversation timeline\n- an optional follow-up turn scoped to the child node\n\nThat means the user does not land in an empty chat. The child conversation carries its origin with it.\n\n**Conclusion:** The branch is explainable because provenance is part of the conversation, not hidden metadata outside it.",
+      "createdAt": "2026-05-15T00:06:08.000Z"
+    },
+    {
+      "sourceMessageId": "8f3d60f0-9a1f-4a10-9b71-000000007001",
+      "nodeSourceId": "8f3d60f0-9a1f-4a10-9b71-000000000070",
+      "authorUserId": "8f3d60f0-9a1f-4a10-9b71-000000000002",
+      "role": "system",
+      "content": "Branched from Flow 3: the selected question was why source provenance should be stored in the child conversation timeline instead of only as hidden metadata.",
+      "createdAt": "2026-05-15T00:07:00.000Z"
+    },
+    {
+      "sourceMessageId": "8f3d60f0-9a1f-4a10-9b71-000000007002",
+      "nodeSourceId": "8f3d60f0-9a1f-4a10-9b71-000000000070",
+      "authorUserId": "8f3d60f0-9a1f-4a10-9b71-000000000002",
+      "role": "assistant",
+      "content": "A foreign key can tell the backend where a branch came from, but it is mostly invisible to the user. A branch event message makes the origin part of the child conversation itself.\n\nThat changes what the product can do:\n\n- render the source context at the top of the branch\n- let the user understand why the child node exists\n- search or inspect branch origins later\n- include the origin in future context assembly if needed\n\nThe tradeoff is that a message is heavier than a hidden pointer. For this product, that extra weight is useful because explainability is part of the workflow.\n\n**Conclusion:** Store provenance where the user and the system can both use it: inside the branch timeline.",
+      "createdAt": "2026-05-15T00:07:05.000Z"
+    }
+  ]
+}

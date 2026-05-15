@@ -157,7 +157,12 @@ export type UpdateMessageInput = z.infer<typeof updateMessageInputSchema>
 export type ParentMessagesUpToSourceInput = z.infer<typeof parentMessagesUpToSourceInputSchema>
 export type InheritedMessagesByNodeInput = z.infer<typeof inheritedMessagesByNodeInputSchema>
 
-export const EXAMPLE_WORKSPACE_KEYS = ['project-decision', 'database-selection', 'interview-prep'] as const
+export const EXAMPLE_WORKSPACE_KEYS = [
+  'project-decision',
+  'database-selection',
+  'project-walkthrough',
+  'project-walkthrough-script',
+] as const
 export type ExampleWorkspaceKey = (typeof EXAMPLE_WORKSPACE_KEYS)[number]
 
 export const exampleWorkspaceCreateInputSchema = z.object({

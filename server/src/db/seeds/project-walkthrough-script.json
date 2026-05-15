@@ -1,0 +1,240 @@
+{
+  "formatVersion": "workspace-export.v1",
+  "exportedAt": "2026-05-15T00:00:00.000Z",
+  "workspace": {
+    "sourceWorkspaceId": "9c4d70f0-7b2e-4c21-8c82-000000000001",
+    "title": "Project Walkthrough Script",
+    "authorUserId": "9c4d70f0-7b2e-4c21-8c82-000000000002",
+    "rootNodeSourceId": "9c4d70f0-7b2e-4c21-8c82-000000000010",
+    "createdAt": "2026-05-15T00:00:00.000Z",
+    "updatedAt": "2026-05-15T00:00:00.000Z"
+  },
+  "nodes": [
+    {
+      "sourceNodeId": "9c4d70f0-7b2e-4c21-8c82-000000000010",
+      "sourceParentNodeId": "9c4d70f0-7b2e-4c21-8c82-000000000010",
+      "workspaceSourceId": "9c4d70f0-7b2e-4c21-8c82-000000000001",
+      "authorUserId": "9c4d70f0-7b2e-4c21-8c82-000000000002",
+      "depth": 0,
+      "type": "decision",
+      "title": "3-minute project walkthrough",
+      "status": "exploring",
+      "confidence": "high",
+      "summary": "Use this workspace as the recording cheat sheet: product first, diagram second, core workflow code third, then hurdle and scaling.",
+      "conclusion": null,
+      "rationale": null,
+      "createdAt": "2026-05-15T00:00:00.000Z",
+      "updatedAt": "2026-05-15T00:00:00.000Z"
+    },
+    {
+      "sourceNodeId": "9c4d70f0-7b2e-4c21-8c82-000000000020",
+      "sourceParentNodeId": "9c4d70f0-7b2e-4c21-8c82-000000000010",
+      "workspaceSourceId": "9c4d70f0-7b2e-4c21-8c82-000000000001",
+      "authorUserId": "9c4d70f0-7b2e-4c21-8c82-000000000002",
+      "depth": 1,
+      "type": "question",
+      "title": "0:00-0:20 - product opening",
+      "status": "exploring",
+      "confidence": "high",
+      "summary": "Open on the live workspace and establish the product invariant: node-scoped conversations inside a branching tree.",
+      "conclusion": null,
+      "rationale": null,
+      "createdAt": "2026-05-15T00:00:03.000Z",
+      "updatedAt": "2026-05-15T00:00:03.000Z"
+    },
+    {
+      "sourceNodeId": "9c4d70f0-7b2e-4c21-8c82-000000000030",
+      "sourceParentNodeId": "9c4d70f0-7b2e-4c21-8c82-000000000010",
+      "workspaceSourceId": "9c4d70f0-7b2e-4c21-8c82-000000000001",
+      "authorUserId": "9c4d70f0-7b2e-4c21-8c82-000000000002",
+      "depth": 1,
+      "type": "question",
+      "title": "0:20-0:50 - architecture diagram",
+      "status": "exploring",
+      "confidence": "high",
+      "summary": "Use the small diagram to explain frontend state, backend workflow correctness, Postgres durability, and SSE feedback.",
+      "conclusion": null,
+      "rationale": null,
+      "createdAt": "2026-05-15T00:00:06.000Z",
+      "updatedAt": "2026-05-15T00:00:06.000Z"
+    },
+    {
+      "sourceNodeId": "9c4d70f0-7b2e-4c21-8c82-000000000040",
+      "sourceParentNodeId": "9c4d70f0-7b2e-4c21-8c82-000000000010",
+      "workspaceSourceId": "9c4d70f0-7b2e-4c21-8c82-000000000001",
+      "authorUserId": "9c4d70f0-7b2e-4c21-8c82-000000000002",
+      "depth": 1,
+      "type": "question",
+      "title": "0:50-1:35 - turn lifecycle code",
+      "status": "exploring",
+      "confidence": "high",
+      "summary": "Show the strongest backend signal: idempotent preflight, staged persistence, context assembly, model call, and finalization.",
+      "conclusion": null,
+      "rationale": null,
+      "createdAt": "2026-05-15T00:00:09.000Z",
+      "updatedAt": "2026-05-15T00:00:09.000Z"
+    },
+    {
+      "sourceNodeId": "9c4d70f0-7b2e-4c21-8c82-000000000050",
+      "sourceParentNodeId": "9c4d70f0-7b2e-4c21-8c82-000000000010",
+      "workspaceSourceId": "9c4d70f0-7b2e-4c21-8c82-000000000001",
+      "authorUserId": "9c4d70f0-7b2e-4c21-8c82-000000000002",
+      "depth": 1,
+      "type": "question",
+      "title": "1:35-2:05 - streaming replay",
+      "status": "exploring",
+      "confidence": "high",
+      "summary": "Explain why persisted turn events make SSE replayable and why the stream is not the source of truth.",
+      "conclusion": null,
+      "rationale": null,
+      "createdAt": "2026-05-15T00:00:12.000Z",
+      "updatedAt": "2026-05-15T00:00:12.000Z"
+    },
+    {
+      "sourceNodeId": "9c4d70f0-7b2e-4c21-8c82-000000000060",
+      "sourceParentNodeId": "9c4d70f0-7b2e-4c21-8c82-000000000010",
+      "workspaceSourceId": "9c4d70f0-7b2e-4c21-8c82-000000000001",
+      "authorUserId": "9c4d70f0-7b2e-4c21-8c82-000000000002",
+      "depth": 1,
+      "type": "question",
+      "title": "2:05-2:35 - branch provenance",
+      "status": "exploring",
+      "confidence": "high",
+      "summary": "Show that branching creates durable product data: child node, source annotation, branch event, and child conversation.",
+      "conclusion": null,
+      "rationale": null,
+      "createdAt": "2026-05-15T00:00:15.000Z",
+      "updatedAt": "2026-05-15T00:00:15.000Z"
+    },
+    {
+      "sourceNodeId": "9c4d70f0-7b2e-4c21-8c82-000000000070",
+      "sourceParentNodeId": "9c4d70f0-7b2e-4c21-8c82-000000000010",
+      "workspaceSourceId": "9c4d70f0-7b2e-4c21-8c82-000000000001",
+      "authorUserId": "9c4d70f0-7b2e-4c21-8c82-000000000002",
+      "depth": 1,
+      "type": "question",
+      "title": "2:35-3:00 - hurdle and scaling close",
+      "status": "exploring",
+      "confidence": "high",
+      "summary": "Close honestly: reliable turn workflow was the hurdle; distributed operation is the first scaling boundary.",
+      "conclusion": null,
+      "rationale": null,
+      "createdAt": "2026-05-15T00:00:18.000Z",
+      "updatedAt": "2026-05-15T00:00:18.000Z"
+    }
+  ],
+  "messages": [
+    {
+      "sourceMessageId": "9c4d70f0-7b2e-4c21-8c82-000000001001",
+      "nodeSourceId": "9c4d70f0-7b2e-4c21-8c82-000000000010",
+      "authorUserId": "9c4d70f0-7b2e-4c21-8c82-000000000002",
+      "role": "user",
+      "content": "Create a high-signal 3-minute project walkthrough flow for the project architecture prompt. It should be honest about the MVP scope while showing strong full-stack and systems judgment.",
+      "createdAt": "2026-05-15T00:01:00.000Z"
+    },
+    {
+      "sourceMessageId": "9c4d70f0-7b2e-4c21-8c82-000000001002",
+      "nodeSourceId": "9c4d70f0-7b2e-4c21-8c82-000000000010",
+      "authorUserId": "9c4d70f0-7b2e-4c21-8c82-000000000002",
+      "role": "assistant",
+      "content": "Use a simple spine:\n\n1. **Product first** - show the workspace tree and node conversation.\n2. **Architecture second** - show the small diagram and name the core responsibilities.\n3. **Code third** - open the turn workflow, execution pipeline, stream route, and branch service.\n4. **Close honestly** - hardest hurdle was reliable turn workflow; first scaling boundary is distributed operation.\n\n**Conclusion:** The demo should sell architecture judgment, not code volume. Make the viewer remember one idea: this is a branching AI workspace where model turns are durable workflows.",
+      "createdAt": "2026-05-15T00:01:05.000Z"
+    },
+    {
+      "sourceMessageId": "9c4d70f0-7b2e-4c21-8c82-000000002001",
+      "nodeSourceId": "9c4d70f0-7b2e-4c21-8c82-000000000020",
+      "authorUserId": "9c4d70f0-7b2e-4c21-8c82-000000000002",
+      "role": "user",
+      "content": "What should I say in the first 20 seconds while showing the live product?",
+      "createdAt": "2026-05-15T00:02:00.000Z"
+    },
+    {
+      "sourceMessageId": "9c4d70f0-7b2e-4c21-8c82-000000002002",
+      "nodeSourceId": "9c4d70f0-7b2e-4c21-8c82-000000000020",
+      "authorUserId": "9c4d70f0-7b2e-4c21-8c82-000000000002",
+      "role": "assistant",
+      "content": "**Show:** the live `Project Walkthrough` workspace, with the tree and conversation panel visible.\n\n**Say:**\n\n> This is a branching AI workspace I built as a 0-to-1 MVP. The core idea is that conversations do not have to stay linear. Each node in this tree owns a scoped conversation, and when an assistant response surfaces a subtopic, the user can branch from the exact text span and continue in a child node.\n\n**Do not show:** every UI control, merge flows, or settings.\n\n**Conclusion:** The opening should make the product understandable before you touch architecture or code.",
+      "createdAt": "2026-05-15T00:02:05.000Z"
+    },
+    {
+      "sourceMessageId": "9c4d70f0-7b2e-4c21-8c82-000000003001",
+      "nodeSourceId": "9c4d70f0-7b2e-4c21-8c82-000000000030",
+      "authorUserId": "9c4d70f0-7b2e-4c21-8c82-000000000002",
+      "role": "user",
+      "content": "What should I say over the architecture diagram?",
+      "createdAt": "2026-05-15T00:03:00.000Z"
+    },
+    {
+      "sourceMessageId": "9c4d70f0-7b2e-4c21-8c82-000000003002",
+      "nodeSourceId": "9c4d70f0-7b2e-4c21-8c82-000000000030",
+      "authorUserId": "9c4d70f0-7b2e-4c21-8c82-000000000002",
+      "role": "assistant",
+      "content": "**Show:** the small walkthrough diagram in `ARCHITECTURE_DIAGRAM.md`.\n\n**Say:**\n\n> The frontend owns interaction state: selected workspace, tree layout, active conversation, pending messages, and stream state. The backend owns workflow correctness. A message goes through tRPC into a turn workflow, which handles idempotency, persistence, context assembly, model generation, and event streaming. Postgres is the durable source of truth for nodes, messages, turns, and stream events.\n\n**Point to:** React UI, tRPC API, Turn Workflow, Postgres, SSE Stream.\n\n**Conclusion:** Land this sentence: an AI response is treated as a durable workflow, not just a request/response.",
+      "createdAt": "2026-05-15T00:03:05.000Z"
+    },
+    {
+      "sourceMessageId": "9c4d70f0-7b2e-4c21-8c82-000000004001",
+      "nodeSourceId": "9c4d70f0-7b2e-4c21-8c82-000000000040",
+      "authorUserId": "9c4d70f0-7b2e-4c21-8c82-000000000002",
+      "role": "user",
+      "content": "How should I walk through the backend turn lifecycle without getting lost in code?",
+      "createdAt": "2026-05-15T00:04:00.000Z"
+    },
+    {
+      "sourceMessageId": "9c4d70f0-7b2e-4c21-8c82-000000004002",
+      "nodeSourceId": "9c4d70f0-7b2e-4c21-8c82-000000000040",
+      "authorUserId": "9c4d70f0-7b2e-4c21-8c82-000000000002",
+      "role": "assistant",
+      "content": "**Show:**\n\n- `server/src/chat/runConversationTurnFlow.ts`\n- `server/src/chat/turnExecutionPipeline.ts`\n\n**Say:**\n\n> This is the main turn entrypoint. Before generation starts, the server validates the request and resolves or recovers the turn by idempotency key. That matters because browser retries or double-submits should converge on the same logical turn instead of creating duplicate messages.\n\nThen say:\n\n> The execution path is split into stages: build context, run retrieval if enabled, apply prompt budget, generate the assistant reply, persist the assistant message, and finalize the turn. Those stage boundaries make failures easier to reason about.\n\n**Do not do:** line-by-line reading.\n\n**Conclusion:** The code walkthrough should prove the system has backend workflow design beyond CRUD.",
+      "createdAt": "2026-05-15T00:04:05.000Z"
+    },
+    {
+      "sourceMessageId": "9c4d70f0-7b2e-4c21-8c82-000000005001",
+      "nodeSourceId": "9c4d70f0-7b2e-4c21-8c82-000000000050",
+      "authorUserId": "9c4d70f0-7b2e-4c21-8c82-000000000002",
+      "role": "user",
+      "content": "How do I explain SSE streaming and replay quickly?",
+      "createdAt": "2026-05-15T00:05:00.000Z"
+    },
+    {
+      "sourceMessageId": "9c4d70f0-7b2e-4c21-8c82-000000005002",
+      "nodeSourceId": "9c4d70f0-7b2e-4c21-8c82-000000000050",
+      "authorUserId": "9c4d70f0-7b2e-4c21-8c82-000000000002",
+      "role": "assistant",
+      "content": "**Show:** `server/src/chat/stream/routes.ts`.\n\n**Say:**\n\n> For live feedback, I used SSE because this flow is server-to-client. The server persists turn events and also publishes live events. When a client reconnects, the route replays persisted events first, subscribes to live events, then does a catch-up read to close the replay/subscription race.\n\n**Point to:** replay rows, broker subscribe, post-subscribe catch-up, polling fallback.\n\n**Conclusion:** The stream is not the source of truth. The persisted event log is.",
+      "createdAt": "2026-05-15T00:05:05.000Z"
+    },
+    {
+      "sourceMessageId": "9c4d70f0-7b2e-4c21-8c82-000000006001",
+      "nodeSourceId": "9c4d70f0-7b2e-4c21-8c82-000000000060",
+      "authorUserId": "9c4d70f0-7b2e-4c21-8c82-000000000002",
+      "role": "user",
+      "content": "How do I explain branch provenance as the product-specific architecture decision?",
+      "createdAt": "2026-05-15T00:06:00.000Z"
+    },
+    {
+      "sourceMessageId": "9c4d70f0-7b2e-4c21-8c82-000000006002",
+      "nodeSourceId": "9c4d70f0-7b2e-4c21-8c82-000000000060",
+      "authorUserId": "9c4d70f0-7b2e-4c21-8c82-000000000002",
+      "role": "assistant",
+      "content": "**Show:** live branch action if stable, otherwise `server/src/annotations/branchAndSendFollowup.ts`.\n\n**Say:**\n\n> Branching is product data, not just navigation. When the user branches from assistant text, the server creates a child node, stores the source selection through the annotation path, writes a branch event message into the child conversation, and can start a follow-up turn there.\n\n**Point to:** branch node creation, annotation creation/recovery, branch event message, follow-up turn.\n\n**Conclusion:** The child conversation is explainable because its origin is visible in the timeline.",
+      "createdAt": "2026-05-15T00:06:05.000Z"
+    },
+    {
+      "sourceMessageId": "9c4d70f0-7b2e-4c21-8c82-000000007001",
+      "nodeSourceId": "9c4d70f0-7b2e-4c21-8c82-000000000070",
+      "authorUserId": "9c4d70f0-7b2e-4c21-8c82-000000000002",
+      "role": "user",
+      "content": "How should I close with the hardest hurdle and what broke first when scaling?",
+      "createdAt": "2026-05-15T00:07:00.000Z"
+    },
+    {
+      "sourceMessageId": "9c4d70f0-7b2e-4c21-8c82-000000007002",
+      "nodeSourceId": "9c4d70f0-7b2e-4c21-8c82-000000000070",
+      "authorUserId": "9c4d70f0-7b2e-4c21-8c82-000000000002",
+      "role": "assistant",
+      "content": "**Say:**\n\n> The hardest technical hurdle was making a model turn reliable under retries, streaming, and partial failure. The first version solves that with idempotency, staged persistence, and persisted stream events.\n\nThen say:\n\n> The first thing that breaks at scale is distributed operation. This works as a single-instance MVP, but production would need shared session storage, shared pub/sub for turn events, a real queue for workers, CI/CD, deployment, and better observability.\n\n**Avoid:** claiming mature agents, mature RAG, or production infra.\n\n**Conclusion:** Frame it as a serious 0-to-1 MVP: the core product loop and workflow architecture are implemented; infra hardening and deeper agent behavior are the next layers.",
+      "createdAt": "2026-05-15T00:07:05.000Z"
+    }
+  ]
+}

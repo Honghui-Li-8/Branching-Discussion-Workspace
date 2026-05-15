@@ -16,9 +16,14 @@ const EXAMPLES: { key: ExampleWorkspaceKey; title: string; description: string }
     description: 'PostgreSQL vs MongoDB vs DynamoDB for a new service.',
   },
   {
-    key: 'interview-prep',
-    title: 'Interview Walkthrough Prep',
-    description: 'Structure a 60-minute technical session with branched deep-dives.',
+    key: 'project-walkthrough',
+    title: 'Project Walkthrough',
+    description: 'Seeded architecture walkthrough with turn lifecycle and branch provenance.',
+  },
+  {
+    key: 'project-walkthrough-script',
+    title: 'Project Walkthrough Script',
+    description: 'Three-minute recording script embedded as node conversations.',
   },
 ]
 

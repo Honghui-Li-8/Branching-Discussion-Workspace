@@ -18,7 +18,8 @@ const resolveSeedPath = (fileName: string): string => {
 const EXAMPLE_PATHS: Record<ExampleWorkspaceKey, string> = {
   'project-decision': resolveSeedPath('introWorkspace.json'),
   'database-selection': resolveSeedPath('database-selection.json'),
-  'interview-prep': resolveSeedPath('interview-prep.json'),
+  'project-walkthrough': resolveSeedPath('project-walkthrough.json'),
+  'project-walkthrough-script': resolveSeedPath('project-walkthrough-script.json'),
 }
 
 const cache = new Map<ExampleWorkspaceKey, Promise<WorkspaceExportPayload>>()

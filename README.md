@@ -122,21 +122,45 @@ On first local sign-in, the server seeds an intro workspace for the dev user if 
 ## Current status
 
 - Serious MVP, not a production-ready product.
-- Local auth is dev-oriented and session storage is in-memory.
+- Supabase-backed OAuth is wired for browser sign-in and backend token verification; local dev auth is also available.
+- Session storage is still process-local/in-memory and should be replaced before multi-instance production deployment.
 - The app is configured for localhost-first development.
-- Some retrieval and provider seams are still evolving.
+- The core IO flow is implemented: workspace load, node-scoped conversation, model-backed turn execution, SSE streaming, and branch provenance.
+- The AI layer is intentionally simple: provider-backed generation plus context/prompt/retrieval seams, not a mature autonomous agent system.
+- Cloud deployment, CI/CD, distributed realtime, queue hardening, and observability are intentionally deferred.
 
-## Current caveat
+## MVP completeness and production gaps
 
-Assistant generation is temporarily in a debug echo mode in `server/src/chat/generateAssistantReplyForTurn.ts`. That override is useful for deterministic prompt and context validation, but it means the assistant may echo prompt-context input instead of calling the real model.
+This repo is best described as a 0-to-1 technical MVP of a branching AI workspace. The implemented product slice is:
 
-The rest of the path is still real:
+- authenticated workspace access
+- workspace tree loading and node-scoped conversations
+- idempotent conversation turns
+- staged user/assistant message persistence
+- model-backed assistant generation
+- SSE status/token streaming with persisted event replay
+- branch-from-selection flow with durable provenance
 
-- turn orchestration
-- SSE event streaming
-- event persistence and replay
-- node and message persistence
-- branching and follow-up bootstrapping
+The remaining gap to a production platform is mostly operational and AI-depth work:
+
+- shared session storage or fully externalized session validation
+- distributed event pub/sub for multi-instance live streaming
+- a real queue for postprocess jobs
+- cloud deployment and CI/CD
+- production observability
+- mature retrieval/memory policy
+- true agentic workflows if the product requires autonomous planning or tool use
+
+## Project walkthrough prep
+
+Prep files:
+
+- `ARCHITECTURE.md` - concise system architecture and production gap notes.
+- `ARCHITECTURE_DIAGRAM.md` - simple and advanced Mermaid diagrams for screen sharing.
+- `docs/PROJECT_WALKTHROUGH_WORKSPACE.md` - recommended demo workspace/storyboard and seed content.
+- `docs/PROJECT_WALKTHROUGH_SEED.json` - workspace-export seed object for the project walkthrough example.
+- `server/src/db/seeds/project-walkthrough.json` - registered example seed available through `workspaceCreateFromExample`.
+- `server/src/db/seeds/project-walkthrough-script.json` - registered example seed that embeds the 3-minute project walkthrough script as node conversations.
 
 ## Engineering notes
 
