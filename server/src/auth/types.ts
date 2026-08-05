@@ -13,12 +13,6 @@ export type SessionRecord = {
 export type LoginRequestBody = {
   token?: unknown
   provider?: unknown
-  user?: {
-    id?: unknown
-    authUserId?: unknown
-    email?: unknown
-    displayName?: unknown
-  }
 }
 
 export type VerifiedExternalIdentity = {

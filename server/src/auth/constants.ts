@@ -7,6 +7,27 @@ export const getAppEnv = (): string | undefined => process.env.APP_ENV
 export const isDevelopmentAppEnv = (): boolean => getAppEnv() === 'development'
 export const isDevAuthEnabled = (): boolean => process.env.DEV_AUTH_ENABLED === 'true'
 
+const LOOPBACK_ORIGIN_PATTERN = /^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/
+
+export const isLoopbackOrigin = (origin: string | undefined): boolean =>
+  typeof origin === 'string' && LOOPBACK_ORIGIN_PATTERN.test(origin)
+
+export const evaluateLocalAuthPolicy = (input: {
+  presentedToken: string
+  origin: string | undefined
+}): boolean => {
+  if (!isDevelopmentAppEnv() || !isDevAuthEnabled()) {
+    return false
+  }
+
+  const configuredToken = getDevAuthToken()
+  if (!configuredToken || input.presentedToken !== configuredToken) {
+    return false
+  }
+
+  return isLoopbackOrigin(input.origin)
+}
+
 const LEGACY_DEV_AUTH_ALIAS = 'AUTH_BACKDOOR_TOKEN'
 
 export const assertSafeHostedAuthConfig = (): void => {
