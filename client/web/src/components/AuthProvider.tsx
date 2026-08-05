@@ -40,6 +40,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const [isAuthActionPending, setIsAuthActionPending] = useState(false)
   const [authError, setAuthError] = useState<string | null>(null)
+  const [isLocalBypassPending, setIsLocalBypassPending] = useState(false)
+  const [localBypassError, setLocalBypassError] = useState<string | null>(null)
 
   const apiBaseUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:3001'
 
@@ -149,6 +151,43 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
   }, [apiBaseUrl, dispatch, isAuthActionPending, isAuthBootstrapPending])
 
+  const loginWithLocalBypass = useCallback(async (): Promise<void> => {
+    if (isAuthBootstrapPending || isLocalBypassPending) {
+      return
+    }
+
+    setLocalBypassError(null)
+    setIsLocalBypassPending(true)
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ token: import.meta.env.VITE_DEV_AUTH_TOKEN }),
+      })
+      const payload = (await response.json().catch(() => ({}))) as {
+        authenticated?: unknown
+        user?: unknown
+        error?: unknown
+      }
+
+      if (!response.ok || payload.authenticated !== true || !isAuthUser(payload.user)) {
+        throw new Error(
+          typeof payload.error === 'string' ? payload.error : 'Local developer sign-in failed.',
+        )
+      }
+
+      dispatch(setAuthState({ status: 'authenticated', user: payload.user }))
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Local developer sign-in failed.'
+      setLocalBypassError(message)
+      throw error
+    } finally {
+      setIsLocalBypassPending(false)
+    }
+  }, [apiBaseUrl, dispatch, isAuthBootstrapPending, isLocalBypassPending])
+
   const refreshBalance = useCallback(async (): Promise<void> => {
     try {
       const response = await fetch(`${apiBaseUrl}/auth/me`, {
@@ -178,6 +217,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       login,
       logout,
       refreshBalance,
+      loginWithLocalBypass,
+      isLocalBypassPending,
+      localBypassError,
     }),
     [
       authUser,
@@ -189,6 +231,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       login,
       logout,
       refreshBalance,
+      loginWithLocalBypass,
+      isLocalBypassPending,
+      localBypassError,
     ],
   )
 
