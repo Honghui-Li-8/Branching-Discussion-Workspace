@@ -4,6 +4,10 @@ Branching Discussion Workspace is a full-stack MVP for structured reasoning. Ins
 
 I built it to practice the kinds of problems that do not show up in tutorial apps: workflow orchestration, streaming, persistence, branching provenance, shared contracts, and frontend state that has to stay aligned with backend events.
 
+## Preview
+
+Screenshots and a demo clip are pending the MVP 1.5A visual pass (shadcn/ui integration, design tokens, first-run flow - see [Where this is going](#where-this-is-going)). The current UI is functional but not the intended visual direction yet. Until then, `ARCHITECTURE_DIAGRAM.md` covers the runtime flow, and the seeded example workspaces under [Project walkthrough prep](#project-walkthrough-prep) reproduce a full demo locally.
+
 ## Why branching?
 
 Linear chat is weak for structured reasoning. Once a subtopic appears, you either derail the main thread or lose the idea entirely.
@@ -151,14 +155,26 @@ The remaining gap to a production platform is mostly operational and AI-depth wo
 - mature retrieval/memory policy
 - true agentic workflows if the product requires autonomous planning or tool use
 
+## Where this is going
+
+Current phase is MVP 1.5A, Product Face. The branching engine (workspace, node tree, node-scoped conversation, turn pipeline, SSE streaming, branch provenance) is built. This phase makes that engine legible and demoable: UI foundation, public routes, first-run flow, accessibility baseline. It adds no new AI capability.
+
+Past MVP 1.5, the AI-depth direction, in order:
+
+1. Memory and context - replace the current full-history-until-token-cap context with a scored system: relevance/importance/recency-weighted memory candidates, a budget allocator, a faithfulness gate before anything reaches the prompt. The schema and scoring weights are already locked; the assembler itself isn't built.
+2. Tools and simple action orchestration - let a turn call a small, defined set of tools and chain a couple of them within one turn, not an open-ended agent loop. The goal is composable actions inside the existing turn pipeline, not a planner.
+3. MCP integration, for example Notion - one external MCP connection, used to show that a branch's approved conclusion can leave the app and land somewhere the user already works. A use-case proof, not an integrations platform.
+
+Deployment direction: the app should run either fully self-hosted, including a small local model for lightweight per-turn tasks like summarization or importance scoring, or fully hosted against a frontier API for turns that need real reasoning quality. The model allowlist and provider check that already gate which OpenAI models a request can use (`server/src/chat/config.ts`) are the seam this generalizes from: a size/cost-aware router in place of a single hardcoded provider.
+
+Full multi-agent orchestration, multiple coordinated agents planning and executing across tools, is the long-term ceiling for this idea, not a near-term deliverable. It depends on the three items above existing first and isn't scheduled.
+
 ## Project walkthrough prep
 
 Prep files:
 
 - `ARCHITECTURE.md` - concise system architecture and production gap notes.
 - `ARCHITECTURE_DIAGRAM.md` - simple and advanced Mermaid diagrams for screen sharing.
-- `docs/PROJECT_WALKTHROUGH_WORKSPACE.md` - recommended demo workspace/storyboard and seed content.
-- `docs/PROJECT_WALKTHROUGH_SEED.json` - workspace-export seed object for the project walkthrough example.
 - `server/src/db/seeds/project-walkthrough.json` - registered example seed available through `workspaceCreateFromExample`.
 - `server/src/db/seeds/project-walkthrough-script.json` - registered example seed that embeds a reusable walkthrough script as node conversations.
 
@@ -170,8 +186,3 @@ Prep files:
 - Request-path server modules must not import unscoped resource query modules directly such as `workspace.ts`, `node.ts`, or `message.ts`.
 - `server/src/db/queries/internal.ts` is restricted to explicitly allowlisted internal usage.
 - Boundary enforcement check: `yarn check:ownership-boundary`
-
-## More context
-
-- Product scope and timeline notes: `docs/0-timeline.md`
-- Architecture and implementation notes: `docs/`
