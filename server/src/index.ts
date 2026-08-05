@@ -10,10 +10,18 @@ import { closePool, testConnection } from './db/client.js'
 import { createAppRouterContext } from './trpcContext.js'
 import { registerConversationStreamRoutes } from './chat/stream/routes.js'
 import { createLogger, getServerLogLevel } from './logging/logger.js'
+import { assertSafeHostedAuthConfig } from './auth/constants.js'
 
 const app = express()
 const PORT = Number(process.env.PORT) || 3001
 const logger = createLogger('server')
+
+try {
+  assertSafeHostedAuthConfig()
+} catch (error) {
+  logger.error('Refusing to start: unsafe development-auth configuration detected.', { error })
+  process.exit(1)
+}
 
 process.stdout.on('error', (error: NodeJS.ErrnoException) => {
   if (error.code !== 'EPIPE') {
