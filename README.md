@@ -2,11 +2,9 @@
 
 Branching Discussion Workspace is a full-stack MVP for structured reasoning. Instead of forcing every subtopic into one linear chat thread, it lets you branch a focused child discussion from a specific span of assistant output and keep the branch origin attached to the data model.
 
-I built it to practice the kinds of problems that do not show up in tutorial apps: workflow orchestration, streaming, persistence, branching provenance, shared contracts, and frontend state that has to stay aligned with backend events.
-
 ## Preview
 
-Screenshots and a demo clip are pending the MVP 1.5A visual pass (shadcn/ui integration, design tokens, first-run flow - see [Where this is going](#where-this-is-going)). The current UI is functional but not the intended visual direction yet. Until then, `ARCHITECTURE_DIAGRAM.md` covers the runtime flow, and the seeded example workspaces under [Project walkthrough prep](#project-walkthrough-prep) reproduce a full demo locally.
+Screenshots and a demo clip are pending the MVP 1.5A visual pass (shadcn/ui integration, design tokens, first-run flow - see [Where this is going](#where-this-is-going)). The current UI is functional but not the intended visual direction yet. Until then, `ARCHITECTURE_DIAGRAM.md` covers the runtime flow, and the seed data under [Example workspace](#example-workspace) reproduces a full demo locally.
 
 ## Why branching?
 
@@ -125,13 +123,7 @@ On first local sign-in, the server seeds an intro workspace for the dev user if 
 
 ## Current status
 
-- Serious MVP, not a production-ready product.
-- Supabase-backed OAuth is wired for browser sign-in and backend token verification; local dev auth is also available.
-- Session storage is still process-local/in-memory and should be replaced before multi-instance production deployment.
-- The app is configured for localhost-first development.
-- The core IO flow is implemented: workspace load, node-scoped conversation, model-backed turn execution, SSE streaming, and branch provenance.
-- The AI layer is intentionally simple: provider-backed generation plus context/prompt/retrieval seams, not a mature autonomous agent system.
-- Cloud deployment, CI/CD, distributed realtime, queue hardening, and observability are intentionally deferred.
+Serious MVP, not a production-ready product. Supabase-backed OAuth is wired for browser sign-in and backend token verification, with local dev auth also available; the app is configured for localhost-first development. See MVP completeness and production gaps below for what's implemented and what's deferred.
 
 ## MVP completeness and production gaps
 
@@ -169,14 +161,12 @@ Deployment direction: the app should run either fully self-hosted, including a s
 
 Full multi-agent orchestration, multiple coordinated agents planning and executing across tools, is the long-term ceiling for this idea, not a near-term deliverable. It depends on the three items above existing first and isn't scheduled.
 
-## Project walkthrough prep
+## Example workspace
 
-Prep files:
-
+- `server/src/db/seeds/project-walkthrough.json` - a registered example seed, available through `workspaceCreateFromExample`, that reproduces the branch -> explore -> approve -> resume flow with real data instead of an empty workspace.
+- `server/src/db/seeds/project-walkthrough-script.json` - the same example seed with a scripted walkthrough embedded as node conversations, so each node explains what to look at next.
 - `ARCHITECTURE.md` - concise system architecture and production gap notes.
-- `ARCHITECTURE_DIAGRAM.md` - simple and advanced Mermaid diagrams for screen sharing.
-- `server/src/db/seeds/project-walkthrough.json` - registered example seed available through `workspaceCreateFromExample`.
-- `server/src/db/seeds/project-walkthrough-script.json` - registered example seed that embeds a reusable walkthrough script as node conversations.
+- `ARCHITECTURE_DIAGRAM.md` - runtime flow diagrams.
 
 ## Engineering notes
 
@@ -186,3 +176,7 @@ Prep files:
 - Request-path server modules must not import unscoped resource query modules directly such as `workspace.ts`, `node.ts`, or `message.ts`.
 - `server/src/db/queries/internal.ts` is restricted to explicitly allowlisted internal usage.
 - Boundary enforcement check: `yarn check:ownership-boundary`
+
+## Why this exists
+
+I built it to practice the kinds of problems that do not show up in tutorial apps: workflow orchestration, streaming, persistence, branching provenance, shared contracts, and frontend state that has to stay aligned with backend events.
