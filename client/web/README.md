@@ -1,6 +1,6 @@
 # Web Client
 
-This package contains the React + Vite frontend for Branching Discussion Workspace.
+This package contains the React + Vite frontend for Trellis (a branching discussion workspace).
 
 Its main responsibilities are:
 

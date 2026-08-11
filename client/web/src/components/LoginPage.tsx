@@ -48,7 +48,7 @@ export const LoginPage = () => {
     <main className="grid min-h-screen place-items-center bg-[#f5f7fb] px-5 py-8">
       <section className="flex w-full max-w-[560px] flex-col items-center rounded-xl border border-slate-200 bg-white px-6 py-10 text-center shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
         <p className="m-0 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-          Branching Decision Workspace
+          Trellis
         </p>
         <h1 className="my-[14px] text-[clamp(30px,5vw,46px)] font-semibold leading-[1.08] text-slate-950">
           Sign in to continue

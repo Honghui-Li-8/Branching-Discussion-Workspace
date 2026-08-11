@@ -1,4 +1,4 @@
-# Branching Discussion Workspace Architecture
+# Trellis Architecture
 
 This project is a 0-to-1 MVP of a branching AI workspace. It is not a production platform and it is not a mature agentic system. The implemented core is the product and workflow slice: authenticated workspace access, a tree of node-scoped conversations, model-backed assistant turns, streaming feedback, persisted turn events, and durable branch provenance.
 
