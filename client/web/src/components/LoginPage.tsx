@@ -1,19 +1,26 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import GoogleIcon from '@mui/icons-material/Google'
-import { describeLocalAuthBypassMisconfiguration, isLocalAuthBypassAvailable } from '../devFlags'
+import {
+  describeLocalAuthBypassMisconfiguration,
+  isLocalAuthBypassAvailable,
+  type LocalAuthBypassGateInput,
+} from '../devFlags'
 import { useAuth } from './useAuth'
 
-const localAuthBypassGateInput = {
+// Read at call time, not on import: touching window at module scope makes this module impossible
+// to import outside a DOM. The import.meta.env reads are still statically replaced by Vite.
+const readLocalAuthBypassGateInput = (): LocalAuthBypassGateInput => ({
   isViteDev: import.meta.env.DEV,
   bypassEnabledFlag: import.meta.env.VITE_ENABLE_LOCAL_AUTH_BYPASS,
   hostname: window.location.hostname,
   devToken: import.meta.env.VITE_DEV_AUTH_TOKEN,
-}
-const isBypassAvailable = isLocalAuthBypassAvailable(localAuthBypassGateInput)
+})
 
 export const LoginPage = () => {
   const { authError, login, loginWithLocalBypass, isLocalBypassPending, localBypassError } = useAuth()
   const [isLoginPending, setIsLoginPending] = useState(false)
+  const localAuthBypassGateInput = useMemo(readLocalAuthBypassGateInput, [])
+  const isBypassAvailable = isLocalAuthBypassAvailable(localAuthBypassGateInput)
 
   const handleLogin = async () => {
     setIsLoginPending(true)
@@ -42,7 +49,7 @@ export const LoginPage = () => {
     if (explanation) {
       console.info(explanation)
     }
-  }, [])
+  }, [isBypassAvailable, localAuthBypassGateInput])
 
   return (
     <main className="grid min-h-screen place-items-center bg-[#f5f7fb] px-5 py-8">

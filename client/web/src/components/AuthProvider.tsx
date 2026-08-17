@@ -5,29 +5,11 @@ import {
   setAuthState,
   selectAuthStatus,
   selectAuthUser,
-  type AuthUser,
 } from '../store/slices/authSlice'
 import { getSupabaseClient } from '../lib/supabaseClient'
 import { AuthContext, type AuthContextValue } from './authContext'
-
-const isAuthUser = (value: unknown): value is AuthUser => {
-  if (!value || typeof value !== 'object') {
-    return false
-  }
-
-  const candidate = value as Partial<AuthUser>
-  const emailIsValid = typeof candidate.email === 'string' || candidate.email === null
-  const displayNameIsValid =
-    typeof candidate.displayName === 'string' || candidate.displayName === null
-
-  return (
-    typeof candidate.id === 'string' &&
-    typeof candidate.authUserId === 'string' &&
-    emailIsValid &&
-    displayNameIsValid &&
-    typeof candidate.creditBalance === 'number'
-  )
-}
+import { isAuthUser } from './authCallbackLogic'
+import { runLocalBypassLogin } from './localBypassLogin'
 
 type AuthProviderProps = {
   children: ReactNode
@@ -160,29 +142,25 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     setIsLocalBypassPending(true)
 
     try {
-      const response = await fetch(`${apiBaseUrl}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ token: import.meta.env.VITE_DEV_AUTH_TOKEN }),
+      await runLocalBypassLogin({
+        postLogin: async () => {
+          const response = await fetch(`${apiBaseUrl}/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ token: import.meta.env.VITE_DEV_AUTH_TOKEN }),
+          })
+          const payload = (await response.json().catch(() => ({}))) as {
+            authenticated?: unknown
+            user?: unknown
+            error?: unknown
+          }
+
+          return { ok: response.ok, payload }
+        },
+        dispatchAuthUser: (user) => dispatch(setAuthState({ status: 'authenticated', user })),
+        setError: setLocalBypassError,
       })
-      const payload = (await response.json().catch(() => ({}))) as {
-        authenticated?: unknown
-        user?: unknown
-        error?: unknown
-      }
-
-      if (!response.ok || payload.authenticated !== true || !isAuthUser(payload.user)) {
-        throw new Error(
-          typeof payload.error === 'string' ? payload.error : 'Local developer sign-in failed.',
-        )
-      }
-
-      dispatch(setAuthState({ status: 'authenticated', user: payload.user }))
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Local developer sign-in failed.'
-      setLocalBypassError(message)
-      throw error
     } finally {
       setIsLocalBypassPending(false)
     }
