@@ -35,6 +35,27 @@
   --radius-sm: 2px;
   --radius-md: 6px;
   --radius-lg: 12px;
+
+  /* Motion — decided via hl/A05a-motion-trials (d5fc82d, 1bc6f3f, 9f5090e).
+     Enter/exit uniform across the overlay family (Dialog/Sheet/Dropdown/
+     Popover/Tooltip); tooltip delay and continuous-motion speeds are
+     separate, independently-decided values. */
+  --duration-overlay: 200ms;
+  --ease-overlay-enter: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-overlay-exit: ease-in;
+
+  --delay-tooltip: 150ms;
+
+  --duration-pulse: 1.5s;
+  --duration-spin: 1.5s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 @layer base {
