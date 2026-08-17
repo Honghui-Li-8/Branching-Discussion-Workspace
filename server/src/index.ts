@@ -17,14 +17,14 @@ import {
 } from './auth/constants.js'
 import { loadEnvFiles } from './env.js'
 
+// First statement in the module body: everything below reads process.env, including the
+// auth-config guard. Do not rely on env arriving as a side effect of importing the DB client —
+// with nothing loaded the guard finds nothing to reject and passes vacuously.
+loadEnvFiles()
+
 const app = express()
 const PORT = Number(process.env.PORT) || 3001
 const logger = createLogger('server')
-
-// The auth-config guard below reads process.env, so env files must already be loaded. Do not rely
-// on this happening as a side effect of importing the DB client: with nothing loaded the guard
-// finds nothing to reject and passes vacuously.
-loadEnvFiles()
 
 try {
   assertSafeHostedAuthConfig()
