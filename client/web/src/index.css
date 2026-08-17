@@ -1,5 +1,42 @@
 @import 'tailwindcss';
 
+/* Design tokens — ported from A03a's locked Figma spec (real hex values
+   transcribed in docs/mvp-1.5/refrences/A04a-code-reference/shared-toolchain/figmaTokens.ts).
+   Colors and radius only; typography/spacing/shadow and extended semantic
+   states remain open (see docs/mvp-1.5/A05a-token-audit-and-reference.md). */
+@theme static {
+  --color-bg-default: #ffffff;
+  --color-bg-subtle: #f3f6f7;
+  --color-bg-subtlest: #fafbfc;
+  --color-bg-muted: #dee3e5;
+  --color-bg-emphasis: #c9d0d3;
+
+  --color-text-default: #0d1217;
+  --color-text-secondary: #383f42;
+  --color-text-muted: #666f73;
+  --color-text-disabled: #87969b;
+  --color-text-inverse: #ffffff;
+  --color-text-link: #008ca8;
+
+  --color-border-default: #e6eaec;
+  --color-border-strong: #d2d9dc;
+  --color-border-subtle: #eff1f3;
+
+  --color-accent-default: #008ca8;
+  --color-accent-hover: #007e97;
+  --color-accent-active: #00697e;
+  --color-accent-tint: #d6edf1;
+  --color-accent-wash: #a6d7e1;
+  --color-accent-strong: #005565;
+  --color-accent-on-accent: #ffffff;
+
+  --color-error-default: #dc2626;
+
+  --radius-sm: 2px;
+  --radius-md: 6px;
+  --radius-lg: 12px;
+}
+
 @layer base {
   *,
   *::before,
