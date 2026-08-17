@@ -38,30 +38,34 @@ describe('evaluateLocalAuthPolicy', () => {
   })
 
   test('allows when environment, flag, token, and origin all hold', () => {
-    expect(evaluateLocalAuthPolicy(allowedInput)).toBe(true)
+    expect(evaluateLocalAuthPolicy(allowedInput)).toBe('allowed')
   })
 
   test('rejects when APP_ENV is not development', () => {
     process.env.APP_ENV = 'production'
-    expect(evaluateLocalAuthPolicy(allowedInput)).toBe(false)
+    expect(evaluateLocalAuthPolicy(allowedInput)).toBe('rejected')
   })
 
   test('rejects when DEV_AUTH_ENABLED is not true', () => {
     delete process.env.DEV_AUTH_ENABLED
-    expect(evaluateLocalAuthPolicy(allowedInput)).toBe(false)
-  })
-
-  test('rejects when the presented token does not match', () => {
-    expect(evaluateLocalAuthPolicy({ ...allowedInput, presentedToken: 'wrong-token' })).toBe(false)
-  })
-
-  test('rejects when DEV_AUTH_TOKEN is not configured', () => {
-    delete process.env.DEV_AUTH_TOKEN
-    expect(evaluateLocalAuthPolicy(allowedInput)).toBe(false)
+    expect(evaluateLocalAuthPolicy(allowedInput)).toBe('rejected')
   })
 
   test('rejects when the origin is not loopback', () => {
-    expect(evaluateLocalAuthPolicy({ ...allowedInput, origin: 'https://example.com' })).toBe(false)
+    expect(evaluateLocalAuthPolicy({ ...allowedInput, origin: 'https://example.com' })).toBe(
+      'rejected',
+    )
+  })
+
+  test('reports a mismatched token as not-dev-token so the caller falls through to the provider', () => {
+    expect(evaluateLocalAuthPolicy({ ...allowedInput, presentedToken: 'wrong-token' })).toBe(
+      'not-dev-token',
+    )
+  })
+
+  test('reports not-dev-token when DEV_AUTH_TOKEN is not configured', () => {
+    delete process.env.DEV_AUTH_TOKEN
+    expect(evaluateLocalAuthPolicy(allowedInput)).toBe('not-dev-token')
   })
 })
 

@@ -80,6 +80,13 @@ export const LoginPage = () => {
           </p>
         ) : null}
 
+        {/*
+          The literal `import.meta.env.DEV` is load-bearing, not redundant with isBypassAvailable.
+          Vite statically replaces it with `false` in a production build, which is what lets the
+          bundler drop this whole block including the button label. isBypassAvailable is a runtime
+          value the bundler cannot fold, so removing the literal would ship the label. See A00a
+          DoD #8.
+        */}
         {import.meta.env.DEV && isBypassAvailable ? (
           <>
             <button

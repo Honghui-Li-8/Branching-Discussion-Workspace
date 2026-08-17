@@ -12,20 +12,25 @@ const LOOPBACK_ORIGIN_PATTERN = /^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+
 export const isLoopbackOrigin = (origin: string | undefined): boolean =>
   typeof origin === 'string' && LOOPBACK_ORIGIN_PATTERN.test(origin)
 
+// 'not-dev-token' means the caller presented something else entirely and should continue to
+// third-party verification. 'rejected' means they presented the dev token and policy refused it —
+// the two must stay distinguishable, or callers end up re-comparing the token themselves.
+export type LocalAuthDecision = 'not-dev-token' | 'rejected' | 'allowed'
+
 export const evaluateLocalAuthPolicy = (input: {
   presentedToken: string
   origin: string | undefined
-}): boolean => {
-  if (!isDevelopmentAppEnv() || !isDevAuthEnabled()) {
-    return false
-  }
-
+}): LocalAuthDecision => {
   const configuredToken = getDevAuthToken()
   if (!configuredToken || input.presentedToken !== configuredToken) {
-    return false
+    return 'not-dev-token'
   }
 
-  return isLoopbackOrigin(input.origin)
+  if (!isDevelopmentAppEnv() || !isDevAuthEnabled()) {
+    return 'rejected'
+  }
+
+  return isLoopbackOrigin(input.origin) ? 'allowed' : 'rejected'
 }
 
 const LEGACY_DEV_AUTH_ALIAS = 'AUTH_BACKDOOR_TOKEN'

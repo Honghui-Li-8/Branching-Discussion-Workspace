@@ -6,7 +6,7 @@ import {
   insertCreditTransaction,
   seedIntroWorkspace,
 } from '../db/index.js'
-import { evaluateLocalAuthPolicy, getDevAuthToken } from './constants.js'
+import { evaluateLocalAuthPolicy } from './constants.js'
 import {
   getSessionIdFromCookieHeader,
   serializeClearedSessionCookie,
@@ -68,17 +68,18 @@ export const handleLogin = async (req: Request, res: Response): Promise<void> =>
   let user: SessionUser
 
   try {
-    const devAuthToken = getDevAuthToken()
-    const presentsDevAuthToken = typeof devAuthToken === 'string' && token === devAuthToken
+    const decision = evaluateLocalAuthPolicy({
+      presentedToken: token,
+      origin: req.headers.origin,
+    })
 
-    if (presentsDevAuthToken) {
-      const isAllowed = evaluateLocalAuthPolicy({ presentedToken: token, origin: req.headers.origin })
-      if (!isAllowed) {
-        logger.warn('[auth] Local developer sign-in rejected by policy.', { auth_mode: 'dev_token' })
-        res.status(401).json({ error: 'Local developer sign-in is not available on this server.' })
-        return
-      }
+    if (decision === 'rejected') {
+      logger.warn('[auth] Local developer sign-in rejected by policy.', { auth_mode: 'dev_token' })
+      res.status(401).json({ error: 'Local developer sign-in is not available on this server.' })
+      return
+    }
 
+    if (decision === 'allowed') {
       user = await resolveFixedLocalDevUser()
       logger.info('[auth] Local developer sign-in accepted.', { auth_mode: 'dev_token' })
     } else {
