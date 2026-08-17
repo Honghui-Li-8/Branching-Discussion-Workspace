@@ -1,10 +1,33 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import GoogleIcon from '@mui/icons-material/Google'
+import {
+  describeLocalAuthBypassMisconfiguration,
+  isLocalAuthBypassAvailable,
+  type LocalAuthBypassGateInput,
+} from '../devFlags'
 import { useAuth } from './useAuth'
 
+// Read at call time, not on import: touching window at module scope makes this module impossible
+// to import outside a DOM.
+//
+// Every VITE_* read is gated on the DEV literal. Vite inlines these as string literals wherever
+// they appear, so an unconditional read puts the configured token in the production bundle even
+// though the gate can never open there. Vite replaces DEV with `false`, letting the minifier fold
+// each branch to undefined. A00a DoD #8.
+const readLocalAuthBypassGateInput = (): LocalAuthBypassGateInput => ({
+  isViteDev: import.meta.env.DEV,
+  bypassEnabledFlag: import.meta.env.DEV
+    ? import.meta.env.VITE_ENABLE_LOCAL_AUTH_BYPASS
+    : undefined,
+  hostname: window.location.hostname,
+  devToken: import.meta.env.DEV ? import.meta.env.VITE_DEV_AUTH_TOKEN : undefined,
+})
+
 export const LoginPage = () => {
-  const { authError, login } = useAuth()
+  const { authError, login, loginWithLocalBypass, isLocalBypassPending, localBypassError } = useAuth()
   const [isLoginPending, setIsLoginPending] = useState(false)
+  const localAuthBypassGateInput = useMemo(readLocalAuthBypassGateInput, [])
+  const isBypassAvailable = isLocalAuthBypassAvailable(localAuthBypassGateInput)
 
   const handleLogin = async () => {
     setIsLoginPending(true)
@@ -17,11 +40,31 @@ export const LoginPage = () => {
     }
   }
 
+  const handleLocalBypassLogin = async () => {
+    try {
+      await loginWithLocalBypass()
+    } catch {
+      // AuthProvider has already surfaced localBypassError.
+    }
+  }
+
+  useEffect(() => {
+    // The DEV literal lets Vite tree-shake the misconfiguration helper and its variable-name
+    // strings out of production builds, alongside the button label below.
+    if (!import.meta.env.DEV || isBypassAvailable) {
+      return
+    }
+    const explanation = describeLocalAuthBypassMisconfiguration(localAuthBypassGateInput)
+    if (explanation) {
+      console.info(explanation)
+    }
+  }, [isBypassAvailable, localAuthBypassGateInput])
+
   return (
     <main className="grid min-h-screen place-items-center bg-[#f5f7fb] px-5 py-8">
       <section className="flex w-full max-w-[560px] flex-col items-center rounded-xl border border-slate-200 bg-white px-6 py-10 text-center shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
         <p className="m-0 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-          Branching Decision Workspace
+          Trellis
         </p>
         <h1 className="my-[14px] text-[clamp(30px,5vw,46px)] font-semibold leading-[1.08] text-slate-950">
           Sign in to continue
@@ -51,6 +94,36 @@ export const LoginPage = () => {
           <p className="mt-4 max-w-[440px] text-sm leading-6 text-red-700" role="alert">
             {authError}
           </p>
+        ) : null}
+
+        {/*
+          The literal `import.meta.env.DEV` is load-bearing, not redundant with isBypassAvailable.
+          Vite statically replaces it with `false` in a production build, which is what lets the
+          bundler drop this whole block including the button label. isBypassAvailable is a runtime
+          value the bundler cannot fold, so removing the literal would ship the label. See A00a
+          DoD #8.
+        */}
+        {import.meta.env.DEV && isBypassAvailable ? (
+          <>
+            <button
+              type="button"
+              onClick={() => {
+                void handleLocalBypassLogin()
+              }}
+              disabled={isLocalBypassPending}
+              className="mt-4 inline-flex min-h-12 items-center justify-center gap-3 rounded-lg border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              {isLocalBypassPending ? (
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
+              ) : null}
+              <span>{isLocalBypassPending ? 'Signing in...' : 'Continue as local developer'}</span>
+            </button>
+            {localBypassError ? (
+              <p className="mt-4 max-w-[440px] text-sm leading-6 text-red-700" role="alert">
+                {localBypassError}
+              </p>
+            ) : null}
+          </>
         ) : null}
       </section>
     </main>

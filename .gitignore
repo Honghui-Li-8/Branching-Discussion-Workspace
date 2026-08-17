@@ -37,5 +37,5 @@ timeline.md
 docs/
 
 # Claude Code local-only config
-.claude/commands/
-.claude/launch.json
+CLAUDE.md
+.claude/

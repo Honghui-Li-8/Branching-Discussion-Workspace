@@ -1,6 +1,6 @@
-# Branching Discussion Workspace
+# Trellis
 
-Branching Discussion Workspace is a full-stack MVP for structured reasoning. Instead of forcing every subtopic into one linear chat thread, it lets you branch a focused child discussion from a specific span of assistant output and keep the branch origin attached to the data model.
+Trellis (a branching discussion workspace) is a full-stack MVP for structured reasoning. Instead of forcing every subtopic into one linear chat thread, it lets you branch a focused child discussion from a specific span of assistant output and keep the branch origin attached to the data model.
 
 ## Preview
 
@@ -57,23 +57,65 @@ Runtime env is split by app:
 For the easiest local setup, point both `DATABASE_URL` and `DATABASE_URL_DEV` in
 `server/.env.local` at the same local Postgres database.
 
-Make sure these values are set:
+Make sure these values are set in `server/.env.local`:
 
 - `DATABASE_URL`
 - `DATABASE_URL_DEV`
+- `APP_ENV`
+- `DEV_AUTH_ENABLED`
 - `DEV_AUTH_TOKEN`
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `OPENAI_API_KEY`
+
+And in `client/web/.env.local`:
+
 - `VITE_API_URL`
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_ANON_KEY`
+- `VITE_ENABLE_LOCAL_AUTH_BYPASS`
+- `VITE_DEV_AUTH_TOKEN`
 
 Optional:
 
 - `SERVER_LOG_LEVEL`
 - `CHAT_ALLOWED_MODELS`
 - `RAG_*` settings if you want to exercise retrieval paths
+
+### Local developer sign-in
+
+Local development does not require completing Google OAuth. The login page can show a
+"Continue as local developer" button that signs you in as a fixed, server-owned identity through
+the normal session path.
+
+It is off unless every condition below is true. The server and the browser each check their own
+set, and the server never trusts the browser's answer.
+
+Server (`server/.env.local`):
+
+- `APP_ENV=development` — a dedicated application-environment variable, deliberately separate from `NODE_ENV`
+- `DEV_AUTH_ENABLED=true`
+- `DEV_AUTH_TOKEN` is set
+- the request `Origin` is a loopback host
+
+Browser (`client/web/.env.local`):
+
+- the app is running under `vite dev`
+- `VITE_ENABLE_LOCAL_AUTH_BYPASS=true`
+- the page hostname is `localhost`, `127.0.0.1`, or `[::1]`
+- `VITE_DEV_AUTH_TOKEN` is set, and matches the server's `DEV_AUTH_TOKEN`
+
+The two `VITE_*` values reach the browser and are readable by anyone using the app. Treat them as
+local test data, not secrets — the protection comes from the server-side environment and origin
+checks, not from hiding the token.
+
+Google sign-in stays available locally, so you can still exercise the real OAuth path.
+
+**Upgrading an existing `.env.local`:** if yours predates local developer sign-in, it likely sets
+`DEV_AUTH_TOKEN` with no `APP_ENV`. The server now **refuses to start** in that state — development
+credentials outside a development environment are treated as a deployment mistake. Add
+`APP_ENV=development` and `DEV_AUTH_ENABLED=true`, or remove `DEV_AUTH_TOKEN`. The variable
+`AUTH_BACKDOOR_TOKEN` was retired; use `DEV_AUTH_TOKEN` instead.
 
 ### Initialize the database
 
