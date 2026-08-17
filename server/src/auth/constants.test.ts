@@ -1,8 +1,9 @@
-import { afterEach, beforeEach, describe, expect, test } from '@jest/globals'
+import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globals'
 import {
   assertSafeHostedAuthConfig,
   evaluateLocalAuthPolicy,
   isLoopbackOrigin,
+  warnOnRetiredDevAuthAlias,
 } from './constants'
 
 describe('isLoopbackOrigin', () => {
@@ -103,5 +104,54 @@ describe('assertSafeHostedAuthConfig', () => {
     process.env.APP_ENV = 'production'
     process.env.DEV_AUTH_ENABLED = 'true'
     expect(() => assertSafeHostedAuthConfig()).toThrow(/APP_ENV=development/)
+  })
+
+  test('states the remedy for both local and hosted environments', () => {
+    process.env.DEV_AUTH_TOKEN = 'dev-token-123'
+    expect(() => assertSafeHostedAuthConfig()).toThrow(/set APP_ENV=development/)
+    expect(() => assertSafeHostedAuthConfig()).toThrow(/unset these variables/)
+  })
+
+  test('does not leak configured values into the failure message', () => {
+    process.env.DEV_AUTH_TOKEN = 'dev-token-123'
+    expect(() => assertSafeHostedAuthConfig()).not.toThrow(/dev-token-123/)
+  })
+})
+
+describe('warnOnRetiredDevAuthAlias', () => {
+  afterEach(() => {
+    delete process.env.APP_ENV
+    delete process.env.AUTH_BACKDOOR_TOKEN
+  })
+
+  test('warns when the retired alias is set in development', () => {
+    process.env.APP_ENV = 'development'
+    process.env.AUTH_BACKDOOR_TOKEN = 'legacy-token'
+    const warn = jest.fn()
+
+    warnOnRetiredDevAuthAlias(warn)
+
+    expect(warn).toHaveBeenCalledTimes(1)
+    expect(warn.mock.calls[0][0]).toContain('AUTH_BACKDOOR_TOKEN')
+    expect(warn.mock.calls[0][0]).toContain('DEV_AUTH_TOKEN')
+    expect(warn.mock.calls[0][0]).not.toContain('legacy-token')
+  })
+
+  test('stays silent when the retired alias is not set', () => {
+    process.env.APP_ENV = 'development'
+    const warn = jest.fn()
+
+    warnOnRetiredDevAuthAlias(warn)
+
+    expect(warn).not.toHaveBeenCalled()
+  })
+
+  test('stays silent outside development, where the startup guard already rejects the alias', () => {
+    process.env.AUTH_BACKDOOR_TOKEN = 'legacy-token'
+    const warn = jest.fn()
+
+    warnOnRetiredDevAuthAlias(warn)
+
+    expect(warn).not.toHaveBeenCalled()
   })
 })

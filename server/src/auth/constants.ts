@@ -42,7 +42,22 @@ export const assertSafeHostedAuthConfig = (): void => {
 
   if (offendingNames.length > 0) {
     throw new Error(
-      `Refusing to start: development-auth configuration (${offendingNames.join(', ')}) is set outside APP_ENV=development.`,
+      `Refusing to start: development-auth configuration (${offendingNames.join(', ')}) is set outside APP_ENV=development. ` +
+        'For local development set APP_ENV=development. For a hosted environment unset these variables.',
     )
   }
+}
+
+// AUTH_BACKDOOR_TOKEN is no longer read as a credential. Outside development the startup guard
+// above rejects it outright; inside development it would otherwise be ignored in silence, leaving
+// a developer with a working-looking config and a bare 401.
+export const warnOnRetiredDevAuthAlias = (warn: (message: string) => void): void => {
+  if (!isDevelopmentAppEnv() || !process.env[LEGACY_DEV_AUTH_ALIAS]) {
+    return
+  }
+
+  warn(
+    `${LEGACY_DEV_AUTH_ALIAS} is set but no longer read; it was retired in favor of DEV_AUTH_TOKEN. ` +
+      'Rename the variable, or local developer sign-in will be rejected.',
+  )
 }

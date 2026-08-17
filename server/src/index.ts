@@ -10,11 +10,17 @@ import { closePool, testConnection } from './db/client.js'
 import { createAppRouterContext } from './trpcContext.js'
 import { registerConversationStreamRoutes } from './chat/stream/routes.js'
 import { createLogger, getServerLogLevel } from './logging/logger.js'
-import { assertSafeHostedAuthConfig } from './auth/constants.js'
+import { assertSafeHostedAuthConfig, warnOnRetiredDevAuthAlias } from './auth/constants.js'
+import { loadEnvFiles } from './env.js'
 
 const app = express()
 const PORT = Number(process.env.PORT) || 3001
 const logger = createLogger('server')
+
+// The auth-config guard below reads process.env, so env files must already be loaded. Do not rely
+// on this happening as a side effect of importing the DB client: with nothing loaded the guard
+// finds nothing to reject and passes vacuously.
+loadEnvFiles()
 
 try {
   assertSafeHostedAuthConfig()
@@ -22,6 +28,10 @@ try {
   logger.error('Refusing to start: unsafe development-auth configuration detected.', { error })
   process.exit(1)
 }
+
+warnOnRetiredDevAuthAlias((message) => {
+  logger.warn(message)
+})
 
 process.stdout.on('error', (error: NodeJS.ErrnoException) => {
   if (error.code !== 'EPIPE') {
