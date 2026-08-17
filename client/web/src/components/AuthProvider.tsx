@@ -11,6 +11,14 @@ import { AuthContext, type AuthContextValue } from './authContext'
 import { isAuthUser } from './authCallbackLogic'
 import { runLocalBypassLogin } from './localBypassLogin'
 
+// Vite inlines import.meta.env.VITE_* as string literals wherever they appear, so reading the dev
+// token unconditionally puts its value in the production bundle. Gating on the DEV literal — which
+// Vite replaces with `false` — lets the minifier fold this to undefined and drop the string.
+// A00a DoD #8 requires the configured credential to be absent from `yarn build` output.
+const localDevAuthToken: string | undefined = import.meta.env.DEV
+  ? import.meta.env.VITE_DEV_AUTH_TOKEN
+  : undefined
+
 type AuthProviderProps = {
   children: ReactNode
 }
@@ -148,7 +156,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify({ token: import.meta.env.VITE_DEV_AUTH_TOKEN }),
+            body: JSON.stringify({ token: localDevAuthToken }),
           })
           const payload = (await response.json().catch(() => ({}))) as {
             authenticated?: unknown

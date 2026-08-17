@@ -8,12 +8,19 @@ import {
 import { useAuth } from './useAuth'
 
 // Read at call time, not on import: touching window at module scope makes this module impossible
-// to import outside a DOM. The import.meta.env reads are still statically replaced by Vite.
+// to import outside a DOM.
+//
+// Every VITE_* read is gated on the DEV literal. Vite inlines these as string literals wherever
+// they appear, so an unconditional read puts the configured token in the production bundle even
+// though the gate can never open there. Vite replaces DEV with `false`, letting the minifier fold
+// each branch to undefined. A00a DoD #8.
 const readLocalAuthBypassGateInput = (): LocalAuthBypassGateInput => ({
   isViteDev: import.meta.env.DEV,
-  bypassEnabledFlag: import.meta.env.VITE_ENABLE_LOCAL_AUTH_BYPASS,
+  bypassEnabledFlag: import.meta.env.DEV
+    ? import.meta.env.VITE_ENABLE_LOCAL_AUTH_BYPASS
+    : undefined,
   hostname: window.location.hostname,
-  devToken: import.meta.env.VITE_DEV_AUTH_TOKEN,
+  devToken: import.meta.env.DEV ? import.meta.env.VITE_DEV_AUTH_TOKEN : undefined,
 })
 
 export const LoginPage = () => {
@@ -42,7 +49,9 @@ export const LoginPage = () => {
   }
 
   useEffect(() => {
-    if (isBypassAvailable) {
+    // The DEV literal lets Vite tree-shake the misconfiguration helper and its variable-name
+    // strings out of production builds, alongside the button label below.
+    if (!import.meta.env.DEV || isBypassAvailable) {
       return
     }
     const explanation = describeLocalAuthBypassMisconfiguration(localAuthBypassGateInput)
