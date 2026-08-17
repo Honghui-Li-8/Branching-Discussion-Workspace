@@ -38,5 +38,4 @@ docs/
 
 # Claude Code local-only config
 CLAUDE.md
-.claude/commands/
-.claude/launch.json
+.claude/
