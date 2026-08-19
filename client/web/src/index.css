@@ -94,22 +94,32 @@
   --color-purple-active: #7e22ce;
   --color-purple-strong: #6b21a8;
 
-  --color-bg-default: #ffffff;
-  --color-bg-subtle: #f3f6f7;
-  --color-bg-subtlest: #fafbfc;
-  --color-bg-muted: #dee3e5;
-  --color-bg-emphasis: #c9d0d3;
+  /* ═══ ROLES ═════════════════════════════════════════════════════════
+     What components are made of, as pointers. Same names as always —
+     consumers keep writing bg-bg-default and never notice the
+     indirection. Dark mode repoints THIS block (bg-default -> gray-900,
+     text-default -> gray-0, ...) and every palette value stays put.
 
-  --color-text-default: #0d1217;
-  --color-text-secondary: #383f42;
-  --color-text-muted: #666f73;
-  --color-text-disabled: #87969b;
-  --color-text-inverse: #ffffff;
-  --color-text-link: #008ca8;
+     border-* deliberately stays its own family rather than folding into
+     the surfaces: sorted by lightness the two interleave rather than
+     nest, and a 1px border needs more contrast per pixel than any fill.
+     ═══════════════════════════════════════════════════════════════════ */
+  --color-bg-default: var(--color-gray-0);
+  --color-bg-subtlest: var(--color-gray-25);
+  --color-bg-subtle: var(--color-gray-50);
+  --color-bg-muted: var(--color-gray-150);
+  --color-bg-emphasis: var(--color-gray-250);
 
-  --color-border-default: #e6eaec;
-  --color-border-strong: #d2d9dc;
-  --color-border-subtle: #eff1f3;
+  --color-text-default: var(--color-gray-900);
+  --color-text-secondary: var(--color-gray-700);
+  --color-text-muted: var(--color-gray-500);
+  --color-text-disabled: var(--color-gray-400);
+  --color-text-inverse: var(--color-gray-0);
+  --color-text-link: var(--color-accent-default);
+
+  --color-border-subtle: var(--color-gray-75);
+  --color-border-default: var(--color-gray-100);
+  --color-border-strong: var(--color-gray-200);
 
   /* ═══ SEMANTIC ══════════════════════════════════════════════════════
      Pointers, never values. Two semantics may share a hue, and any one
@@ -189,6 +199,12 @@
   --radius-sm: 2px;
   --radius-md: 6px;
   --radius-lg: 12px;
+
+  /* Elevation — replaces the inline shadow-[...] arbitrary values the
+     Step 7 components carry. */
+  --shadow-overlay: 0 12px 32px -8px rgba(13, 18, 23, 0.35);
+  --shadow-panel: -12px 0 32px -8px rgba(13, 18, 23, 0.25);
+  --shadow-card: 0 4px 16px -4px rgba(13, 18, 23, 0.18);
 
   /* Motion — decided via hl/A05a-motion-trials (d5fc82d, 1bc6f3f, 9f5090e).
      Enter/exit uniform across the overlay family (Dialog/Sheet/Dropdown/
