@@ -111,15 +111,80 @@
   --color-border-strong: #d2d9dc;
   --color-border-subtle: #eff1f3;
 
-  --color-accent-default: #008ca8;
-  --color-accent-hover: #007e97;
-  --color-accent-active: #00697e;
-  --color-accent-tint: #d6edf1;
-  --color-accent-wash: #a6d7e1;
-  --color-accent-strong: #005565;
+  /* ═══ SEMANTIC ══════════════════════════════════════════════════════
+     Pointers, never values. Two semantics may share a hue, and any one
+     can be repointed later, without a palette value moving — which is
+     the entire reason this layer exists.
+     ═══════════════════════════════════════════════════════════════════ */
+
+  /* Neutral — the "no color" state: folded, read-only, disabled. Borrows
+     six of gray's twelve steps; the rest serve bg/text/border below. */
+  --color-neutral-tint: var(--color-gray-50);
+  --color-neutral-wash: var(--color-gray-150);
+  --color-neutral-default: var(--color-gray-250);
+  --color-neutral-hover: var(--color-gray-400);
+  --color-neutral-active: var(--color-gray-500);
+  --color-neutral-strong: var(--color-gray-700);
+
+  /* Accent — the brand semantic. Also where text-link and Figma's
+     state-exploring point. on-accent stays an inline value: it is
+     text-on-fill, not a ramp position. */
+  --color-accent-tint: var(--color-teal-tint);
+  --color-accent-wash: var(--color-teal-wash);
+  --color-accent-default: var(--color-teal-default);
+  --color-accent-hover: var(--color-teal-hover);
+  --color-accent-active: var(--color-teal-active);
+  --color-accent-strong: var(--color-teal-strong);
   --color-accent-on-accent: #ffffff;
 
-  --color-error-default: #dc2626;
+  --color-error-tint: var(--color-red-tint);
+  --color-error-wash: var(--color-red-wash);
+  --color-error-default: var(--color-red-default);
+  --color-error-hover: var(--color-red-hover);
+  --color-error-active: var(--color-red-active);
+  --color-error-strong: var(--color-red-strong);
+
+  --color-success-tint: var(--color-green-tint);
+  --color-success-wash: var(--color-green-wash);
+  --color-success-default: var(--color-green-default);
+  --color-success-hover: var(--color-green-hover);
+  --color-success-active: var(--color-green-active);
+  --color-success-strong: var(--color-green-strong);
+
+  --color-warning-tint: var(--color-amber-tint);
+  --color-warning-wash: var(--color-amber-wash);
+  --color-warning-default: var(--color-amber-default);
+  --color-warning-hover: var(--color-amber-hover);
+  --color-warning-active: var(--color-amber-active);
+  --color-warning-strong: var(--color-amber-strong);
+
+  /* OPEN: info may later point at teal instead, so it and exploring read
+     as one thing. One line to change; no palette value moves. */
+  --color-info-tint: var(--color-blue-tint);
+  --color-info-wash: var(--color-blue-wash);
+  --color-info-default: var(--color-blue-default);
+  --color-info-hover: var(--color-blue-hover);
+  --color-info-active: var(--color-blue-active);
+  --color-info-strong: var(--color-blue-strong);
+
+  /* OPEN: pending may not earn a dedicated hue — repointing at amber or
+     gray is the same one-line change. */
+  --color-pending-tint: var(--color-indigo-tint);
+  --color-pending-wash: var(--color-indigo-wash);
+  --color-pending-default: var(--color-indigo-default);
+  --color-pending-hover: var(--color-indigo-hover);
+  --color-pending-active: var(--color-indigo-active);
+  --color-pending-strong: var(--color-indigo-strong);
+
+  /* Merged — chosen over A03a's gray alias. Figma's state-merged still
+     points at text-muted and needs repointing; until then code and
+     design disagree on this one token. */
+  --color-merged-tint: var(--color-purple-tint);
+  --color-merged-wash: var(--color-purple-wash);
+  --color-merged-default: var(--color-purple-default);
+  --color-merged-hover: var(--color-purple-hover);
+  --color-merged-active: var(--color-purple-active);
+  --color-merged-strong: var(--color-purple-strong);
 
   --radius-sm: 2px;
   --radius-md: 6px;
