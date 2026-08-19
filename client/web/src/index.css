@@ -3,8 +3,97 @@
 /* Design tokens — ported from A03a's locked Figma spec (real hex values
    transcribed in docs/mvp-1.5/refrences/A04a-code-reference/shared-toolchain/figmaTokens.ts).
    Colors and radius only; typography/spacing/shadow and extended semantic
-   states remain open (see docs/mvp-1.5/A05a-token-audit-and-reference.md). */
+   states remain open (see docs/mvp-1.5/A05a-token-audit-and-reference.md).
+
+   `static` is required, not stylistic: plain `@theme` tree-shakes any
+   variable no scanned utility class references, which would silently drop
+   most of the palette below. Confirmed empirically in commit 69f28a4. */
 @theme static {
+  /* ═══ PALETTE ═══════════════════════════════════════════════════════
+     Named for the color they are, not for what they mean. These hold
+     every value in the system; the semantic and role layers below hold
+     none and point here. That separation is what lets two semantics
+     share one hue, and what makes dark mode a repoint rather than a
+     rewrite. Full rationale: docs/mvp-1.5/reports/A05a-color-system-report.md
+     ═══════════════════════════════════════════════════════════════════ */
+
+  /* Gray — numeric because grays span white to near-black, twice a hue's
+     range (12 steps where a hue needs 6), and because numbers sort, which
+     the role names cannot: bg-subtlest is darker than bg-default. Gaps at
+     300/600/800 are honest — those values don't exist yet. */
+  --color-gray-0: #ffffff;
+  --color-gray-25: #fafbfc;
+  --color-gray-50: #f3f6f7;
+  --color-gray-75: #eff1f3;
+  --color-gray-100: #e6eaec;
+  --color-gray-150: #dee3e5;
+  --color-gray-200: #d2d9dc;
+  --color-gray-250: #c9d0d3;
+  --color-gray-400: #87969b;
+  --color-gray-500: #666f73;
+  --color-gray-700: #383f42;
+  --color-gray-900: #0d1217;
+
+  /* Teal — the brand hue, locked by A03a (Quartz). Already had exactly
+     this six-step shape, so it is the model the other hues copy. */
+  --color-teal-tint: #d6edf1;
+  --color-teal-wash: #a6d7e1;
+  --color-teal-default: #008ca8;
+  --color-teal-hover: #007e97;
+  --color-teal-active: #00697e;
+  --color-teal-strong: #005565;
+
+  /* Red — note the shift: default is Tailwind red-600, not red-500 like
+     every other hue here, because #dc2626 was locked by A03a. This ramp
+     therefore sits one step darker than its siblings. Deliberate; kept
+     rather than re-tidied. */
+  --color-red-tint: #fee2e2;
+  --color-red-wash: #fecaca;
+  --color-red-default: #dc2626;
+  --color-red-hover: #b91c1c;
+  --color-red-active: #991b1b;
+  --color-red-strong: #7f1d1d;
+
+  /* Green */
+  --color-green-tint: #dcfce7;
+  --color-green-wash: #bbf7d0;
+  --color-green-default: #22c55e;
+  --color-green-hover: #16a34a;
+  --color-green-active: #15803d;
+  --color-green-strong: #166534;
+
+  /* Amber */
+  --color-amber-tint: #fef3c7;
+  --color-amber-wash: #fde68a;
+  --color-amber-default: #f59e0b;
+  --color-amber-hover: #d97706;
+  --color-amber-active: #b45309;
+  --color-amber-strong: #92400e;
+
+  /* Blue */
+  --color-blue-tint: #dbeafe;
+  --color-blue-wash: #bfdbfe;
+  --color-blue-default: #3b82f6;
+  --color-blue-hover: #2563eb;
+  --color-blue-active: #1d4ed8;
+  --color-blue-strong: #1e40af;
+
+  /* Indigo */
+  --color-indigo-tint: #e0e7ff;
+  --color-indigo-wash: #c7d2fe;
+  --color-indigo-default: #6366f1;
+  --color-indigo-hover: #4f46e5;
+  --color-indigo-active: #4338ca;
+  --color-indigo-strong: #3730a3;
+
+  /* Purple */
+  --color-purple-tint: #f3e8ff;
+  --color-purple-wash: #e9d5ff;
+  --color-purple-default: #a855f7;
+  --color-purple-hover: #9333ea;
+  --color-purple-active: #7e22ce;
+  --color-purple-strong: #6b21a8;
+
   --color-bg-default: #ffffff;
   --color-bg-subtle: #f3f6f7;
   --color-bg-subtlest: #fafbfc;
