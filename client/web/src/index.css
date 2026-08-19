@@ -518,3 +518,122 @@
 .sugg-row::-webkit-scrollbar { height: 0.5px; }
 .sugg-row::-webkit-scrollbar-track { background: transparent; }
 .sugg-row::-webkit-scrollbar-thumb { background: #b9d6e8; border-radius: 9999px; }
+
+/* ── Component keyframes (A05a ui/ primitives) ─────────────────────────
+   Referenced by the overlay/feedback components via the motion tokens
+   (--duration-overlay etc.). Settled on hl/A05a-motion-trials. ── */
+
+/* Shared overlay enter/exit keyframes — consume the motion tokens above.
+   Step 6 only defined the duration/easing values; Step 7's Dialog/Sheet/
+   Dropdown/Popover/Tooltip primitives are the first real consumers, driven
+   via Radix's data-[state=open|closed] attributes. Trial-branch code —
+   see docs/tickets-iml/mvp-1.5a/A05a-step7-trials-temp-impl-plan.md. */
+@keyframes a05a-overlay-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes a05a-overlay-exit {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+  }
+}
+
+/* Backdrop-only fade — opacity, no transform. The full-viewport overlay
+   behind Dialog/Sheet must not share the content's translate+scale
+   keyframes: applying a translateY/scale to a fixed inset-0 element reads
+   as the whole screen "rising up," visibly wrong especially when the
+   content itself is sliding in from an edge (Sheet). */
+@keyframes a05a-backdrop-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes a05a-backdrop-exit {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* Sheet-specific: same duration/easing tokens as the overlay family, but a
+   slide-from-edge shape rather than fade+scale — matches what a sheet is
+   (a panel intruding from off-screen), not a dialog. */
+@keyframes a05a-sheet-enter {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes a05a-sheet-exit {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+}
+
+/* AlertPopup's auto-dismiss progress bar — two directions kept as a real
+   comparable option (not settled), duration set inline per-instance
+   since it's a runtime parameter, not a fixed token. */
+@keyframes a05a-countdown-fill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes a05a-countdown-drain {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+@keyframes a05a-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+@keyframes a05a-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
