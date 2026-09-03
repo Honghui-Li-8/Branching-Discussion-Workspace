@@ -81,12 +81,6 @@ export const AppSidebar = () => {
   const [popoverPosition, setPopoverPosition] = useState({ top: 0, left: 0 })
   const createButtonRef = useRef<HTMLButtonElement>(null)
 
-  const [contextMenu, setContextMenu] = useState<{
-    workspaceId: string
-    workspaceTitle: string
-    x: number
-    y: number
-  } | null>(null)
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
 
@@ -104,7 +98,6 @@ export const AppSidebar = () => {
 
   const handleDelete = (workspaceId: string) => {
     deleteWorkspaceMutation.mutate({ id: workspaceId })
-    setContextMenu(null)
   }
 
   const toggleCreatePopover = () => {
@@ -204,24 +197,27 @@ export const AppSidebar = () => {
                       className="w-full rounded-lg border border-blue-300 bg-blue-50 px-3 py-2.5 text-[13px] font-semibold text-slate-900 outline-none ring-4 ring-blue-500/10"
                     />
                   ) : (
-                    <button
-                      type="button"
-                      className={`flex w-full cursor-pointer flex-col gap-1.5 rounded-lg border px-3 py-2.5 text-left transition ${
-                        isActive
-                          ? 'border-blue-200 bg-blue-50 shadow-sm'
-                          : 'border-transparent bg-transparent hover:border-slate-200 hover:bg-slate-50'
-                      }`}
-                      onClick={() => dispatch(setActiveWorkspaceId(workspace.id))}
-                      onContextMenu={(e) => {
-                        e.preventDefault()
-                        setContextMenu({ workspaceId: workspace.id, workspaceTitle: workspace.title, x: e.clientX, y: e.clientY })
-                      }}
+                    <WorkspaceContextMenu
+                      workspaceTitle={workspace.title}
+                      onRename={() => startRename(workspace.id, workspace.title)}
+                      onDelete={() => handleDelete(workspace.id)}
+                      isDeletePending={deleteWorkspaceMutation.isPending}
                     >
-                      <span className="truncate text-[13px] font-semibold text-slate-900">
-                        {workspace.title}
-                      </span>
-                      <small className="line-clamp-2 text-[11px] leading-snug text-slate-500">{workspaceSummary}</small>
-                    </button>
+                      <button
+                        type="button"
+                        className={`flex w-full cursor-pointer flex-col gap-1.5 rounded-lg border px-3 py-2.5 text-left transition ${
+                          isActive
+                            ? 'border-blue-200 bg-blue-50 shadow-sm'
+                            : 'border-transparent bg-transparent hover:border-slate-200 hover:bg-slate-50'
+                        }`}
+                        onClick={() => dispatch(setActiveWorkspaceId(workspace.id))}
+                      >
+                        <span className="truncate text-[13px] font-semibold text-slate-900">
+                          {workspace.title}
+                        </span>
+                        <small className="line-clamp-2 text-[11px] leading-snug text-slate-500">{workspaceSummary}</small>
+                      </button>
+                    </WorkspaceContextMenu>
                   )}
                 </li>
               )
@@ -265,17 +261,6 @@ export const AppSidebar = () => {
       </section>
     </aside>
 
-    {contextMenu && (
-      <WorkspaceContextMenu
-        workspaceTitle={contextMenu.workspaceTitle}
-        x={contextMenu.x}
-        y={contextMenu.y}
-        onRename={() => startRename(contextMenu.workspaceId, contextMenu.workspaceTitle)}
-        onDelete={() => handleDelete(contextMenu.workspaceId)}
-        onClose={() => setContextMenu(null)}
-        isDeletePending={deleteWorkspaceMutation.isPending}
-      />
-    )}
     {isPopoverOpen && (
       <CreateWorkspacePopover
         anchorRef={createButtonRef}

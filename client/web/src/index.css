@@ -1,5 +1,233 @@
 @import 'tailwindcss';
 
+/* Design tokens — ported from A03a's locked Figma spec (real hex values
+   transcribed in docs/mvp-1.5/refrences/A04a-code-reference/shared-toolchain/figmaTokens.ts).
+   Colors and radius only; typography/spacing/shadow and extended semantic
+   states remain open (see docs/mvp-1.5/A05a-token-audit-and-reference.md).
+
+   `static` is required, not stylistic: plain `@theme` tree-shakes any
+   variable no scanned utility class references, which would silently drop
+   most of the palette below. Confirmed empirically in commit 69f28a4. */
+@theme static {
+  /* ═══ PALETTE ═══════════════════════════════════════════════════════
+     Named for the color they are, not for what they mean. These hold
+     every value in the system; the semantic and role layers below hold
+     none and point here. That separation is what lets two semantics
+     share one hue, and what makes dark mode a repoint rather than a
+     rewrite. Full rationale: docs/mvp-1.5/reports/A05a-color-system-report.md
+     ═══════════════════════════════════════════════════════════════════ */
+
+  /* Gray — numeric because grays span white to near-black, twice a hue's
+     range (12 steps where a hue needs 6), and because numbers sort, which
+     the role names cannot: bg-subtlest is darker than bg-default. Gaps at
+     300/600/800 are honest — those values don't exist yet. */
+  --color-gray-0: #ffffff;
+  --color-gray-25: #fafbfc;
+  --color-gray-50: #f3f6f7;
+  --color-gray-75: #eff1f3;
+  --color-gray-100: #e6eaec;
+  --color-gray-150: #dee3e5;
+  --color-gray-200: #d2d9dc;
+  --color-gray-250: #c9d0d3;
+  --color-gray-400: #87969b;
+  --color-gray-500: #666f73;
+  --color-gray-700: #383f42;
+  --color-gray-900: #0d1217;
+
+  /* Teal — the brand hue, locked by A03a (Quartz). Already had exactly
+     this six-step shape, so it is the model the other hues copy. */
+  --color-teal-tint: #d6edf1;
+  --color-teal-wash: #a6d7e1;
+  --color-teal-default: #008ca8;
+  --color-teal-hover: #007e97;
+  --color-teal-active: #00697e;
+  --color-teal-strong: #005565;
+
+  /* Red — note the shift: default is Tailwind red-600, not red-500 like
+     every other hue here, because #dc2626 was locked by A03a. This ramp
+     therefore sits one step darker than its siblings. Deliberate; kept
+     rather than re-tidied. */
+  --color-red-tint: #fee2e2;
+  --color-red-wash: #fecaca;
+  --color-red-default: #dc2626;
+  --color-red-hover: #b91c1c;
+  --color-red-active: #991b1b;
+  --color-red-strong: #7f1d1d;
+
+  /* Green */
+  --color-green-tint: #dcfce7;
+  --color-green-wash: #bbf7d0;
+  --color-green-default: #22c55e;
+  --color-green-hover: #16a34a;
+  --color-green-active: #15803d;
+  --color-green-strong: #166534;
+
+  /* Amber */
+  --color-amber-tint: #fef3c7;
+  --color-amber-wash: #fde68a;
+  --color-amber-default: #f59e0b;
+  --color-amber-hover: #d97706;
+  --color-amber-active: #b45309;
+  --color-amber-strong: #92400e;
+
+  /* Blue */
+  --color-blue-tint: #dbeafe;
+  --color-blue-wash: #bfdbfe;
+  --color-blue-default: #3b82f6;
+  --color-blue-hover: #2563eb;
+  --color-blue-active: #1d4ed8;
+  --color-blue-strong: #1e40af;
+
+  /* Indigo */
+  --color-indigo-tint: #e0e7ff;
+  --color-indigo-wash: #c7d2fe;
+  --color-indigo-default: #6366f1;
+  --color-indigo-hover: #4f46e5;
+  --color-indigo-active: #4338ca;
+  --color-indigo-strong: #3730a3;
+
+  /* Purple */
+  --color-purple-tint: #f3e8ff;
+  --color-purple-wash: #e9d5ff;
+  --color-purple-default: #a855f7;
+  --color-purple-hover: #9333ea;
+  --color-purple-active: #7e22ce;
+  --color-purple-strong: #6b21a8;
+
+  /* ═══ ROLES ═════════════════════════════════════════════════════════
+     What components are made of, as pointers. Same names as always —
+     consumers keep writing bg-bg-default and never notice the
+     indirection. Dark mode repoints THIS block (bg-default -> gray-900,
+     text-default -> gray-0, ...) and every palette value stays put.
+
+     border-* deliberately stays its own family rather than folding into
+     the surfaces: sorted by lightness the two interleave rather than
+     nest, and a 1px border needs more contrast per pixel than any fill.
+     ═══════════════════════════════════════════════════════════════════ */
+  --color-bg-default: var(--color-gray-0);
+  --color-bg-subtlest: var(--color-gray-25);
+  --color-bg-subtle: var(--color-gray-50);
+  --color-bg-muted: var(--color-gray-150);
+  --color-bg-emphasis: var(--color-gray-250);
+
+  --color-text-default: var(--color-gray-900);
+  --color-text-secondary: var(--color-gray-700);
+  --color-text-muted: var(--color-gray-500);
+  --color-text-disabled: var(--color-gray-400);
+  --color-text-inverse: var(--color-gray-0);
+  --color-text-link: var(--color-accent-default);
+
+  --color-border-subtle: var(--color-gray-75);
+  --color-border-default: var(--color-gray-100);
+  --color-border-strong: var(--color-gray-200);
+
+  /* ═══ SEMANTIC ══════════════════════════════════════════════════════
+     Pointers, never values. Two semantics may share a hue, and any one
+     can be repointed later, without a palette value moving — which is
+     the entire reason this layer exists.
+     ═══════════════════════════════════════════════════════════════════ */
+
+  /* Neutral — the "no color" state: folded, read-only, disabled. Borrows
+     six of gray's twelve steps; the rest serve bg/text/border below. */
+  --color-neutral-tint: var(--color-gray-50);
+  --color-neutral-wash: var(--color-gray-150);
+  --color-neutral-default: var(--color-gray-250);
+  --color-neutral-hover: var(--color-gray-400);
+  --color-neutral-active: var(--color-gray-500);
+  --color-neutral-strong: var(--color-gray-700);
+
+  /* Accent — the brand semantic. Also where text-link and Figma's
+     state-exploring point. on-accent stays an inline value: it is
+     text-on-fill, not a ramp position. */
+  --color-accent-tint: var(--color-teal-tint);
+  --color-accent-wash: var(--color-teal-wash);
+  --color-accent-default: var(--color-teal-default);
+  --color-accent-hover: var(--color-teal-hover);
+  --color-accent-active: var(--color-teal-active);
+  --color-accent-strong: var(--color-teal-strong);
+  --color-accent-on-accent: #ffffff;
+
+  --color-error-tint: var(--color-red-tint);
+  --color-error-wash: var(--color-red-wash);
+  --color-error-default: var(--color-red-default);
+  --color-error-hover: var(--color-red-hover);
+  --color-error-active: var(--color-red-active);
+  --color-error-strong: var(--color-red-strong);
+
+  --color-success-tint: var(--color-green-tint);
+  --color-success-wash: var(--color-green-wash);
+  --color-success-default: var(--color-green-default);
+  --color-success-hover: var(--color-green-hover);
+  --color-success-active: var(--color-green-active);
+  --color-success-strong: var(--color-green-strong);
+
+  --color-warning-tint: var(--color-amber-tint);
+  --color-warning-wash: var(--color-amber-wash);
+  --color-warning-default: var(--color-amber-default);
+  --color-warning-hover: var(--color-amber-hover);
+  --color-warning-active: var(--color-amber-active);
+  --color-warning-strong: var(--color-amber-strong);
+
+  /* OPEN: info may later point at teal instead, so it and exploring read
+     as one thing. One line to change; no palette value moves. */
+  --color-info-tint: var(--color-blue-tint);
+  --color-info-wash: var(--color-blue-wash);
+  --color-info-default: var(--color-blue-default);
+  --color-info-hover: var(--color-blue-hover);
+  --color-info-active: var(--color-blue-active);
+  --color-info-strong: var(--color-blue-strong);
+
+  /* OPEN: pending may not earn a dedicated hue — repointing at amber or
+     gray is the same one-line change. */
+  --color-pending-tint: var(--color-indigo-tint);
+  --color-pending-wash: var(--color-indigo-wash);
+  --color-pending-default: var(--color-indigo-default);
+  --color-pending-hover: var(--color-indigo-hover);
+  --color-pending-active: var(--color-indigo-active);
+  --color-pending-strong: var(--color-indigo-strong);
+
+  /* Merged — chosen over A03a's gray alias. Figma's state-merged still
+     points at text-muted and needs repointing; until then code and
+     design disagree on this one token. */
+  --color-merged-tint: var(--color-purple-tint);
+  --color-merged-wash: var(--color-purple-wash);
+  --color-merged-default: var(--color-purple-default);
+  --color-merged-hover: var(--color-purple-hover);
+  --color-merged-active: var(--color-purple-active);
+  --color-merged-strong: var(--color-purple-strong);
+
+  --radius-sm: 2px;
+  --radius-md: 6px;
+  --radius-lg: 12px;
+
+  /* Elevation — replaces the inline shadow-[...] arbitrary values the
+     Step 7 components carry. */
+  --shadow-overlay: 0 12px 32px -8px rgba(13, 18, 23, 0.35);
+  --shadow-panel: -12px 0 32px -8px rgba(13, 18, 23, 0.25);
+  --shadow-card: 0 4px 16px -4px rgba(13, 18, 23, 0.18);
+
+  /* Motion — decided via hl/A05a-motion-trials (d5fc82d, 1bc6f3f, 9f5090e).
+     Enter/exit uniform across the overlay family (Dialog/Sheet/Dropdown/
+     Popover/Tooltip); tooltip delay and continuous-motion speeds are
+     separate, independently-decided values. */
+  --duration-overlay: 200ms;
+  --ease-overlay-enter: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-overlay-exit: ease-in;
+
+  --delay-tooltip: 150ms;
+
+  --duration-pulse: 1.5s;
+  --duration-spin: 1.5s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 @layer base {
   *,
   *::before,
@@ -290,3 +518,122 @@
 .sugg-row::-webkit-scrollbar { height: 0.5px; }
 .sugg-row::-webkit-scrollbar-track { background: transparent; }
 .sugg-row::-webkit-scrollbar-thumb { background: #b9d6e8; border-radius: 9999px; }
+
+/* ── Component keyframes (A05a ui/ primitives) ─────────────────────────
+   Referenced by the overlay/feedback components via the motion tokens
+   (--duration-overlay etc.). Settled on hl/A05a-motion-trials. ── */
+
+/* Shared overlay enter/exit keyframes — consume the motion tokens above.
+   Step 6 only defined the duration/easing values; Step 7's Dialog/Sheet/
+   Dropdown/Popover/Tooltip primitives are the first real consumers, driven
+   via Radix's data-[state=open|closed] attributes. Trial-branch code —
+   see docs/tickets-iml/mvp-1.5a/A05a-step7-trials-temp-impl-plan.md. */
+@keyframes a05a-overlay-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes a05a-overlay-exit {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+  }
+}
+
+/* Backdrop-only fade — opacity, no transform. The full-viewport overlay
+   behind Dialog/Sheet must not share the content's translate+scale
+   keyframes: applying a translateY/scale to a fixed inset-0 element reads
+   as the whole screen "rising up," visibly wrong especially when the
+   content itself is sliding in from an edge (Sheet). */
+@keyframes a05a-backdrop-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes a05a-backdrop-exit {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* Sheet-specific: same duration/easing tokens as the overlay family, but a
+   slide-from-edge shape rather than fade+scale — matches what a sheet is
+   (a panel intruding from off-screen), not a dialog. */
+@keyframes a05a-sheet-enter {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes a05a-sheet-exit {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+}
+
+/* AlertPopup's auto-dismiss progress bar — two directions kept as a real
+   comparable option (not settled), duration set inline per-instance
+   since it's a runtime parameter, not a fixed token. */
+@keyframes a05a-countdown-fill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes a05a-countdown-drain {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+@keyframes a05a-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+@keyframes a05a-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
