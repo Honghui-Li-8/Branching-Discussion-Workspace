@@ -10,10 +10,32 @@ import { closePool, testConnection } from './db/client.js'
 import { createAppRouterContext } from './trpcContext.js'
 import { registerConversationStreamRoutes } from './chat/stream/routes.js'
 import { createLogger, getServerLogLevel } from './logging/logger.js'
+import {
+  assertSafeHostedAuthConfig,
+  isLoopbackOrigin,
+  warnOnRetiredDevAuthAlias,
+} from './auth/constants.js'
+import { loadEnvFiles } from './env.js'
+
+// First statement in the module body: everything below reads process.env, including the
+// auth-config guard. Do not rely on env arriving as a side effect of importing the DB client —
+// with nothing loaded the guard finds nothing to reject and passes vacuously.
+loadEnvFiles()
 
 const app = express()
 const PORT = Number(process.env.PORT) || 3001
 const logger = createLogger('server')
+
+try {
+  assertSafeHostedAuthConfig()
+} catch (error) {
+  logger.error('Refusing to start: unsafe development-auth configuration detected.', { error })
+  process.exit(1)
+}
+
+warnOnRetiredDevAuthAlias((message) => {
+  logger.warn(message)
+})
 
 process.stdout.on('error', (error: NodeJS.ErrnoException) => {
   if (error.code !== 'EPIPE') {
@@ -73,12 +95,7 @@ export const streamLimiter: RequestHandler = rateLimit({
   handler: jsonRateLimitHandler,
 })
 
-const defaultAllowedOrigins = new Set([
-  'http://localhost:5173',
-  'http://localhost:5174',
-  'http://localhost:5175',
-  'http://localhost:5176',
-])
+const DEV_ORIGIN_PORT_PATTERN = /:51\d{2}$/
 
 const configuredAllowedOrigins = new Set(
   (process.env.CORS_ORIGIN ?? '')
@@ -87,12 +104,15 @@ const configuredAllowedOrigins = new Set(
     .filter(Boolean),
 )
 
+// Share one definition of "loopback" with the local-auth gate. Without this, the client could
+// pass its own hostname check on 127.0.0.1, render the local sign-in button, and then have the
+// request fail CORS — a network error instead of the recoverable message the gate promises.
 const isAllowedCorsOrigin = (origin: string): boolean => {
   if (configuredAllowedOrigins.size > 0) {
     return configuredAllowedOrigins.has(origin)
   }
 
-  return defaultAllowedOrigins.has(origin) || /^http:\/\/localhost:51\d{2}$/.test(origin)
+  return isLoopbackOrigin(origin) && DEV_ORIGIN_PORT_PATTERN.test(origin)
 }
 
 app.use(

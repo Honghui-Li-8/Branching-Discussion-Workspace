@@ -1,0 +1,161 @@
+import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globals'
+import {
+  assertSafeHostedAuthConfig,
+  evaluateLocalAuthPolicy,
+  isLoopbackOrigin,
+  warnOnRetiredDevAuthAlias,
+} from './constants'
+
+describe('isLoopbackOrigin', () => {
+  test('accepts loopback origins with or without a port', () => {
+    expect(isLoopbackOrigin('http://localhost:5173')).toBe(true)
+    expect(isLoopbackOrigin('http://127.0.0.1:4000')).toBe(true)
+    expect(isLoopbackOrigin('http://[::1]:5173')).toBe(true)
+    expect(isLoopbackOrigin('http://localhost')).toBe(true)
+  })
+
+  test('rejects non-loopback, https, suffix-domain, and missing origins', () => {
+    expect(isLoopbackOrigin('https://example.com')).toBe(false)
+    expect(isLoopbackOrigin('http://evil.com')).toBe(false)
+    expect(isLoopbackOrigin('http://localhost.attacker.com')).toBe(false)
+    expect(isLoopbackOrigin(undefined)).toBe(false)
+  })
+})
+
+describe('evaluateLocalAuthPolicy', () => {
+  const allowedInput = { presentedToken: 'dev-token-123', origin: 'http://localhost:5173' }
+
+  beforeEach(() => {
+    process.env.APP_ENV = 'development'
+    process.env.DEV_AUTH_ENABLED = 'true'
+    process.env.DEV_AUTH_TOKEN = 'dev-token-123'
+  })
+
+  afterEach(() => {
+    delete process.env.APP_ENV
+    delete process.env.DEV_AUTH_ENABLED
+    delete process.env.DEV_AUTH_TOKEN
+  })
+
+  test('allows when environment, flag, token, and origin all hold', () => {
+    expect(evaluateLocalAuthPolicy(allowedInput)).toBe('allowed')
+  })
+
+  test('rejects when APP_ENV is not development', () => {
+    process.env.APP_ENV = 'production'
+    expect(evaluateLocalAuthPolicy(allowedInput)).toBe('rejected')
+  })
+
+  test('rejects when DEV_AUTH_ENABLED is not true', () => {
+    delete process.env.DEV_AUTH_ENABLED
+    expect(evaluateLocalAuthPolicy(allowedInput)).toBe('rejected')
+  })
+
+  test('rejects when the origin is not loopback', () => {
+    expect(evaluateLocalAuthPolicy({ ...allowedInput, origin: 'https://example.com' })).toBe(
+      'rejected',
+    )
+  })
+
+  test('reports a mismatched token as not-dev-token so the caller falls through to the provider', () => {
+    expect(evaluateLocalAuthPolicy({ ...allowedInput, presentedToken: 'wrong-token' })).toBe(
+      'not-dev-token',
+    )
+  })
+
+  test('reports not-dev-token when DEV_AUTH_TOKEN is not configured', () => {
+    delete process.env.DEV_AUTH_TOKEN
+    expect(evaluateLocalAuthPolicy(allowedInput)).toBe('not-dev-token')
+  })
+})
+
+describe('assertSafeHostedAuthConfig', () => {
+  afterEach(() => {
+    delete process.env.APP_ENV
+    delete process.env.DEV_AUTH_ENABLED
+    delete process.env.DEV_AUTH_TOKEN
+    delete process.env.AUTH_BACKDOOR_TOKEN
+  })
+
+  test('does not throw when APP_ENV=development regardless of other flags', () => {
+    process.env.APP_ENV = 'development'
+    process.env.DEV_AUTH_ENABLED = 'true'
+    process.env.DEV_AUTH_TOKEN = 'dev-token-123'
+    process.env.AUTH_BACKDOOR_TOKEN = 'legacy-token'
+    expect(() => assertSafeHostedAuthConfig()).not.toThrow()
+  })
+
+  test('does not throw when APP_ENV is unset and nothing else is set', () => {
+    expect(() => assertSafeHostedAuthConfig()).not.toThrow()
+  })
+
+  test('throws when DEV_AUTH_ENABLED is set outside development', () => {
+    process.env.DEV_AUTH_ENABLED = 'true'
+    expect(() => assertSafeHostedAuthConfig()).toThrow(/DEV_AUTH_ENABLED/)
+  })
+
+  test('throws when DEV_AUTH_TOKEN is set outside development', () => {
+    process.env.DEV_AUTH_TOKEN = 'dev-token-123'
+    expect(() => assertSafeHostedAuthConfig()).toThrow(/DEV_AUTH_TOKEN/)
+  })
+
+  test('throws when the legacy AUTH_BACKDOOR_TOKEN alias is set outside development', () => {
+    process.env.AUTH_BACKDOOR_TOKEN = 'legacy-token'
+    expect(() => assertSafeHostedAuthConfig()).toThrow(/AUTH_BACKDOOR_TOKEN/)
+  })
+
+  test('throws when APP_ENV is production and dev-auth config is set', () => {
+    process.env.APP_ENV = 'production'
+    process.env.DEV_AUTH_ENABLED = 'true'
+    expect(() => assertSafeHostedAuthConfig()).toThrow(/APP_ENV=development/)
+  })
+
+  test('states the remedy for both local and hosted environments', () => {
+    process.env.DEV_AUTH_TOKEN = 'dev-token-123'
+    expect(() => assertSafeHostedAuthConfig()).toThrow(/set APP_ENV=development/)
+    expect(() => assertSafeHostedAuthConfig()).toThrow(/unset these variables/)
+  })
+
+  test('does not leak configured values into the failure message', () => {
+    process.env.DEV_AUTH_TOKEN = 'dev-token-123'
+    expect(() => assertSafeHostedAuthConfig()).not.toThrow(/dev-token-123/)
+  })
+})
+
+describe('warnOnRetiredDevAuthAlias', () => {
+  afterEach(() => {
+    delete process.env.APP_ENV
+    delete process.env.AUTH_BACKDOOR_TOKEN
+  })
+
+  test('warns when the retired alias is set in development', () => {
+    process.env.APP_ENV = 'development'
+    process.env.AUTH_BACKDOOR_TOKEN = 'legacy-token'
+    const warn = jest.fn()
+
+    warnOnRetiredDevAuthAlias(warn)
+
+    expect(warn).toHaveBeenCalledTimes(1)
+    expect(warn.mock.calls[0][0]).toContain('AUTH_BACKDOOR_TOKEN')
+    expect(warn.mock.calls[0][0]).toContain('DEV_AUTH_TOKEN')
+    expect(warn.mock.calls[0][0]).not.toContain('legacy-token')
+  })
+
+  test('stays silent when the retired alias is not set', () => {
+    process.env.APP_ENV = 'development'
+    const warn = jest.fn()
+
+    warnOnRetiredDevAuthAlias(warn)
+
+    expect(warn).not.toHaveBeenCalled()
+  })
+
+  test('stays silent outside development, where the startup guard already rejects the alias', () => {
+    process.env.AUTH_BACKDOOR_TOKEN = 'legacy-token'
+    const warn = jest.fn()
+
+    warnOnRetiredDevAuthAlias(warn)
+
+    expect(warn).not.toHaveBeenCalled()
+  })
+})

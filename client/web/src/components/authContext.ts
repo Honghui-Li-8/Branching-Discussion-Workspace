@@ -11,6 +11,9 @@ export type AuthContextValue = {
   login: () => Promise<void>
   logout: () => Promise<void>
   refreshBalance: () => Promise<void>
+  loginWithLocalBypass: () => Promise<void>
+  isLocalBypassPending: boolean
+  localBypassError: string | null
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null)

@@ -97,8 +97,8 @@ const createMockResponse = (): MockResponse => {
   return response
 }
 
-const requestWithBody = (body: unknown): Request =>
-  ({ body, headers: {} } as Request)
+const requestWithBody = (body: unknown, origin = 'http://localhost:5173'): Request =>
+  ({ body, headers: { origin } } as Request)
 
 const requestWithCookie = (cookie: string): Request =>
   ({ headers: { cookie } } as Request)
@@ -106,6 +106,8 @@ const requestWithCookie = (cookie: string): Request =>
 describe('auth handlers', () => {
   beforeEach(() => {
     process.env.DEV_AUTH_TOKEN = 'dev-token-123'
+    process.env.APP_ENV = 'development'
+    process.env.DEV_AUTH_ENABLED = 'true'
     clearAllSessions()
     getOrCreateUserByAuthIdentityMock.mockClear()
     getUserByIdMock.mockClear()
@@ -116,6 +118,8 @@ describe('auth handlers', () => {
   afterEach(() => {
     clearAllSessions()
     delete process.env.DEV_AUTH_TOKEN
+    delete process.env.APP_ENV
+    delete process.env.DEV_AUTH_ENABLED
     jest.restoreAllMocks()
   })
 
@@ -132,6 +136,53 @@ describe('auth handlers', () => {
     expect(seedIntroWorkspaceMock).toHaveBeenCalledWith('00000000-0000-4000-8000-000000000001')
     expect(res.headers['set-cookie']).toContain('bdw_session=mocked-session-id')
     expect(res.headers['set-cookie']).toContain('HttpOnly')
+  })
+
+  test('handleLogin rejects the dev token when DEV_AUTH_ENABLED is not true', async () => {
+    delete process.env.DEV_AUTH_ENABLED
+    const req = requestWithBody({ token: 'dev-token-123' })
+    const res = createMockResponse()
+
+    await handleLogin(req, res as unknown as Response)
+
+    expect(res.statusCode).toBe(401)
+    expect(res.headers['set-cookie']).toBeUndefined()
+  })
+
+  test('handleLogin rejects the dev token when APP_ENV is not development', async () => {
+    process.env.APP_ENV = 'production'
+    const req = requestWithBody({ token: 'dev-token-123' })
+    const res = createMockResponse()
+
+    await handleLogin(req, res as unknown as Response)
+
+    expect(res.statusCode).toBe(401)
+    expect(res.headers['set-cookie']).toBeUndefined()
+  })
+
+  test('handleLogin rejects the dev token from a non-loopback Origin', async () => {
+    const req = requestWithBody({ token: 'dev-token-123' }, 'https://example.com')
+    const res = createMockResponse()
+
+    await handleLogin(req, res as unknown as Response)
+
+    expect(res.statusCode).toBe(401)
+    expect(res.headers['set-cookie']).toBeUndefined()
+  })
+
+  test('handleLogin ignores a client-supplied identity override for the dev token', async () => {
+    const req = requestWithBody({
+      token: 'dev-token-123',
+      user: { id: 'someone-else', authUserId: 'someone:else' },
+    })
+    const res = createMockResponse()
+
+    await handleLogin(req, res as unknown as Response)
+
+    expect(res.statusCode).toBe(200)
+    expect(getOrCreateUserByAuthIdentityMock).toHaveBeenCalledWith(
+      expect.objectContaining({ authUserId: 'local:dev-user' }),
+    )
   })
 
   test('handleMe returns authenticated user with valid session cookie', async () => {
