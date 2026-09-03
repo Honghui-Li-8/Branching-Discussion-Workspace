@@ -17,7 +17,7 @@ export function TooltipContent({
       <TooltipPrimitive.Content
         sideOffset={sideOffset}
         className={cn(
-          'rounded-md border border-border-strong bg-text-default px-2 py-1 text-xs text-white shadow-sm',
+          'rounded-md border border-border-strong bg-text-default px-2 py-1 text-caption text-white shadow-sm',
           'data-[state=delayed-open]:[animation:a05a-overlay-enter_var(--duration-overlay)_var(--ease-overlay-enter)]',
           className,
         )}

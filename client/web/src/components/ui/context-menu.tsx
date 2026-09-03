@@ -45,7 +45,7 @@ export function ContextMenuItem({
   return (
     <ContextMenuPrimitive.Item
       className={cn(
-        'flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors',
+        'flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-label outline-none transition-colors',
         'text-text-default data-[highlighted]:bg-bg-subtle',
         destructive && 'text-error-default data-[highlighted]:bg-error-default/10',
         'data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
@@ -68,7 +68,7 @@ export const ContextMenuLabel = ({
   ...props
 }: ContextMenuPrimitive.ContextMenuLabelProps) => (
   <ContextMenuPrimitive.Label
-    className={cn('px-2 py-1.5 text-xs font-medium text-text-muted', className)}
+    className={cn('px-2 py-1.5 text-caption font-medium text-text-muted', className)}
     {...props}
   />
 )

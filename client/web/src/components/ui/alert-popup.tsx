@@ -135,14 +135,14 @@ function PopupCard({ popup, onClose }: { popup: ActivePopup; onClose: () => void
           <>
             <div className="flex items-center gap-2">
               {hasDot && <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', styles.dot)} aria-hidden="true" />}
-              <span className={cn('text-sm font-semibold', styles.title)}>{popup.title}</span>
+              <span className={cn('text-label font-semibold', styles.title)}>{popup.title}</span>
             </div>
-            <p className="text-sm leading-tight text-text-secondary">{popup.description}</p>
+            <p className="text-label leading-tight text-text-secondary">{popup.description}</p>
           </>
         ) : (
           <div className="flex items-center gap-2">
             {hasDot && <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', styles.dot)} aria-hidden="true" />}
-            <p className={cn('text-sm font-medium leading-tight', styles.title)}>{popup.description}</p>
+            <p className={cn('text-label font-medium leading-tight', styles.title)}>{popup.description}</p>
           </div>
         )}
       </div>

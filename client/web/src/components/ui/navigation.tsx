@@ -16,7 +16,7 @@ import { cn } from '../../lib/utils'
 // primitive. Flagged rather than silently skipped.
 
 export const Breadcrumb = ({ className, ...props }: React.ComponentProps<'nav'>) => (
-  <nav aria-label="Breadcrumb" className={cn('text-sm', className)} {...props} />
+  <nav aria-label="Breadcrumb" className={cn('text-label', className)} {...props} />
 )
 
 export const BreadcrumbList = ({ className, ...props }: React.ComponentProps<'ol'>) => (
@@ -68,7 +68,7 @@ export function PaginationItem({
       type="button"
       aria-current={active ? 'page' : undefined}
       className={cn(
-        'inline-flex h-8 min-w-8 items-center justify-center rounded-md px-2 text-sm transition-colors',
+        'inline-flex h-8 min-w-8 items-center justify-center rounded-md px-2 text-label transition-colors',
         active
           ? 'bg-accent-tint font-medium text-accent-active'
           : 'text-text-secondary hover:bg-bg-subtle',

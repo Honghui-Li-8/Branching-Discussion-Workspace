@@ -3,15 +3,17 @@ import { cloneElement, forwardRef, isValidElement } from 'react'
 import * as LabelPrimitive from '@radix-ui/react-label'
 import { cn } from '../../lib/utils'
 
-// Typography note: A05a's Step 5 audit flagged no app-specific type scale
-// exists yet. These use Tailwind's default text-sm/text-xs as a v1 stand-in,
-// not an invented app-specific value.
+// Typography note: A05a's Step 5 audit flagged that no app-specific type
+// scale existed, and left these on Tailwind's raw text-sm/text-xs as a v1
+// stand-in. A-T3a supplied the scale, so they now use the semantic roles
+// (text-label / text-caption) — identical rendered size, named by the job
+// they do rather than by how big they are.
 
 export const Label = forwardRef<HTMLLabelElement, LabelHTMLAttributes<HTMLLabelElement>>(
   ({ className, ...props }, ref) => (
     <LabelPrimitive.Root
       ref={ref}
-      className={cn('text-sm font-medium text-text-default', className)}
+      className={cn('text-label font-medium text-text-default', className)}
       {...props}
     />
   ),
@@ -19,7 +21,7 @@ export const Label = forwardRef<HTMLLabelElement, LabelHTMLAttributes<HTMLLabelE
 Label.displayName = 'Label'
 
 const fieldBase =
-  'w-full rounded-md border border-border-default bg-bg-default px-3 py-2 text-sm text-text-default placeholder:text-text-muted outline-none transition-colors focus-visible:border-border-strong focus-visible:ring-2 focus-visible:ring-accent-default disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-error-default aria-invalid:focus-visible:ring-error-default'
+  'w-full rounded-md border border-border-default bg-bg-default px-3 py-2 text-label text-text-default placeholder:text-text-muted outline-none transition-colors focus-visible:border-border-strong focus-visible:ring-2 focus-visible:ring-accent-default disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-error-default aria-invalid:focus-visible:ring-error-default'
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(
   ({ className, ...props }, ref) => (
@@ -46,7 +48,7 @@ export function ValidationMessage({
 }) {
   void tone
   return (
-    <p id={id} className="mt-1 text-xs text-error-default" role="alert">
+    <p id={id} className="mt-1 text-caption text-error-default" role="alert">
       {children}
     </p>
   )

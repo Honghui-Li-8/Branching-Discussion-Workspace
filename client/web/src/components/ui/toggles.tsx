@@ -79,7 +79,7 @@ export function RadioGroupItem({ className, ...props }: RadioGroupPrimitive.Radi
 }
 
 const toggleBase = cn(
-  'inline-flex items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+  'inline-flex items-center justify-center gap-2 rounded-md px-3 py-1.5 text-label font-medium transition-colors',
   'text-text-secondary hover:bg-bg-subtle',
   'data-[state=on]:bg-accent-tint data-[state=on]:text-accent-active',
   'disabled:pointer-events-none disabled:opacity-50',
