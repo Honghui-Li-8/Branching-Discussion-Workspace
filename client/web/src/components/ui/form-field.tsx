@@ -21,7 +21,7 @@ export const Label = forwardRef<HTMLLabelElement, LabelHTMLAttributes<HTMLLabelE
 Label.displayName = 'Label'
 
 const fieldBase =
-  'w-full rounded-md border border-border-default bg-bg-default px-3 py-2 text-label text-text-default placeholder:text-text-muted outline-none transition-colors focus-visible:border-border-strong focus-visible:ring-2 focus-visible:ring-accent-default disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-error-default aria-invalid:focus-visible:ring-error-default'
+  'w-full rounded-md border border-border-default bg-bg-default px-3 py-2 text-label text-text-default placeholder:text-text-muted outline-none transition-colors focus-visible:border-border-strong focus-visible:ring-2 focus-visible:ring-accent-default focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-error-default aria-invalid:focus-visible:ring-error-default'
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(
   ({ className, ...props }, ref) => (

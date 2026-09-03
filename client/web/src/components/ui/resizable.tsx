@@ -31,7 +31,7 @@ export function ResizableHandle({
     <Separator
       className={cn(
         'relative flex items-center justify-center bg-border-default',
-        'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent-default',
+        'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent-default focus-visible:ring-offset-2',
         'data-[orientation=vertical]:h-full data-[orientation=vertical]:w-px',
         'data-[orientation=horizontal]:h-px data-[orientation=horizontal]:w-full',
         className,

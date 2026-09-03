@@ -25,8 +25,8 @@ export function AccordionTrigger({ className, children, ...props }: AccordionPri
       <AccordionPrimitive.Trigger
         className={cn(
           'flex flex-1 items-center justify-between gap-2 py-3 text-label font-medium text-text-default',
-          'transition-colors hover:text-accent-default',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default',
+          'transition-colors hover:text-accent-hover',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default focus-visible:ring-offset-2',
           '[&[data-state=open]>svg]:rotate-180',
           className,
         )}
@@ -65,7 +65,7 @@ export const TabsTrigger = ({ className, ...props }: TabsPrimitive.TabsTriggerPr
       'border-b-2 border-transparent px-3 py-2 text-label font-medium text-text-secondary transition-colors',
       'hover:text-text-default',
       'data-[state=active]:border-accent-default data-[state=active]:text-accent-active',
-      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default',
+      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default focus-visible:ring-offset-2',
       'disabled:pointer-events-none disabled:opacity-50',
       className,
     )}

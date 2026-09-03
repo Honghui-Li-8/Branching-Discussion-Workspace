@@ -30,8 +30,8 @@ export const BreadcrumbItem = ({ className, ...props }: React.ComponentProps<'li
 export const BreadcrumbLink = ({ className, ...props }: React.ComponentProps<'a'>) => (
   <a
     className={cn(
-      'transition-colors hover:text-accent-default',
-      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default',
+      'transition-colors hover:text-accent-hover',
+      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default focus-visible:ring-offset-2',
       className,
     )}
     {...props}
@@ -72,7 +72,7 @@ export function PaginationItem({
         active
           ? 'bg-accent-tint font-medium text-accent-active'
           : 'text-text-secondary hover:bg-bg-subtle',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default focus-visible:ring-offset-2',
         'disabled:pointer-events-none disabled:opacity-50',
         className,
       )}
