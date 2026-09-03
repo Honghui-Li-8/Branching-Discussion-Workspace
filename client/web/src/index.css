@@ -115,7 +115,12 @@
   --color-text-muted: var(--color-gray-500);
   --color-text-disabled: var(--color-gray-400);
   --color-text-inverse: var(--color-gray-0);
-  --color-text-link: var(--color-accent-default);
+  /* A-T3e: link text must clear WCAG 1.4.3 (4.5:1 for normal text).
+     accent-default (#008ca8) is 3.95:1 on white — fine for focus rings and
+     other non-text UI at the 3:1 bar, but it fails as body-size text.
+     accent-hover (#007e97) is 4.74:1 and already in the palette, so this
+     is a repoint rather than a new value. */
+  --color-text-link: var(--color-accent-hover);
 
   --color-border-subtle: var(--color-gray-75);
   --color-border-default: var(--color-gray-100);
@@ -195,6 +200,13 @@
   --color-merged-hover: var(--color-purple-hover);
   --color-merged-active: var(--color-purple-active);
   --color-merged-strong: var(--color-purple-strong);
+
+  /* Focus — A-T3e. Figma defines `color/focus` but A05a never ported it, so
+     components were reaching for accent-default directly. Naming the role
+     means the focus colour can move without touching the brand accent.
+     #008ca8 is 3.95:1 on white: above WCAG 1.4.11's 3:1 bar for non-text UI,
+     which is the requirement that governs a focus indicator. */
+  --color-focus: var(--color-accent-default);
 
   --radius-sm: 2px;
   --radius-md: 6px;
