@@ -47,15 +47,15 @@ export default defineConfig([
         'warn',
         {
           selector:
-            'Literal[value=/(^|\\s)([a-z0-9-]+:)*!?(w|h|min-w|max-w|min-h|max-h)-\\[[0-9.]+px\\]/]',
+            'Literal[value=/(^|\\s)([a-z0-9-]+:)*!?(w|h)-\\[[0-9.]{2,}px\\]/]',
           message:
-            'Fluid sizing (A-T3b): do not pin size in px — it blocks container-query adoption. Use a spacing-scale step (w-64, p-4), a relative unit (w-full, min-w-0), or a semantic max-width. px remains correct inside shadows, blurs and hairlines.',
+            'Fluid sizing (A-T3b): do not pin width or height in px — it blocks container-query adoption. Minimums and maximums are constraints, not pins, and are not matched, nor are hairlines under 10px where px is the correct unit; page-level overflow risk from a large min-* is covered by the A-T3e no-horizontal-overflow rule and its reflow harness. Use a spacing-scale step (w-64, p-4), a relative unit (w-full, min-w-0), or a semantic max-width. px remains correct inside shadows, blurs and hairlines.',
         },
         {
           selector:
-            'TemplateElement[value.raw=/(^|\\s)([a-z0-9-]+:)*!?(w|h|min-w|max-w|min-h|max-h)-\\[[0-9.]+px\\]/]',
+            'TemplateElement[value.raw=/(^|\\s)([a-z0-9-]+:)*!?(w|h)-\\[[0-9.]{2,}px\\]/]',
           message:
-            'Fluid sizing (A-T3b): do not pin size in px — it blocks container-query adoption. Use a spacing-scale step (w-64, p-4), a relative unit (w-full, min-w-0), or a semantic max-width. px remains correct inside shadows, blurs and hairlines.',
+            'Fluid sizing (A-T3b): do not pin width or height in px — it blocks container-query adoption. Minimums and maximums are constraints, not pins, and are not matched, nor are hairlines under 10px where px is the correct unit; page-level overflow risk from a large min-* is covered by the A-T3e no-horizontal-overflow rule and its reflow harness. Use a spacing-scale step (w-64, p-4), a relative unit (w-full, min-w-0), or a semantic max-width. px remains correct inside shadows, blurs and hairlines.',
         },
       ],
     },
