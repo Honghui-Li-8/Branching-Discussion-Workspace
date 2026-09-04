@@ -22,7 +22,7 @@ export function HoverCardContent({
       <HoverCardPrimitive.Content
         sideOffset={sideOffset}
         className={cn(
-          'w-64 rounded-md border border-border-default bg-bg-default p-3 text-sm text-text-secondary shadow-md',
+          'w-64 rounded-md border border-border-default bg-bg-default p-3 text-label text-text-secondary shadow-md',
           'data-[state=open]:[animation:a05a-overlay-enter_var(--duration-overlay)_var(--ease-overlay-enter)]',
           'data-[state=closed]:[animation:a05a-overlay-exit_var(--duration-overlay)_var(--ease-overlay-exit)]',
           className,

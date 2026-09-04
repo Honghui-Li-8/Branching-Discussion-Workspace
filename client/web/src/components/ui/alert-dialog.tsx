@@ -51,7 +51,7 @@ export function AlertDialogContent({
 export function AlertDialogTitle({ className, ...props }: AlertDialogPrimitive.AlertDialogTitleProps) {
   return (
     <AlertDialogPrimitive.Title
-      className={cn('text-base font-semibold text-text-default', className)}
+      className={cn('text-body font-semibold text-text-default', className)}
       {...props}
     />
   )
@@ -63,7 +63,7 @@ export function AlertDialogDescription({
 }: AlertDialogPrimitive.AlertDialogDescriptionProps) {
   return (
     <AlertDialogPrimitive.Description
-      className={cn('text-sm text-text-secondary', className)}
+      className={cn('text-label text-text-secondary', className)}
       {...props}
     />
   )

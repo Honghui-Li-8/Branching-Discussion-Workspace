@@ -38,10 +38,21 @@ const getTextOffsetWithinElement = (
 }
 
 const getCaretPoint = (doc: Document, x: number, y: number): CaretPoint | null => {
+  // caretRangeFromPoint is read off the document because it is non-standard and absent in
+  // some engines. It must still be invoked with `doc` as the receiver — calling the
+  // extracted reference bare throws "TypeError: Illegal invocation" in Chromium, which
+  // killed the whole caret fallback and surfaced as an uncaught error on every click
+  // inside an annotated message.
   const caretRangeFromPoint = (doc as unknown as Record<string, unknown>)['caretRangeFromPoint']
   const range =
     typeof caretRangeFromPoint === 'function'
-      ? (caretRangeFromPoint as (pointX: number, pointY: number) => Range | null)(x, y)
+      ? (
+          caretRangeFromPoint as (
+            this: Document,
+            pointX: number,
+            pointY: number,
+          ) => Range | null
+        ).call(doc, x, y)
       : null
   if (range) {
     return {

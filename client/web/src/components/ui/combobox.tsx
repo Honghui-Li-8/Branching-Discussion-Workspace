@@ -44,7 +44,7 @@ export function Combobox({
           role="combobox"
           aria-expanded={open}
           className={cn(
-            'flex h-9 w-full items-center justify-between gap-2 rounded-md border border-border-default bg-bg-default px-3 text-sm',
+            'flex h-9 w-full items-center justify-between gap-2 rounded-md border border-border-default bg-bg-default px-3 text-label',
             selected ? 'text-text-default' : 'text-text-muted',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default focus-visible:ring-offset-2',
             className,

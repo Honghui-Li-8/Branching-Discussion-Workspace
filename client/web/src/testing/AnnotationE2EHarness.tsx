@@ -7,7 +7,11 @@ import {
 import { AssistantMessageAnnotationWrapper } from '../components/conversation/AssistantMessageAnnotations'
 import { trpc } from '../trpc'
 
-const E2E_MESSAGE_ID = 'e2e-assistant-message'
+// Must be a UUID: AssistantMessageAnnotationWrapper gates all annotation behavior behind
+// isUuid(messageId), and messageAnnotationsByMessageInputSchema rejects non-UUID ids server
+// side. A non-UUID id here renders the children with no annotator at all, so the selection
+// menu never opens. Keep this value in sync with assistant-annotation-dismiss.e2e.ts.
+const E2E_MESSAGE_ID = 'e2e00000-0000-4000-8000-000000000001'
 const E2E_TEXT = `This is a stable test paragraph so we can validate annotation dismiss behavior with advanced PG features and branch controls.`
 const E2E_MARK_TEXT = 'advanced PG features'
 const E2E_MARK_START = E2E_TEXT.indexOf(E2E_MARK_TEXT)

@@ -163,7 +163,7 @@ export function DataTable<T>({
       </div>
 
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs text-text-muted">
+        <span className="text-caption text-text-muted">
           Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount() || 1} ·{' '}
           {table.getFilteredRowModel().rows.length} row(s)
         </span>

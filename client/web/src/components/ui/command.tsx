@@ -46,7 +46,7 @@ export const CommandInput = ({
     <Search className="h-4 w-4 shrink-0 text-text-muted" aria-hidden="true" />
     <CommandPrimitive.Input
       className={cn(
-        'h-11 w-full bg-transparent text-sm text-text-default outline-none',
+        'h-11 w-full bg-transparent text-label text-text-default outline-none',
         'placeholder:text-text-muted disabled:cursor-not-allowed disabled:opacity-50',
         className,
       )}
@@ -70,7 +70,7 @@ export const CommandEmpty = ({
   ...props
 }: React.ComponentProps<typeof CommandPrimitive.Empty>) => (
   <CommandPrimitive.Empty
-    className={cn('py-6 text-center text-sm text-text-muted', className)}
+    className={cn('py-6 text-center text-label text-text-muted', className)}
     {...props}
   />
 )
@@ -83,7 +83,7 @@ export const CommandGroup = ({
     className={cn(
       'overflow-hidden text-text-default',
       '[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5',
-      '[&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-text-muted',
+      '[&_[cmdk-group-heading]]:text-caption [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-text-muted',
       className,
     )}
     {...props}
@@ -96,7 +96,7 @@ export const CommandItem = ({
 }: React.ComponentProps<typeof CommandPrimitive.Item>) => (
   <CommandPrimitive.Item
     className={cn(
-      'flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-2 text-sm outline-none',
+      'flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-2 text-label outline-none',
       'data-[selected=true]:bg-bg-subtle',
       'data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50',
       className,
@@ -113,5 +113,5 @@ export const CommandSeparator = ({
 )
 
 export const CommandShortcut = ({ className, ...props }: React.ComponentProps<'span'>) => (
-  <span className={cn('ml-auto text-xs tracking-widest text-text-muted', className)} {...props} />
+  <span className={cn('ml-auto text-caption tracking-widest text-text-muted', className)} {...props} />
 )
