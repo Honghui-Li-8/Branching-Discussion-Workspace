@@ -117,9 +117,12 @@ const useLongPress = (
     setLongPressProgress(0)
   }
 
-  const tick = () => {
+  // `tick` is created during render and re-entered via requestAnimationFrame, so it
+  // must not call an impure clock itself. rAF hands it a DOMHighResTimeStamp on the
+  // performance.now() clock; the event handlers below set/read the same clock.
+  const tick = (frameNow: DOMHighResTimeStamp) => {
     if (startTimeRef.current === null) return
-    const p = Math.min((Date.now() - startTimeRef.current) / LONG_PRESS_DELETE_MS, 1)
+    const p = Math.min((frameNow - startTimeRef.current) / LONG_PRESS_DELETE_MS, 1)
     setLongPressProgress(p)
     if (p < 1) rafRef.current = requestAnimationFrame(tick)
   }
@@ -127,7 +130,7 @@ const useLongPress = (
   const longPressMouseDown = (e: MouseEvent<HTMLButtonElement>) => {
     e.preventDefault() // prevent browser text-selection during hold
     reset()
-    startTimeRef.current = Date.now()
+    startTimeRef.current = performance.now()
     rafRef.current = requestAnimationFrame(tick)
   }
 
@@ -136,7 +139,7 @@ const useLongPress = (
       reset()
       return
     }
-    const elapsed = Date.now() - startTimeRef.current
+    const elapsed = performance.now() - startTimeRef.current
     reset()
 
     if (elapsed >= LONG_PRESS_DELETE_MS) {
