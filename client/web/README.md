@@ -62,7 +62,7 @@ everything:
 | Harness | Runs | Covers |
 |---|---|---|
 | `src/components/ui/accessibility.test.tsx` (jest-axe) | `yarn test:unit`, and CI | Accessible names, ARIA validity, landmarks, heading order |
-| `e2e/a11y-reflow.e2e.ts` (Playwright) | `yarn test:e2e`, local only | No page-level horizontal overflow at sm/md/lg/xl/1440 and at 720px (the 200%-zoom equivalent) |
+| `e2e/a11y-reflow.e2e.ts` (Playwright) | `yarn test:e2e`, and CI via `yarn test` | No page-level horizontal overflow at sm/md/lg/xl/1440 and at 720px (the 200%-zoom equivalent) |
 
 jsdom has no layout engine, so **contrast, target size, and reflow cannot be checked in the
 unit suite** — they are verified manually or in the Playwright harness. Treat a green unit run

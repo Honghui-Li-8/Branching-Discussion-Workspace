@@ -6,6 +6,7 @@ TASKS=(
   "unit tests|yarn test:unit|required"
   "ownership import boundary|yarn check:ownership-boundary|required"
   "type check|yarn check:type|required"
+  "e2e tests|yarn test:e2e|required"
   "deprecation check|yarn check:deprecations|optional"
   "spell check|yarn spellcheck|optional"
 )

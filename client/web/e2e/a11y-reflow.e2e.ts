@@ -7,7 +7,8 @@
  * horizontal overflow, computed size, or what 200% zoom does. Those need a real
  * browser, which is what this file is for.
  *
- * Per A-T3e's Q6 decision this runs locally (`yarn test:e2e`), not in CI:
+ * Runs locally (`yarn test:e2e`) and in CI as a required task of `yarn test`.
+ * A-T3e's Q6 decision originally kept this local-only, reversed 2026-09-06:
  * `test:unit` already runs in CI and gates the structural rules at no cost,
  * whereas booting a browser on every push is a permanent tax for a solo project.
  *
