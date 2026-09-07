@@ -47,6 +47,7 @@ export const CommandInput = ({
     <CommandPrimitive.Input
       className={cn(
         'h-11 w-full bg-transparent text-label text-text-default outline-none',
+        'focus-visible:ring-2 focus-visible:ring-accent-default focus-visible:ring-offset-2',
         'placeholder:text-text-muted disabled:cursor-not-allowed disabled:opacity-50',
         className,
       )}
