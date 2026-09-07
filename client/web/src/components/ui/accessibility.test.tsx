@@ -1,10 +1,10 @@
 /**
  * @jest-environment jsdom
  *
- * A-T3e — accessibility harness.
+ * ADR-0004 (ticket A-T3e) — accessibility harness.
  *
  * Deliberately small. Its job is not component coverage; it is to prove the
- * automated check actually catches violations, which A-T3e requires as
+ * automated check actually catches violations, which ADR-0004 requires as
  * evidence: "a harness that has never gone red is not evidence."
  *
  * Scope note — what jsdom can and cannot check:
@@ -12,7 +12,7 @@
  *   CANNOT contrast, target size, or reflow — all three need real layout and
  *          computed styles, which jsdom does not provide. Those belong to the
  *          Playwright side of the harness, which runs in CI as a required task
- *          of `yarn test` since 2026-09-06 (A-T3e's Q6 local-only call, reversed).
+ *          of `yarn test` since 2026-09-06 (ADR-0004; originally local-only, reversed).
  *
  * So the seeded cases below cover the structural rules only. That is a real
  * limit of the CI-side gate, recorded here rather than implied by a green tick.
@@ -24,7 +24,7 @@ import { Button } from './button'
 
 expect.extend(toHaveNoViolations)
 
-/** A-T3e's failure threshold: serious and critical only. */
+/** ADR-0004's failure threshold: serious and critical only. */
 const SERIOUS = new Set(['serious', 'critical'])
 
 const seriousViolations = async (container: Element) => {
@@ -32,7 +32,7 @@ const seriousViolations = async (container: Element) => {
   return results.violations.filter((v) => SERIOUS.has(String(v.impact)))
 }
 
-describe('A-T3e accessibility harness', () => {
+describe('accessibility harness (ADR-0004)', () => {
   describe('seeded violations — the harness must go red', () => {
     it('flags an icon-only control with no accessible name', async () => {
       // Q11: icon-only controls take their name from A05b's icon mapping.

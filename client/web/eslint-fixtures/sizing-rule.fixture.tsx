@@ -2,7 +2,7 @@
  * Fixture for `check:sizing-rule` — NOT application code. Do not "fix" it.
  *
  * `scripts/check-sizing-rule.mjs` lints this file with `--no-ignore` and asserts
- * the A-T3b fluid-sizing rule fires on exactly one of the two tagged JSX lines
+ * the fluid-sizing rule (ADR-0003) fires on exactly one of the two tagged JSX lines
  * below (the pinned px width) and stays silent on the other (a fluid width).
  * If the rule is ever removed, switched off, or its selector broken, that
  * check goes red. The tags are the trailing `@sizing-fixture` comments; the

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Guards the A-T3b fluid-sizing lint rule against silent deletion.
+ * Guards the fluid-sizing lint rule (ADR-0003) against silent deletion.
  *
  * The rule lives under a single `no-restricted-syntax` key in
  * client/web/eslint.config.js. ESLint flat config replaces rule options

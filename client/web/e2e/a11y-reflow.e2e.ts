@@ -1,5 +1,5 @@
 /**
- * A-T3e — viewport / reflow harness.
+ * ADR-0004 (ticket A-T3e) — viewport / reflow harness.
  *
  * The layout half of the accessibility harness. The jsdom side
  * (`components/ui/accessibility.test.tsx`) covers structural rules — accessible
@@ -8,17 +8,17 @@
  * browser, which is what this file is for.
  *
  * Runs locally (`yarn test:e2e`) and in CI as a required task of `yarn test`.
- * A-T3e's Q6 decision originally kept this local-only — the reasoning was that
+ * ADR-0004 records that this was originally kept local-only — the reasoning was that
  * `test:unit` already gated the structural rules in CI and a browser on every
  * push was a tax not worth paying. Reversed 2026-09-06 after five e2e specs sat
  * broken on `main` unnoticed, masking a real product bug.
  *
- * The seeded cases at the bottom are not ceremony. A-T3e's own words: "a harness
+ * The seeded cases at the bottom are not ceremony. In ADR-0004's words: "a harness
  * that has never gone red is not evidence." They prove the assertions can fail.
  */
 import { expect, test, type Page } from '@playwright/test'
 
-/** A-T3e §1 — Tailwind's default set. `lg` is the product's canonical boundary. */
+/** ADR-0004 — Tailwind's default set. `lg` is the product's canonical boundary. */
 const BREAKPOINTS = [
   { name: 'sm', width: 640 },
   { name: 'md', width: 768 },
@@ -31,11 +31,11 @@ const BREAKPOINTS = [
  * 200% zoom on a 1440px window leaves 720 effective CSS px — below `lg`.
  * Emulated by halving the viewport rather than by a real zoom, because CSS px
  * is what layout responds to and Playwright cannot set browser zoom directly.
- * A-T3e §1 records that this narrow state exists whether or not it is designed.
+ * ADR-0004 records that this narrow state exists whether or not it is designed.
  */
 const ZOOM_200_EQUIVALENT = { name: '200% zoom @1440', width: 720 }
 
-/** A-T3e §9 — no page-level horizontal scrolling at any supported width. */
+/** ADR-0004 — no page-level horizontal scrolling at any supported width. */
 const hasHorizontalOverflow = (page: Page) =>
   page.evaluate(() => {
     const doc = document.documentElement
@@ -56,7 +56,7 @@ const overflowingElements = (page: Page) =>
       })
   })
 
-test.describe('A-T3e reflow — no page-level horizontal overflow', () => {
+test.describe('reflow contract (ADR-0004) — no page-level horizontal overflow', () => {
   for (const { name, width } of [...BREAKPOINTS, ZOOM_200_EQUIVALENT]) {
     test(`${name} (${width}px)`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 })
@@ -73,7 +73,7 @@ test.describe('A-T3e reflow — no page-level horizontal overflow', () => {
   }
 })
 
-test.describe('A-T3e harness self-check — these must be able to fail', () => {
+test.describe('reflow harness self-check (ADR-0004) — these must be able to fail', () => {
   test('a seeded pinned width is detected as overflow', async ({ page }) => {
     await page.setViewportSize({ width: 400, height: 900 })
     await page.goto('/')
