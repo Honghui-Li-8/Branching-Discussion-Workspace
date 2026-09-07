@@ -11,8 +11,8 @@
  *   CAN  structural rules (accessible names, ARIA validity, roles, labels)
  *   CANNOT contrast, target size, or reflow — all three need real layout and
  *          computed styles, which jsdom does not provide. Those belong to the
- *          Playwright side of the harness, which per A-T3e's Q6 decision stays
- *          local rather than running in CI.
+ *          Playwright side of the harness, which runs in CI as a required task
+ *          of `yarn test` since 2026-09-06 (A-T3e's Q6 local-only call, reversed).
  *
  * So the seeded cases below cover the structural rules only. That is a real
  * limit of the CI-side gate, recorded here rather than implied by a green tick.

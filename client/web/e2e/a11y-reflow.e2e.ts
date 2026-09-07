@@ -8,9 +8,10 @@
  * browser, which is what this file is for.
  *
  * Runs locally (`yarn test:e2e`) and in CI as a required task of `yarn test`.
- * A-T3e's Q6 decision originally kept this local-only, reversed 2026-09-06:
- * `test:unit` already runs in CI and gates the structural rules at no cost,
- * whereas booting a browser on every push is a permanent tax for a solo project.
+ * A-T3e's Q6 decision originally kept this local-only — the reasoning was that
+ * `test:unit` already gated the structural rules in CI and a browser on every
+ * push was a tax not worth paying. Reversed 2026-09-06 after five e2e specs sat
+ * broken on `main` unnoticed, masking a real product bug.
  *
  * The seeded cases at the bottom are not ceremony. A-T3e's own words: "a harness
  * that has never gone red is not evidence." They prove the assertions can fail.
