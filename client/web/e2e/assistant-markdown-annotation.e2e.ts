@@ -24,18 +24,26 @@ type PersistedAnnotation = {
   deletedAt?: string | null
 }
 
-type MockBranchResult = {
-  annotation: PersistedAnnotation
+// Mirrors branchAndSendFollowupResultSchema in shared/src/router/schemas/annotations.ts.
+type MockBranchFollowupResult = {
   branchNodeId: string
+  annotationId: string
+  branchEventMessageId: string | null
+  userFollowupMessageId: string | null
+  turnId: string
+  status: 'pending' | 'processing' | 'completed' | 'failed'
 }
 
 type MockBackendState = {
   annotationsByMessageId: Map<string, PersistedAnnotation[]>
-  branchResultByIdempotencyKey: Map<string, MockBranchResult>
+  branchResultByIdempotencyKey: Map<string, MockBranchFollowupResult>
   nextAnnotationNumber: number
   nextBranchNodeNumber: number
   listRequests: number
   branchRequests: number
+  // Any procedure the UI calls that this mock does not model. Asserted empty by every
+  // test so a client-side procedure rename cannot silently rot the mock again.
+  unhandledProcedures: string[]
 }
 
 const createMockBackendState = (): MockBackendState => ({
@@ -45,6 +53,7 @@ const createMockBackendState = (): MockBackendState => ({
   nextBranchNodeNumber: 1,
   listRequests: 0,
   branchRequests: 0,
+  unhandledProcedures: [],
 })
 
 const toSortedBatchValues = (value: unknown): unknown[] => {
@@ -105,11 +114,13 @@ const installMockTrpcBackend = async (page: Page, state: MockBackendState) => {
         return { result: { data: annotations } }
       }
 
-      if (procedureName === 'messageBranchFromSelection') {
+      if (procedureName === 'branchAndSendFollowup') {
         state.branchRequests += 1
         const input = unwrapInputValue<{
           messageId: string
           idempotencyKey: string
+          text: string
+          model: string
           annotationKind?: 'branch' | 'suggestion-branch'
           selection: {
             quote: string
@@ -140,9 +151,13 @@ const installMockTrpcBackend = async (page: Page, state: MockBackendState) => {
           updatedAt: createdAt,
           deletedAt: null,
         }
-        const branchResult: MockBranchResult = {
-          annotation,
+        const branchResult: MockBranchFollowupResult = {
           branchNodeId: annotation.leadsToNodeId ?? `mock-branch-node-${state.nextBranchNodeNumber}`,
+          annotationId: annotation.id,
+          branchEventMessageId: null,
+          userFollowupMessageId: `mock-user-followup-${state.nextBranchNodeNumber}`,
+          turnId: `mock-turn-${state.nextBranchNodeNumber}`,
+          status: 'completed',
         }
 
         state.nextAnnotationNumber += 1
@@ -153,6 +168,7 @@ const installMockTrpcBackend = async (page: Page, state: MockBackendState) => {
         return { result: { data: branchResult } }
       }
 
+      state.unhandledProcedures.push(procedureName)
       return {
         error: {
           message: `Unhandled mock tRPC procedure: ${procedureName}`,
@@ -220,7 +236,16 @@ const getMarkdownTextSelectionCoords = async (page: Page, targetText: string) =>
   return coords
 }
 
+// The Markdown fixture renders every Markdown case on one page, so the annotation target
+// sits roughly 3,900px down — well below the 720px default viewport, and a reload resets
+// scrollY to 0. Recogito paints only the highlights that intersect the viewport, so the
+// section has to be scrolled into view before selecting text or asserting on a highlight.
+const scrollAnnotationSectionIntoView = async (page: Page) => {
+  await page.getByTestId('markdown-annotation-section').scrollIntoViewIfNeeded()
+}
+
 const dragSelectMarkdownText = async (page: Page, targetText: string) => {
+  await scrollAnnotationSectionIntoView(page)
   const coords = await getMarkdownTextSelectionCoords(page, targetText)
   await page.mouse.move(coords.startX, coords.startY)
   await page.mouse.down()
@@ -228,13 +253,18 @@ const dragSelectMarkdownText = async (page: Page, targetText: string) => {
   await page.mouse.up()
 }
 
+// AssistantSelectionMenu renders no heading text, so its close button's aria-label is the
+// only stable, unique handle for "the menu is open".
+const getSelectionMenu = (page: Page) =>
+  page.getByRole('button', { name: 'Close selection menu' })
+
 const selectMarkdownTextAndWaitForMenu = async (page: Page, targetText: string) => {
-  const selectionMenuTitle = page.getByText('Selected text', { exact: false })
+  const selectionMenu = getSelectionMenu(page)
 
   for (let attempt = 0; attempt < 3; attempt += 1) {
     await dragSelectMarkdownText(page, targetText)
     try {
-      await expect(selectionMenuTitle).toBeVisible({ timeout: 1500 })
+      await expect(selectionMenu).toBeVisible({ timeout: 1500 })
       return
     } catch {
       await page.mouse.click(4, 4)
@@ -242,6 +272,14 @@ const selectMarkdownTextAndWaitForMenu = async (page: Page, targetText: string) 
   }
 
   throw new Error('Selection menu did not open after selecting markdown annotation text.')
+}
+
+// Branch now sends a follow-up question with the branch request: branchAndSendFollowup
+// requires a non-empty `text`, and handleConfirmSelection returns early on empty input.
+// The follow-up must therefore be typed before Branch does anything at all.
+const branchWithFollowup = async (page: Page, followupText: string) => {
+  await page.getByRole('textbox').fill(followupText)
+  await page.getByRole('button', { name: 'Branch' }).click()
 }
 
 test.describe('assistant markdown annotation offset and rehydration', () => {
@@ -261,7 +299,7 @@ test.describe('assistant markdown annotation offset and rehydration', () => {
     page,
   }) => {
     await selectMarkdownTextAndWaitForMenu(page, QUOTE)
-    await page.getByRole('button', { name: 'Branch' }).click()
+    await branchWithFollowup(page, 'Why does this matter?')
 
     await expect.poll(() => backendState.branchRequests).toBe(1)
 
@@ -273,6 +311,7 @@ test.describe('assistant markdown annotation offset and rehydration', () => {
     expect((annotation.endOffset ?? 0) - (annotation.startOffset ?? 0)).toBe(QUOTE.length)
     expect(annotation.selectorJson.selector[0]?.quote).toBe(QUOTE)
 
+    expect(backendState.unhandledProcedures).toEqual([])
     expect(pageErrors).toHaveLength(0)
   })
 
@@ -280,14 +319,16 @@ test.describe('assistant markdown annotation offset and rehydration', () => {
     page,
   }) => {
     await selectMarkdownTextAndWaitForMenu(page, QUOTE)
-    await page.getByRole('button', { name: 'Branch' }).click()
+    await branchWithFollowup(page, 'Why does this matter?')
     await expect.poll(() => backendState.branchRequests).toBe(1)
 
     await page.reload()
     await expect(page.getByTestId('e2e-page-title')).toBeVisible()
+    await scrollAnnotationSectionIntoView(page)
 
     await expect(page.locator('.r6o-span-highlight-layer .r6o-annotation')).toBeVisible()
 
+    expect(backendState.unhandledProcedures).toEqual([])
     expect(pageErrors).toHaveLength(0)
   })
 })

@@ -121,12 +121,25 @@ test.describe('assistant markdown rendering', () => {
     // No live <script> elements inside assistant content.
     await expect(section.locator('script')).toHaveCount(0)
 
-    // No live <div style="..."> from the raw <div style="color: red"> input.
-    await expect(section.locator('div[style]')).toHaveCount(0)
+    // Scope every element assertion to the inside of .model-markdown. ModelMarkdown's
+    // own container carries an inline style (style={{ overflowWrap: 'anywhere' }}), so a
+    // section-wide `div[style]` locator always resolves to that wrapper and can never
+    // reach 0 — it measured component chrome, not rendered Markdown output.
+    //
+    // ModelMarkdown only emits a nested <div> for tables (the overflow-x-auto wrapper),
+    // and MD_RAW_HTML contains no table, so any <div> inside the container would mean the
+    // raw `<div style="color: red">` input became live DOM.
+    await expect(section.locator('.model-markdown div')).toHaveCount(0)
+    await expect(section.locator('.model-markdown div[style]')).toHaveCount(0)
+
+    // Same check for the raw <strong> input: MD_RAW_HTML has no Markdown emphasis, so a
+    // live <strong> here could only come from raw HTML being parsed.
+    await expect(section.locator('.model-markdown strong')).toHaveCount(0)
 
     // The raw HTML tags should appear as escaped visible text, not as elements.
     await expect(section).toContainText('<script>')
     await expect(section).toContainText('<div')
+    await expect(section).toContainText('<strong>')
 
     expect(pageErrors).toHaveLength(0)
   })

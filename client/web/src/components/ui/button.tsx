@@ -5,7 +5,7 @@ import { cn } from '../../lib/utils'
 import { Spinner } from './skeleton'
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
+  'inline-flex items-center justify-center gap-2 rounded-md text-label font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
   {
     variants: {
       variant: {
@@ -21,7 +21,7 @@ const buttonVariants = cva(
         destructive: 'bg-error-default text-white hover:bg-error-hover active:bg-error-active',
       },
       size: {
-        sm: 'h-8 px-3 text-xs',
+        sm: 'h-8 px-3 text-caption',
         md: 'h-9 px-4',
         lg: 'h-10 px-5',
       },

@@ -9,7 +9,7 @@ import { cn } from '../../lib/utils'
 
 export const Table = ({ className, ...props }: React.HTMLAttributes<HTMLTableElement>) => (
   <div className="w-full overflow-x-auto">
-    <table className={cn('w-full caption-bottom text-sm', className)} {...props} />
+    <table className={cn('w-full caption-bottom text-label', className)} {...props} />
   </div>
 )
 
@@ -30,7 +30,7 @@ export const TableRow = ({ className, ...props }: React.HTMLAttributes<HTMLTable
 
 export const TableHead = ({ className, ...props }: React.ThHTMLAttributes<HTMLTableCellElement>) => (
   <th
-    className={cn('px-3 py-2 text-left text-xs font-medium text-text-muted', className)}
+    className={cn('px-3 py-2 text-left text-caption font-medium text-text-muted', className)}
     {...props}
   />
 )

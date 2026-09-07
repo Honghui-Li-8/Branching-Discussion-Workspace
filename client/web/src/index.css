@@ -115,7 +115,12 @@
   --color-text-muted: var(--color-gray-500);
   --color-text-disabled: var(--color-gray-400);
   --color-text-inverse: var(--color-gray-0);
-  --color-text-link: var(--color-accent-default);
+  /* A-T3e: link text must clear WCAG 1.4.3 (4.5:1 for normal text).
+     accent-default (#008ca8) is 3.95:1 on white — fine for focus rings and
+     other non-text UI at the 3:1 bar, but it fails as body-size text.
+     accent-hover (#007e97) is 4.74:1 and already in the palette, so this
+     is a repoint rather than a new value. */
+  --color-text-link: var(--color-accent-hover);
 
   --color-border-subtle: var(--color-gray-75);
   --color-border-default: var(--color-gray-100);
@@ -196,6 +201,13 @@
   --color-merged-active: var(--color-purple-active);
   --color-merged-strong: var(--color-purple-strong);
 
+  /* Focus — A-T3e. Figma defines `color/focus` but A05a never ported it, so
+     components were reaching for accent-default directly. Naming the role
+     means the focus colour can move without touching the brand accent.
+     #008ca8 is 3.95:1 on white: above WCAG 1.4.11's 3:1 bar for non-text UI,
+     which is the requirement that governs a focus indicator. */
+  --color-focus: var(--color-accent-default);
+
   --radius-sm: 2px;
   --radius-md: 6px;
   --radius-lg: 12px;
@@ -218,6 +230,75 @@
 
   --duration-pulse: 1.5s;
   --duration-spin: 1.5s;
+
+  /* ═══ TYPOGRAPHY ════════════════════════════════════════════════════
+     A-T3a. Same two-layer shape as the color system above: Tailwind's
+     default type scale is the *primitive* layer (left untouched — it is
+     the standard, and A05a's 26 ui/ components already sit on it), and
+     these names the *role* each size plays.
+
+     Built to standard, not derived from current usage (owner call,
+     2026-08-19). The 41 legacy `text-[11px]`/`text-[13px]` escapes are
+     deliberately not accommodated — they are symptoms of an
+     unsystematized UI, and those surfaces are due for rebuild anyway.
+
+     Each role must alias BOTH custom properties: Tailwind emits
+     `font-size: var(--text-x); line-height: var(--tw-leading,
+     var(--text-x--line-height))`, so aliasing font-size alone would
+     silently drop the paired line-height. Verified against the compiled
+     output, same discipline A05a used for the tree-shaking check. */
+  --text-display: var(--text-3xl); /* 30px — landing hero, once per page */
+  --text-display--line-height: var(--text-3xl--line-height);
+
+  --text-title: var(--text-xl); /* 20px — page and panel titles */
+  --text-title--line-height: var(--text-xl--line-height);
+
+  --text-heading: var(--text-lg); /* 18px — section headings within a surface */
+  --text-heading--line-height: var(--text-lg--line-height);
+
+  --text-body: var(--text-base); /* 16px — prose and message content */
+  --text-body--line-height: var(--text-base--line-height);
+
+  --text-label: var(--text-sm); /* 14px — the workhorse: buttons, menu items, form labels */
+  --text-label--line-height: var(--text-sm--line-height);
+
+  --text-caption: var(--text-xs); /* 12px — timestamps, metadata, helper text */
+  --text-caption--line-height: var(--text-xs--line-height);
+
+  /* ═══ SPACING ═══════════════════════════════════════════════════════
+     A-T3a — deliberately empty, and that is the finding.
+
+     A03a's Figma collection locks 19 `space/*` values. All 19 land
+     exactly on Tailwind's default `--spacing: 0.25rem` (4px) grid, and
+     Tailwind 4 computes fractional steps dynamically, so every Figma
+     value is already reachable:
+
+       2→p-0.5   3→p-0.75  4→p-1     5→p-1.25  6→p-1.5
+       8→p-2     9→p-2.25  10→p-2.5  12→p-3    14→p-3.5
+       16→p-4    20→p-5    24→p-6    28→p-7    32→p-8
+       40→p-10   48→p-12   64→p-16   96→p-24
+
+     Verified by compiling each step and reading the built CSS — all 19
+     present, zero mismatches. Declaring `--spacing-*` tokens here would
+     create a second way to express values Tailwind already produces,
+     which is the duplication the color system was careful to avoid.
+     The Figma spacing scale *is* the standard 4px grid. Nothing to port. */
+
+  /* ═══ MEASURE ═══════════════════════════════════════════════════════
+     A-T3c. Line-length caps, expressed in `ch` so they track the font
+     rather than a fixed pixel guess.
+
+     Grounded in A-T3b's audit: 7 of its 19 findings were `max-w-[...px]`
+     on prose — LoginPage (4), IntroScreen (2), and a popover cap — each
+     a different magic number for the same intent. These give that intent
+     a name. Tailwind's `--container-*` namespace generates `max-w-prose`
+     and `max-w-narrow` from these.
+
+     Additive only: no existing component is repointed here. Swapping a
+     px cap for a ch measure changes rendered width, so it belongs to
+     each surface's own rebuild (A06–A11b), not to normalization. */
+  --container-prose: 65ch; /* standard readable body measure */
+  --container-narrow: 45ch; /* short intros, ledes, empty-state copy */
 }
 
 @media (prefers-reduced-motion: reduce) {

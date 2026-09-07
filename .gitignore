@@ -45,3 +45,10 @@ CLAUDE.md
 *.db
 .beads-credential-key
 .beads
+# Playwright run artifacts. `e2e/screenshots/` is a tracked directory (.gitkeep)
+# that the specs write evidence PNGs into at run time; the directory is versioned,
+# the images are not.
+test-results
+playwright-report
+blob-report
+client/web/e2e/screenshots/*.png

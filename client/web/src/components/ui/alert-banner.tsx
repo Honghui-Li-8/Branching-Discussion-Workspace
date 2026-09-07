@@ -76,9 +76,9 @@ export function AlertBanner({
     >
       <div className="flex items-center gap-2">
         <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', styles.dot)} aria-hidden="true" />
-        <span className={cn('text-sm font-semibold', styles.title)}>{title}</span>
+        <span className={cn('text-label font-semibold', styles.title)}>{title}</span>
       </div>
-      <p className="mt-0.5 text-sm text-text-secondary">{children}</p>
+      <p className="mt-0.5 text-label text-text-secondary">{children}</p>
     </div>
   )
 }

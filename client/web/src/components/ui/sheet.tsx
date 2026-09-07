@@ -46,7 +46,7 @@ export function SheetContent({
 export function SheetTitle({ className, ...props }: DialogPrimitive.DialogTitleProps) {
   return (
     <DialogPrimitive.Title
-      className={cn('mb-1 text-sm font-medium text-text-default', className)}
+      className={cn('mb-1 text-label font-medium text-text-default', className)}
       {...props}
     />
   )
@@ -55,7 +55,7 @@ export function SheetTitle({ className, ...props }: DialogPrimitive.DialogTitleP
 export function SheetDescription({ className, ...props }: DialogPrimitive.DialogDescriptionProps) {
   return (
     <DialogPrimitive.Description
-      className={cn('mb-4 text-sm text-text-secondary', className)}
+      className={cn('mb-4 text-label text-text-secondary', className)}
       {...props}
     />
   )

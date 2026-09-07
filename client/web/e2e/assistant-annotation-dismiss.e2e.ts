@@ -1,6 +1,9 @@
 import { expect, test, type Page, type Route } from '@playwright/test'
 
-const E2E_MESSAGE_ID = 'e2e-assistant-message'
+// Must match AnnotationE2EHarness's E2E_MESSAGE_ID and must be a UUID.
+// AssistantMessageAnnotationWrapper renders children with no annotator at all for
+// non-UUID ids, so the selection menu can never open.
+const E2E_MESSAGE_ID = 'e2e00000-0000-4000-8000-000000000001'
 const E2E_MARK_TEXT = 'advanced PG features'
 
 type PersistedAnnotation = {
@@ -24,18 +27,26 @@ type PersistedAnnotation = {
   deletedAt?: string | null
 }
 
-type MockBranchResult = {
-  annotation: PersistedAnnotation
+// Mirrors branchAndSendFollowupResultSchema in shared/src/router/schemas/annotations.ts.
+type MockBranchFollowupResult = {
   branchNodeId: string
+  annotationId: string
+  branchEventMessageId: string | null
+  userFollowupMessageId: string | null
+  turnId: string
+  status: 'pending' | 'processing' | 'completed' | 'failed'
 }
 
 type MockBackendState = {
   annotationsByMessageId: Map<string, PersistedAnnotation[]>
-  branchResultByIdempotencyKey: Map<string, MockBranchResult>
+  branchResultByIdempotencyKey: Map<string, MockBranchFollowupResult>
   nextAnnotationNumber: number
   nextBranchNodeNumber: number
   listRequests: number
   branchRequests: number
+  // Any procedure the UI calls that this mock does not model. Asserted empty by every
+  // test so a client-side procedure rename cannot silently rot the mock again.
+  unhandledProcedures: string[]
 }
 
 const createMockBackendState = (): MockBackendState => ({
@@ -45,6 +56,7 @@ const createMockBackendState = (): MockBackendState => ({
   nextBranchNodeNumber: 1,
   listRequests: 0,
   branchRequests: 0,
+  unhandledProcedures: [],
 })
 
 const getLegacyAnnotationStorageKeys = async (page: Page): Promise<string[]> =>
@@ -127,11 +139,13 @@ const installMockTrpcBackend = async (page: Page, state: MockBackendState) => {
         return { result: { data: annotations } }
       }
 
-      if (procedureName === 'messageBranchFromSelection') {
+      if (procedureName === 'branchAndSendFollowup') {
         state.branchRequests += 1
         const input = unwrapInputValue<{
           messageId: string
           idempotencyKey: string
+          text: string
+          model: string
           annotationKind?: 'branch' | 'suggestion-branch'
           selection: {
             quote: string
@@ -168,9 +182,13 @@ const installMockTrpcBackend = async (page: Page, state: MockBackendState) => {
           updatedAt: createdAt,
           deletedAt: null,
         }
-        const branchResult: MockBranchResult = {
-          annotation,
+        const branchResult: MockBranchFollowupResult = {
           branchNodeId: annotation.leadsToNodeId ?? `mock-branch-node-${state.nextBranchNodeNumber}`,
+          annotationId: annotation.id,
+          branchEventMessageId: null,
+          userFollowupMessageId: `mock-user-followup-${state.nextBranchNodeNumber}`,
+          turnId: `mock-turn-${state.nextBranchNodeNumber}`,
+          status: 'completed',
         }
 
         state.nextAnnotationNumber += 1
@@ -181,6 +199,7 @@ const installMockTrpcBackend = async (page: Page, state: MockBackendState) => {
         return { result: { data: branchResult } }
       }
 
+      state.unhandledProcedures.push(procedureName)
       return {
         error: {
           message: `Unhandled mock tRPC procedure: ${procedureName}`,
@@ -258,14 +277,19 @@ const dragSelectMarkText = async (page: Page) => {
   await page.mouse.up()
 }
 
+// AssistantSelectionMenu renders no heading text, so its close button's aria-label is the
+// only stable, unique handle for "the menu is open".
+const getSelectionMenu = (page: Page) =>
+  page.getByRole('button', { name: 'Close selection menu' })
+
 const selectTextAndWaitForMenu = async (page: Page) => {
-  const selectionMenuTitle = page.getByText('Selected text', { exact: false })
+  const selectionMenu = getSelectionMenu(page)
 
   for (let attempt = 0; attempt < 3; attempt += 1) {
     await dragSelectMarkText(page)
 
     try {
-      await expect(selectionMenuTitle).toBeVisible({ timeout: 1500 })
+      await expect(selectionMenu).toBeVisible({ timeout: 1500 })
       return
     } catch {
       // Clear any partial browser selection before retrying.
@@ -274,6 +298,14 @@ const selectTextAndWaitForMenu = async (page: Page) => {
   }
 
   throw new Error('Selection menu did not open after selecting mark text.')
+}
+
+// Branch now sends a follow-up question with the branch request: branchAndSendFollowup
+// requires a non-empty `text`, and handleConfirmSelection returns early on empty input.
+// The follow-up must therefore be typed before Branch does anything at all.
+const branchWithFollowup = async (page: Page, followupText: string) => {
+  await page.getByRole('textbox').fill(followupText)
+  await page.getByRole('button', { name: 'Branch' }).click()
 }
 
 const getHighlightClickCoordinates = async (page: Page) => {
@@ -320,12 +352,13 @@ test.describe('assistant annotation dismiss behavior', () => {
 
     await selectTextAndWaitForMenu(page)
     await expect(annotationCount).toContainText('Annotation count: 1')
-    await expect(page.getByText('Selected text', { exact: false })).toBeVisible()
-    await page.getByRole('button', { name: 'Dismiss selection menu' }).click()
-    await expect(page.getByText('Selected text', { exact: false })).toHaveCount(0)
+    await expect(getSelectionMenu(page)).toBeVisible()
+    await getSelectionMenu(page).click()
+    await expect(getSelectionMenu(page)).toHaveCount(0)
     await expect(annotationCount).toContainText('Annotation count: 0')
     await expect(backendAnnotationCount).toContainText('Backend annotation count: 0')
     expect(backendState.branchRequests).toBe(0)
+    expect(backendState.unhandledProcedures).toEqual([])
   })
 
   test('branch persists across reload and rehydrates from backend query', async ({ page }) => {
@@ -334,9 +367,9 @@ test.describe('assistant annotation dismiss behavior', () => {
     const outsideDismissArea = page.getByTestId('e2e-outside-dismiss-area')
 
     await selectTextAndWaitForMenu(page)
-    await expect(page.getByText('Selected text', { exact: false })).toBeVisible()
-    await page.getByRole('button', { name: 'Branch' }).click()
-    await expect(page.getByText('Selected text', { exact: false })).toHaveCount(0)
+    await expect(getSelectionMenu(page)).toBeVisible()
+    await branchWithFollowup(page, 'Why does this matter?')
+    await expect(getSelectionMenu(page)).toHaveCount(0)
     await expect(annotationCount).toContainText('Annotation count: 1')
     await expect(backendAnnotationCount).toContainText('Backend annotation count: 1')
     await expect.poll(() => backendState.branchRequests).toBe(1)
@@ -353,6 +386,8 @@ test.describe('assistant annotation dismiss behavior', () => {
     await outsideDismissArea.click()
     const highlightCoords = await getHighlightClickCoordinates(page)
     await page.mouse.click(highlightCoords.x, highlightCoords.y)
-    await expect(page.getByText('Selected text', { exact: false })).toBeVisible()
+    await expect(getSelectionMenu(page)).toBeVisible()
+
+    expect(backendState.unhandledProcedures).toEqual([])
   })
 })

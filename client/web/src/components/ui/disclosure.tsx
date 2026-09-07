@@ -24,9 +24,9 @@ export function AccordionTrigger({ className, children, ...props }: AccordionPri
     <AccordionPrimitive.Header className="flex">
       <AccordionPrimitive.Trigger
         className={cn(
-          'flex flex-1 items-center justify-between gap-2 py-3 text-sm font-medium text-text-default',
-          'transition-colors hover:text-accent-default',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default',
+          'flex flex-1 items-center justify-between gap-2 py-3 text-label font-medium text-text-default',
+          'transition-colors hover:text-accent-hover',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default focus-visible:ring-offset-2',
           '[&[data-state=open]>svg]:rotate-180',
           className,
         )}
@@ -41,7 +41,7 @@ export function AccordionTrigger({ className, children, ...props }: AccordionPri
 
 export const AccordionContent = ({ className, ...props }: AccordionPrimitive.AccordionContentProps) => (
   <AccordionPrimitive.Content
-    className={cn('overflow-hidden pb-3 text-sm text-text-secondary', className)}
+    className={cn('overflow-hidden pb-3 text-label text-text-secondary', className)}
     {...props}
   />
 )
@@ -62,10 +62,10 @@ export const TabsList = ({ className, ...props }: TabsPrimitive.TabsListProps) =
 export const TabsTrigger = ({ className, ...props }: TabsPrimitive.TabsTriggerProps) => (
   <TabsPrimitive.Trigger
     className={cn(
-      'border-b-2 border-transparent px-3 py-2 text-sm font-medium text-text-secondary transition-colors',
+      'border-b-2 border-transparent px-3 py-2 text-label font-medium text-text-secondary transition-colors',
       'hover:text-text-default',
       'data-[state=active]:border-accent-default data-[state=active]:text-accent-active',
-      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default',
+      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default focus-visible:ring-offset-2',
       'disabled:pointer-events-none disabled:opacity-50',
       className,
     )}
@@ -74,5 +74,5 @@ export const TabsTrigger = ({ className, ...props }: TabsPrimitive.TabsTriggerPr
 )
 
 export const TabsContent = ({ className, ...props }: TabsPrimitive.TabsContentProps) => (
-  <TabsPrimitive.Content className={cn('pt-3 text-sm text-text-secondary', className)} {...props} />
+  <TabsPrimitive.Content className={cn('pt-3 text-label text-text-secondary', className)} {...props} />
 )

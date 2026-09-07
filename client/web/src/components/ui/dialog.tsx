@@ -44,7 +44,7 @@ export function DialogContent({
 export function DialogTitle({ className, ...props }: DialogPrimitive.DialogTitleProps) {
   return (
     <DialogPrimitive.Title
-      className={cn('mb-1 text-sm font-medium text-text-default', className)}
+      className={cn('mb-1 text-label font-medium text-text-default', className)}
       {...props}
     />
   )
@@ -53,7 +53,7 @@ export function DialogTitle({ className, ...props }: DialogPrimitive.DialogTitle
 export function DialogDescription({ className, ...props }: DialogPrimitive.DialogDescriptionProps) {
   return (
     <DialogPrimitive.Description
-      className={cn('mb-4 text-sm text-text-secondary', className)}
+      className={cn('mb-4 text-label text-text-secondary', className)}
       {...props}
     />
   )
