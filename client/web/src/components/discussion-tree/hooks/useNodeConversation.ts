@@ -364,6 +364,7 @@ export const useNodeConversation = ({
 
   useEffect(() => {
     dispatchStreamAction({ type: 'reset' })
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- deliberate reset on nodeId change; these resets must land in the same effect as the stream teardown below so they cannot interleave with an in-flight event. Restructuring belongs to A11a's conversation-hook rework, not a lint pass.
     setPendingMessages([])
     setHiddenPersistedMessageIds([])
     streamAuthorUserIdRef.current = null
@@ -434,6 +435,7 @@ export const useNodeConversation = ({
         errorMessage:
           branchFollowupStatusQuery.data?.error ?? 'Follow-up generation failed.',
       })
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- syncs the failed-bootstrap overlay from an async query result alongside stream teardown. Restructuring belongs to A11a's conversation-hook rework, not a lint pass.
       setPendingMessages((current) => [
         ...current.filter((message) => message.id !== branchFollowupOverlayMessageId),
         {
@@ -492,6 +494,7 @@ export const useNodeConversation = ({
         errorMessage:
           branchFollowupStatusQuery.data?.error ?? 'Follow-up generation failed.',
       })
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- syncs the failed-bootstrap overlay from an async query result alongside stream teardown. Restructuring belongs to A11a's conversation-hook rework, not a lint pass.
       setPendingMessages((current) => [
         ...current.filter((message) => message.id !== branchFollowupOverlayMessageId),
         {

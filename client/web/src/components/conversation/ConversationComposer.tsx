@@ -1,10 +1,6 @@
 import { type KeyboardEvent, type RefObject, type SubmitEvent } from "react";
+import { CHAT_INPUT_MIN_HEIGHT, CHAT_INPUT_MAX_HEIGHT } from "./conversationComposerConstants";
 
-export const CHAT_INPUT_MIN_HEIGHT = 24;
-export const CHAT_INPUT_MAX_LINES = 10;
-export const CHAT_INPUT_MAX_HEIGHT =
-  CHAT_INPUT_MIN_HEIGHT * CHAT_INPUT_MAX_LINES;
-export const CHAT_MODELS = ["gpt-5", "gpt-4o", "gpt-4.1", "gpt-4"];
 
 type ConversationComposerProps = {
   conversationModel: string;

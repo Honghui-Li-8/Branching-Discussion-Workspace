@@ -115,7 +115,7 @@
   --color-text-muted: var(--color-gray-500);
   --color-text-disabled: var(--color-gray-400);
   --color-text-inverse: var(--color-gray-0);
-  /* A-T3e: link text must clear WCAG 1.4.3 (4.5:1 for normal text).
+  /* ADR-0005: link text must clear WCAG 1.4.3 (4.5:1 for normal text).
      accent-default (#008ca8) is 3.95:1 on white — fine for focus rings and
      other non-text UI at the 3:1 bar, but it fails as body-size text.
      accent-hover (#007e97) is 4.74:1 and already in the palette, so this
@@ -201,7 +201,7 @@
   --color-merged-active: var(--color-purple-active);
   --color-merged-strong: var(--color-purple-strong);
 
-  /* Focus — A-T3e. Figma defines `color/focus` but A05a never ported it, so
+  /* Focus — ADR-0005. Figma defines `color/focus` but A05a never ported it, so
      components were reaching for accent-default directly. Naming the role
      means the focus colour can move without touching the brand accent.
      #008ca8 is 3.95:1 on white: above WCAG 1.4.11's 3:1 bar for non-text UI,
@@ -232,7 +232,7 @@
   --duration-spin: 1.5s;
 
   /* ═══ TYPOGRAPHY ════════════════════════════════════════════════════
-     A-T3a. Same two-layer shape as the color system above: Tailwind's
+     ADR-0001. Same two-layer shape as the color system above: Tailwind's
      default type scale is the *primitive* layer (left untouched — it is
      the standard, and A05a's 26 ui/ components already sit on it), and
      these names the *role* each size plays.
@@ -266,7 +266,7 @@
   --text-caption--line-height: var(--text-xs--line-height);
 
   /* ═══ SPACING ═══════════════════════════════════════════════════════
-     A-T3a — deliberately empty, and that is the finding.
+     ADR-0002 — deliberately empty, and that is the finding.
 
      A03a's Figma collection locks 19 `space/*` values. All 19 land
      exactly on Tailwind's default `--spacing: 0.25rem` (4px) grid, and
@@ -285,10 +285,10 @@
      The Figma spacing scale *is* the standard 4px grid. Nothing to port. */
 
   /* ═══ MEASURE ═══════════════════════════════════════════════════════
-     A-T3c. Line-length caps, expressed in `ch` so they track the font
+     ADR-0001. Line-length caps, expressed in `ch` so they track the font
      rather than a fixed pixel guess.
 
-     Grounded in A-T3b's audit: 7 of its 19 findings were `max-w-[...px]`
+     Grounded in the sizing audit (ADR-0003): 7 of its 19 findings were `max-w-[...px]`
      on prose — LoginPage (4), IntroScreen (2), and a popover cap — each
      a different magic number for the same intent. These give that intent
      a name. Tailwind's `--container-*` namespace generates `max-w-prose`

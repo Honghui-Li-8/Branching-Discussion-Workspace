@@ -5,7 +5,7 @@ import { cn } from '../../lib/utils'
 
 // Typography note: A05a's Step 5 audit flagged that no app-specific type
 // scale existed, and left these on Tailwind's raw text-sm/text-xs as a v1
-// stand-in. A-T3a supplied the scale, so they now use the semantic roles
+// stand-in. ADR-0001 supplied the scale, so they now use the semantic roles
 // (text-label / text-caption) — identical rendered size, named by the job
 // they do rather than by how big they are.
 
