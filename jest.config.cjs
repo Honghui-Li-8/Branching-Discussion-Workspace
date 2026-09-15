@@ -10,8 +10,12 @@ module.exports = {
   moduleNameMapper: {
     /* A06: the route tree reads its environment through client/web/src/lib/env.ts,
        which uses `import.meta` — a hard error under this CommonJS target. Map it
-       to a CJS-safe stand-in so full-app renders compile. */
-    '^(.*)/lib/env$': '<rootDir>/client/web/src/lib/env.jest.ts',
+       to a CJS-safe stand-in so full-app renders compile. Matched on the raw
+       specifier (jest cannot see the resolved path), so it is limited to
+       relative spellings that end in lib/env — every client import spells it
+       that way (see supabaseClient.ts). A server or shared `lib/env` would
+       also match; none exists, and this comment is the tripwire. */
+    '^(\\.\\.?/)+lib/env$': '<rootDir>/client/web/src/lib/env.jest.ts',
     '^@branching/shared$': '<rootDir>/shared/src/index.ts',
     '^@branching/shared/(.*)$': '<rootDir>/shared/src/$1',
     '^(\\.{1,2}/.*)\\.js$': '$1',

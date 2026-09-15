@@ -31,7 +31,7 @@ describe('route resolution (A06)', () => {
       renderWithProviders(<App />, { route: '/', authStatus: 'unknown', fetchImpl: pendingFetch })
 
       expect(screen.getByRole('status').textContent).toMatch(/checking sign-in/i)
-      expect(heading1()).toBeNull()
+      expect(heading1()?.textContent).toBe('Checking sign-in')
       expect(screen.queryByRole('link', { name: 'Sign in' })).toBeNull()
     })
 
@@ -90,7 +90,7 @@ describe('route resolution (A06)', () => {
       expect(screen.getAllByRole('main')).toHaveLength(1)
       expect(screen.getAllByRole('contentinfo')).toHaveLength(1)
       expect(container.querySelector('a')?.textContent).toBe('Skip to main content')
-      expect(screen.queryAllByRole('heading', { level: 1 }).length).toBeLessThanOrEqual(1)
+      expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1)
     })
 
     it('the signed-in workspace stays outside the shell', () => {
@@ -169,7 +169,7 @@ describe('sign-in flow surfaces (A06 Commit 5)', () => {
 
     expect(screen.getByRole('status').textContent).toMatch(/completing sign-in/i)
     expect(screen.getAllByRole('banner')).toHaveLength(1)
-    expect(screen.queryByRole('heading', { level: 1 })).toBeNull()
+    expect(heading1()?.textContent).toBe('Completing sign-in')
     spy.mockRestore()
   })
 

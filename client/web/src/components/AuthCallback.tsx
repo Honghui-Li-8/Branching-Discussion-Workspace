@@ -6,7 +6,7 @@ import { setAuthenticatedUser } from '../store/slices/authSlice'
 import { useAuth } from './useAuth'
 import { runAuthExchange } from './authCallbackLogic'
 import { apiBaseUrl } from '../lib/env'
-import { Container } from './ui/layout'
+import { Container, Stack } from './ui/layout'
 
 // A06 — the OAuth return. This surface renders the pending state only; every
 // terminal outcome is a navigation (success → authenticated root, cancel or
@@ -48,9 +48,12 @@ export const AuthCallback = () => {
 
   return (
     <Container>
-      <p role="status" aria-live="polite" className="py-16 text-center text-label text-text-muted">
-        Completing sign-in…
-      </p>
+      <Stack gap="2" align="center" className="py-16 text-center">
+        <h1 className="m-0 text-title font-medium text-text-default">Completing sign-in</h1>
+        <p role="status" aria-live="polite" className="m-0 text-label text-text-muted">
+          Completing sign-in…
+        </p>
+      </Stack>
     </Container>
   )
 }

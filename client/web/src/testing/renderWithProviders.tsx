@@ -1,6 +1,7 @@
 /* eslint-disable react-refresh/only-export-components -- test harness: exports fixtures and a
    render helper beside one probe component, and is never hot-reloaded. */
 import type { ReactElement, ReactNode } from 'react'
+import { afterEach } from '@jest/globals'
 import { render, type RenderOptions } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Provider } from 'react-redux'
@@ -50,6 +51,13 @@ export type RenderWithProvidersOptions = Omit<RenderOptions, 'wrapper'> & {
   /** Global fetch for the render's lifetime (auth calls and tRPC batches both use it). */
   fetchImpl?: typeof fetch
 }
+
+// Each render installs its fetch globally (auth and tRPC both read the global);
+// restore the original after every test so one render never leaks into the next.
+const originalFetch = globalThis.fetch
+afterEach(() => {
+  globalThis.fetch = originalFetch
+})
 
 export const renderWithProviders = (
   ui: ReactElement,

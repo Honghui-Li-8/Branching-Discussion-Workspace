@@ -11,7 +11,8 @@ export type AuthContextValue = {
   login: () => Promise<void>
   logout: () => Promise<void>
   refreshBalance: () => Promise<void>
-  loginWithLocalBypass: () => Promise<void>
+  /** Resolves true only when a session was actually established; false when the guard declined. */
+  loginWithLocalBypass: () => Promise<boolean>
   isLocalBypassPending: boolean
   localBypassError: string | null
 }

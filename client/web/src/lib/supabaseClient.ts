@@ -6,7 +6,6 @@ import { supabaseAnonKey, supabaseUrl } from '../lib/env'
 let supabaseClient: SupabaseClient | null = null
 
 export const getSupabaseClient = (): SupabaseClient => {
-
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error('Supabase is not configured.')
   }

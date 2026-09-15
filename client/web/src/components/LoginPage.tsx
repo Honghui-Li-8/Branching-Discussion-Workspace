@@ -27,7 +27,14 @@ const readLocalAuthBypassGateInput = (): LocalAuthBypassGateInput => ({
 })
 
 export const LoginPage = () => {
-  const { authError, login, loginWithLocalBypass, isLocalBypassPending, localBypassError } = useAuth()
+  const {
+    authError,
+    login,
+    loginWithLocalBypass,
+    isAuthBootstrapPending,
+    isLocalBypassPending,
+    localBypassError,
+  } = useAuth()
   const navigate = useNavigate()
   const [isLoginPending, setIsLoginPending] = useState(false)
   const localAuthBypassGateInput = useMemo(readLocalAuthBypassGateInput, [])
@@ -46,10 +53,12 @@ export const LoginPage = () => {
 
   const handleLocalBypassLogin = async () => {
     try {
-      await loginWithLocalBypass()
-      // Same seam the OAuth callback uses: the bypass now runs from /login,
-      // which renders regardless of auth state, so success must navigate.
-      navigateAfterLogin(navigate)
+      const signedIn = await loginWithLocalBypass()
+      // Same seam the OAuth callback uses: the bypass runs from /login, which
+      // renders regardless of auth state, so success must navigate. Only a
+      // confirmed session navigates — the provider declines (without throwing)
+      // while bootstrap is still resolving.
+      if (signedIn) navigateAfterLogin(navigate)
     } catch {
       // AuthProvider has already surfaced localBypassError.
     }
@@ -123,6 +132,7 @@ export const LoginPage = () => {
               type="button"
               variant="secondary"
               size="lg"
+              disabled={isAuthBootstrapPending}
               pending={isLocalBypassPending}
               onClick={() => {
                 void handleLocalBypassLogin()

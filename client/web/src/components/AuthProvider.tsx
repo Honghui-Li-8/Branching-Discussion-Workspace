@@ -134,9 +134,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
   }, [dispatch, isAuthActionPending, isAuthBootstrapPending])
 
-  const loginWithLocalBypass = useCallback(async (): Promise<void> => {
+  const loginWithLocalBypass = useCallback(async (): Promise<boolean> => {
+    // Declining is not failing: nothing is thrown, so the caller must not treat a
+    // resolved promise as a sign-in. The boolean is what LoginPage navigates on.
     if (isAuthBootstrapPending || isLocalBypassPending) {
-      return
+      return false
     }
 
     setLocalBypassError(null)
@@ -162,6 +164,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         dispatchAuthUser: (user) => dispatch(setAuthState({ status: 'authenticated', user })),
         setError: setLocalBypassError,
       })
+      return true
     } finally {
       setIsLocalBypassPending(false)
     }

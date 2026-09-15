@@ -322,8 +322,9 @@
      on a wrapper does not cascade — a ring on the near-black header rendered
      its offset as a white halo. --surface-ring-offset is an ordinary custom
      property, which DOES inherit; every element reads its offset colour from
-     it, and a region that changes its surface redefines it once. Utility
-     classes (ring-offset-<colour>) still win, by specificity. */
+     it, and a region that changes its surface redefines it once. A
+     ring-offset-<colour> utility still wins: this rule sits in the base
+     layer and Tailwind's utilities cascade later, whatever the specificity. */
   :root {
     --surface-ring-offset: var(--color-bg-default);
   }
