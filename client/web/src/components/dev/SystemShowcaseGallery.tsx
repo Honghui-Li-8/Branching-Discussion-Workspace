@@ -546,7 +546,7 @@ function Components() {
           <Stack gap="3" className="max-w-md">
             {[30, 70, 100].map((v) => (
               <Cluster key={v} gap="3">
-                <Progress value={v} aria-label={`Merge progress %`} />
+                <Progress value={v} aria-label={`Merge progress ${v}%`} />
                 <span className="w-10 text-right font-mono text-caption text-text-muted">{v}%</span>
               </Cluster>
             ))}
