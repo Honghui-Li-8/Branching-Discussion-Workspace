@@ -1,10 +1,15 @@
-// A06: moved out of App.tsx. The neutral branded state shown while
-// `GET /auth/me` resolves — neither the landing nor the workspace may flash
-// before sign-in status is known. Restyled into the shell in Commit 4.
+import { Container } from '../ui/layout'
+
+// A06: the neutral state shown while `GET /auth/me` resolves — neither the
+// landing nor the workspace may flash before sign-in status is known. Renders
+// inside the public shell, so the page is branded by the header; the text is
+// the state (no motion-only indicator, A-T3e §7).
 export const AuthBootstrapScreen = () => {
   return (
-    <main className="grid min-h-screen place-items-center bg-[#f5f7fb] px-4 text-sm text-slate-500">
-      Checking sign-in...
-    </main>
+    <Container>
+      <p role="status" aria-live="polite" className="py-16 text-center text-label text-text-muted">
+        Checking sign-in…
+      </p>
+    </Container>
   )
 }

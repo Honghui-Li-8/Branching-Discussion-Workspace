@@ -28,6 +28,8 @@ import {
   MoreHorizontal,
   MoreVertical,
   Trash2,
+  Menu,
+  X,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -54,6 +56,11 @@ export const ICONS = {
   warning: AlertTriangle,
   account: User,
   delete: Trash2,
+  // A06 — public-shell navigation. `menu` opens the narrow-screen navigation
+  // sheet; `close` dismisses it. Plain X, not XCircle: `reject` is a decision,
+  // this is a dismissal.
+  menu: Menu,
+  close: X,
 } satisfies Record<string, LucideIcon>;
 
 /**

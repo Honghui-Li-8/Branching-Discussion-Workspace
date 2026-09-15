@@ -5,7 +5,7 @@
  * renders with the right landmarks. Asserts by role and accessible name only;
  * never internal state, dispatch sequences, or component internals.
  */
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 
 import App from './App'
 import { failingFetch, pendingFetch, renderWithProviders } from './testing/renderWithProviders'
@@ -29,7 +29,7 @@ describe('route resolution (A06)', () => {
     it('unknown: shows the neutral bootstrap state and neither the landing nor the workspace', () => {
       renderWithProviders(<App />, { route: '/', authStatus: 'unknown', fetchImpl: pendingFetch })
 
-      expect(screen.getByRole('main').textContent).toMatch(/checking sign-in/i)
+      expect(screen.getByRole('status').textContent).toMatch(/checking sign-in/i)
       expect(heading1()).toBeNull()
       expect(screen.queryByRole('link', { name: 'Sign in' })).toBeNull()
     })
@@ -75,6 +75,30 @@ describe('route resolution (A06)', () => {
     })
   })
 
+  describe('every public route renders inside the one shell', () => {
+    it.each([
+      ['/', 'unauthenticated'],
+      ['/', 'unknown'],
+      ['/login', 'unauthenticated'],
+      ['/login', 'authenticated'],
+      ['/nope', 'unauthenticated'],
+    ] as const)('%s when %s: banner, one main, contentinfo, skip link', (route, authStatus) => {
+      const { container } = renderWithProviders(<App />, { route, authStatus })
+
+      expect(screen.getAllByRole('banner')).toHaveLength(1)
+      expect(screen.getAllByRole('main')).toHaveLength(1)
+      expect(screen.getAllByRole('contentinfo')).toHaveLength(1)
+      expect(container.querySelector('a')?.textContent).toBe('Skip to main content')
+      expect(screen.queryAllByRole('heading', { level: 1 }).length).toBeLessThanOrEqual(1)
+    })
+
+    it('the signed-in workspace stays outside the shell', () => {
+      renderWithProviders(<App />, { route: '/', authStatus: 'authenticated' })
+      expect(screen.queryByRole('banner')).toBeNull()
+      expect(screen.queryByRole('contentinfo')).toBeNull()
+    })
+  })
+
   describe('/login — a real page, regardless of auth state', () => {
     it.each(['unknown', 'unauthenticated', 'authenticated'] as const)(
       'renders the sign-in surface when %s',
@@ -105,26 +129,28 @@ describe('route resolution (A06)', () => {
     it('unauthenticated: offers home and sign-in', () => {
       renderWithProviders(<App />, { route: '/nope', authStatus: 'unauthenticated' })
 
-      const nav = screen.getByRole('navigation', { name: 'Recovery' })
-      expect(nav.textContent).toContain('Go to home')
-      expect(screen.getByRole('link', { name: 'Sign in' }).getAttribute('href')).toBe('/login')
-      expect(screen.queryByRole('link', { name: 'Open workspace' })).toBeNull()
+      const nav = within(screen.getByRole('navigation', { name: 'Recovery' }))
+      expect(nav.getByRole('link', { name: 'Go to home' }).getAttribute('href')).toBe('/')
+      expect(nav.getByRole('link', { name: 'Sign in' }).getAttribute('href')).toBe('/login')
+      expect(nav.queryByRole('link', { name: 'Open workspace' })).toBeNull()
     })
 
     it('authenticated: offers the workspace only', () => {
       renderWithProviders(<App />, { route: '/nope', authStatus: 'authenticated' })
 
-      expect(screen.getByRole('link', { name: 'Open workspace' }).getAttribute('href')).toBe('/')
-      expect(screen.queryByRole('link', { name: 'Sign in' })).toBeNull()
-      expect(screen.queryByRole('link', { name: 'Go to home' })).toBeNull()
+      const nav = within(screen.getByRole('navigation', { name: 'Recovery' }))
+      expect(nav.getByRole('link', { name: 'Open workspace' }).getAttribute('href')).toBe('/')
+      expect(nav.queryByRole('link', { name: 'Sign in' })).toBeNull()
+      expect(nav.queryByRole('link', { name: 'Go to home' })).toBeNull()
     })
 
     it('unknown: offers home only, never a state it cannot vouch for', () => {
       renderWithProviders(<App />, { route: '/nope', authStatus: 'unknown', fetchImpl: pendingFetch })
 
-      expect(screen.getByRole('link', { name: 'Go to home' })).toBeTruthy()
-      expect(screen.queryByRole('link', { name: 'Sign in' })).toBeNull()
-      expect(screen.queryByRole('link', { name: 'Open workspace' })).toBeNull()
+      const nav = within(screen.getByRole('navigation', { name: 'Recovery' }))
+      expect(nav.getByRole('link', { name: 'Go to home' })).toBeTruthy()
+      expect(nav.queryByRole('link', { name: 'Sign in' })).toBeNull()
+      expect(nav.queryByRole('link', { name: 'Open workspace' })).toBeNull()
     })
   })
 })

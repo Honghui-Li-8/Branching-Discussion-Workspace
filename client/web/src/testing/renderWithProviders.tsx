@@ -36,7 +36,9 @@ export const failingFetch: typeof fetch = () => Promise.reject(new TypeError('Fa
 /** Reports the router's current location so tests can assert on navigation. */
 export const LocationProbe = () => {
   const location = useLocation()
-  return <output data-testid="location">{location.pathname + location.hash}</output>
+  // A span, not <output>: <output> carries an implicit `status` role that
+  // would collide with the surfaces under test.
+  return <span data-testid="location">{location.pathname + location.hash}</span>
 }
 
 export type RenderWithProvidersOptions = Omit<RenderOptions, 'wrapper'> & {

@@ -7,6 +7,8 @@ import {
 } from '../devFlags'
 import { useAuth } from './useAuth'
 import { devAuthToken, isDev, localAuthBypassFlag } from '../lib/env'
+import { Button } from './ui/button'
+import { Container, Stack } from './ui/layout'
 
 // Read at call time, not on import: touching window at module scope makes this module impossible
 // to import outside a DOM.
@@ -58,38 +60,43 @@ export const LoginPage = () => {
     }
   }, [isBypassAvailable, localAuthBypassGateInput])
 
+  // A06: this surface renders inside the public shell, which owns the page's
+  // `main`, header and footer. The card is the page content — and its only h1.
+  // Re-tokened in the same pass (ADR-0001 assigns replacing this surface's
+  // pinned measures to its own rebuild): role colours, the narrow measure,
+  // the ui Button for both actions. Behaviour and the bypass gate are untouched.
   return (
-    <main className="grid min-h-screen place-items-center bg-[#f5f7fb] px-5 py-8">
-      <section className="flex w-full max-w-[560px] flex-col items-center rounded-xl border border-slate-200 bg-white px-6 py-10 text-center shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
-        <p className="m-0 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-          Trellis
-        </p>
-        <h1 className="my-[14px] text-[clamp(30px,5vw,46px)] font-semibold leading-[1.08] text-slate-950">
+    <Container width="narrow" className="py-12">
+      <Stack
+        as="section"
+        aria-labelledby="login-heading"
+        gap="4"
+        align="center"
+        className="rounded-lg border border-border-default bg-bg-default px-6 py-10 text-center shadow-card"
+      >
+        <p className="m-0 text-caption font-semibold uppercase tracking-wide text-text-muted">Trellis</p>
+        <h1 id="login-heading" className="m-0 text-title font-semibold text-text-default">
           Sign in to continue
         </h1>
-        <p className="m-0 max-w-[520px] text-base leading-7 text-slate-600">
+        <p className="m-0 text-body text-text-secondary">
           Use your Google account to open your workspaces and keep your discussion tree
           history in one place.
         </p>
 
-        <button
+        <Button
           type="button"
+          size="lg"
+          pending={isLoginPending}
           onClick={() => {
             void handleLogin()
           }}
-          disabled={isLoginPending}
-          className="mt-8 inline-flex min-h-12 items-center justify-center gap-3 rounded-lg border border-slate-200 bg-slate-950 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
         >
-          {isLoginPending ? (
-            <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-          ) : (
-            <GoogleIcon fontSize="small" aria-hidden="true" />
-          )}
-          <span>{isLoginPending ? 'Signing in...' : 'Sign in with Google'}</span>
-        </button>
+          <GoogleIcon fontSize="small" aria-hidden="true" />
+          Sign in with Google
+        </Button>
 
         {authError ? (
-          <p className="mt-4 max-w-[440px] text-sm leading-6 text-red-700" role="alert">
+          <p className="m-0 text-label text-error-default" role="alert">
             {authError}
           </p>
         ) : null}
@@ -103,27 +110,25 @@ export const LoginPage = () => {
         */}
         {isDev && isBypassAvailable ? (
           <>
-            <button
+            <Button
               type="button"
+              variant="secondary"
+              size="lg"
+              pending={isLocalBypassPending}
               onClick={() => {
                 void handleLocalBypassLogin()
               }}
-              disabled={isLocalBypassPending}
-              className="mt-4 inline-flex min-h-12 items-center justify-center gap-3 rounded-lg border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70"
             >
-              {isLocalBypassPending ? (
-                <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
-              ) : null}
-              <span>{isLocalBypassPending ? 'Signing in...' : 'Continue as local developer'}</span>
-            </button>
+              Continue as local developer
+            </Button>
             {localBypassError ? (
-              <p className="mt-4 max-w-[440px] text-sm leading-6 text-red-700" role="alert">
+              <p className="m-0 text-label text-error-default" role="alert">
                 {localBypassError}
               </p>
             ) : null}
           </>
         ) : null}
-      </section>
-    </main>
+      </Stack>
+    </Container>
   )
 }
