@@ -150,7 +150,7 @@ yarn db:init
 yarn db:seed
 ```
 
-`db:init` migrates the app database target. `db:seed` seeds the dev database target, so using the same local database for both env vars is the simplest way to get a working demo dataset.
+`db:init` migrates the app database target. `db:seed` seeds the dev database target, so using the same local database for both env vars is the simplest way to get a working demo dataset. `db:reset` drops and recreates the dev database target, then migrates and seeds it; seed and reset refuse any target other than `dev` (`--dev` or `DB_ENV=dev`), so the database the server reads through `DATABASE_URL` can only be reset when it is also the one named by `DATABASE_URL_DEV`.
 
 ### Run the app
 

@@ -3,6 +3,7 @@ import { runMigrations } from './migrate.js'
 import { runSeed } from './seed.js'
 import { resolveDatabaseTarget, type DatabaseTarget } from './client.js'
 import { createLogger } from '../logging/logger.js'
+import { isEntrypoint } from './entrypoint.js'
 
 const getTarget = (): DatabaseTarget =>
   resolveDatabaseTarget(process.argv.includes('--dev') || process.env.DB_ENV === 'dev' ? 'dev' : undefined)
@@ -21,11 +22,14 @@ const main = async (): Promise<void> => {
   logger.info('Reset completed.', { target })
 }
 
-main()
-  .catch((error) => {
-    logger.error('Reset command failed.', { error })
-    process.exitCode = 1
-  })
-  .finally(async () => {
-    await closePool()
-  })
+// Guarded like migrate.ts and seed.ts so importing this module never runs a reset.
+if (isEntrypoint(import.meta.url)) {
+  main()
+    .catch((error) => {
+      logger.error('Reset command failed.', { error })
+      process.exitCode = 1
+    })
+    .finally(async () => {
+      await closePool()
+    })
+}
