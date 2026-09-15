@@ -224,7 +224,7 @@ function TypeScale() {
               <TableCell><code className="font-mono text-caption">{r.cls}</code></TableCell>
               <TableCell><span data-type-role={r.role} className={`${r.cls} text-text-default`}>Branch every idea</span></TableCell>
               <TableCell><code className="font-mono text-caption">{tokens[`--text-${r.role}`]}</code></TableCell>
-              <TableCell><code className="font-mono text-caption">{tokens[`--text---line-height`]}</code></TableCell>
+              <TableCell><code className="font-mono text-caption">{tokens[`--text-${r.role}--line-height`]}</code></TableCell>
               <TableCell><code className="font-mono text-caption">{rendered[r.role] ?? '…'}</code></TableCell>
               <TableCell className="text-caption text-text-muted">{r.use}</TableCell>
             </TableRow>
@@ -546,7 +546,7 @@ function Components() {
           <Stack gap="3" className="max-w-md">
             {[30, 70, 100].map((v) => (
               <Cluster key={v} gap="3">
-                <Progress value={v} />
+                <Progress value={v} aria-label={`Merge progress %`} />
                 <span className="w-10 text-right font-mono text-caption text-text-muted">{v}%</span>
               </Cluster>
             ))}
@@ -673,7 +673,7 @@ export function SystemShowcaseGallery() {
                 <SpacingScale />
               </Section>
 
-              <Section id="layout" title="Layout primitives — Stack, Cluster, Container" note="The three A06 shipped (A-T3c's deferred deliverable). Spacing props are a closed union of grid steps.">
+              <Section id="layout" title="Layout primitives — Stack, Cluster, Container" note="The three A06 shipped (A-T3c's deferred deliverable). Their gap/gutter props accept a 12-step subset of the 19 (0, 1, 2, 3, 4, 5, 6, 8, 10, 12, 16, 24) — the steps a layout gap plausibly takes; finer steps stay available as plain utilities.">
                 <LayoutPrimitives />
               </Section>
 
@@ -695,6 +695,12 @@ export function SystemShowcaseGallery() {
                   <li>
                     Contrast is not verified here (A13 owns it). Known open: white text on the teal primary Button
                     (3.95:1). The gallery shows it as shipped.
+                  </li>
+                  <li>
+                    The shipped Combobox trigger has no accessible name: a `role="combobox"` element
+                    cannot take its name from content, so the placeholder text is its value, not its
+                    label, and the component exposes no `aria-label`/`id` route (axe `button-name`,
+                    critical). Surfaced by this page's scan; routed to A13 rather than patched here.
                   </li>
                   <li>
                     A11a still carries three pinned component widths from the sizing audit; they are not on this
