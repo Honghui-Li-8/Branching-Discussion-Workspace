@@ -1,0 +1,7 @@
+{
+  "app": "node --import tsx bin/infra.ts",
+  "context": {
+    "region": "us-east-2",
+    "environment": "feasibility"
+  }
+}

@@ -6,7 +6,8 @@
   "workspaces": [
     "client/web",
     "server",
-    "shared"
+    "shared",
+    "infra"
   ],
   "scripts": {
     "dev": "yarn workspace web dev",

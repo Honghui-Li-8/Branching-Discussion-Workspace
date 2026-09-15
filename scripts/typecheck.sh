@@ -6,6 +6,7 @@ PROJECTS=(
   "web:client/web:tsconfig.app.json"
   "server:server:tsconfig.json"
   "shared:shared:tsconfig.json"
+  "infra:infra:tsconfig.json"
 )
 
 total_errors=0

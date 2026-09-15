@@ -1,0 +1,21 @@
+{
+  "name": "infra",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "synth": "cdk synth",
+    "check:type": "tsc -p tsconfig.json --noEmit",
+    "test": "yarn run -T test:unit infra"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "2.269.0",
+    "constructs": "10.8.1"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "aws-cdk": "2.1141.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}
