@@ -5,8 +5,7 @@ import { useAppDispatch } from '../store/hooks'
 import { setAuthenticatedUser } from '../store/slices/authSlice'
 import { useAuth } from './useAuth'
 import { runAuthExchange } from './authCallbackLogic'
-
-const apiBaseUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:3001'
+import { apiBaseUrl } from '../lib/env'
 
 export const AuthCallback = () => {
   const dispatch = useAppDispatch()

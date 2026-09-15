@@ -7,6 +7,7 @@ import { trpc } from '../../../trpc'
 import type { TreeMessage } from '../../../types/tree'
 import { DEBUG_RAW_MARKDOWN } from '../../../devFlags'
 import { invalidateMessagesByNode } from './mutationInvalidation'
+import { apiBaseUrl } from '../../../lib/env'
 import type { BranchFollowupBootstrap } from './useDiscussionTreeUiState'
 import {
   conversationStreamReducer,
@@ -265,7 +266,6 @@ export const useNodeConversation = ({
 
     closeTurnStream()
 
-    const apiBaseUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:3001'
     const streamUrl = `${apiBaseUrl}/chat/turns/${encodeURIComponent(turnId)}/stream`
     const source = new EventSource(streamUrl, { withCredentials: true })
     streamSourceRef.current = source

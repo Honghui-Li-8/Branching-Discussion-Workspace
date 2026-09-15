@@ -14,7 +14,10 @@ const LocationProbe = () => {
 
 const renderAt = (initialEntry: string, ui: ReactNode) =>
   render(
-    <MemoryRouter initialEntries={[initialEntry]}>
+    <MemoryRouter
+      initialEntries={[initialEntry]}
+      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+    >
       {ui}
       <LocationProbe />
     </MemoryRouter>,

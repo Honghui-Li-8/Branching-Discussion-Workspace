@@ -4,6 +4,7 @@ import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query'
 
 import type { AppRouter } from '@branching/shared'
 import { store } from './store'
+import { apiBaseUrl } from './lib/env'
 import {
   clearClientSessionState,
   isUnauthorizedTrpcError,
@@ -41,7 +42,7 @@ export const queryClient = new QueryClient({
 export const trpcClient = trpc.createClient({
   links: [
     httpBatchLink({
-      url: `${import.meta.env.VITE_API_URL ?? 'http://localhost:3001'}/trpc`,
+      url: `${apiBaseUrl}/trpc`,
       fetch(url, options) {
         return fetch(url, {
           ...(options ?? {}),

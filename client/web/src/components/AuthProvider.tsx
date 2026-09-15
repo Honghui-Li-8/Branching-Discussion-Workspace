@@ -10,14 +10,9 @@ import { getSupabaseClient } from '../lib/supabaseClient'
 import { AuthContext, type AuthContextValue } from './authContext'
 import { isAuthUser } from './authCallbackLogic'
 import { runLocalBypassLogin } from './localBypassLogin'
-
-// Vite inlines import.meta.env.VITE_* as string literals wherever they appear, so reading the dev
-// token unconditionally puts its value in the production bundle. Gating on the DEV literal — which
-// Vite replaces with `false` — lets the minifier fold this to undefined and drop the string.
-// A00a DoD #8 requires the configured credential to be absent from `yarn build` output.
-const localDevAuthToken: string | undefined = import.meta.env.DEV
-  ? import.meta.env.VITE_DEV_AUTH_TOKEN
-  : undefined
+// Environment reads go through lib/env (A06): it carries the DEV gate that keeps the dev token out
+// of production bundles (A00a DoD #8) and is what lets jest render this provider.
+import { apiBaseUrl, devAuthToken as localDevAuthToken } from '../lib/env'
 
 type AuthProviderProps = {
   children: ReactNode
@@ -32,8 +27,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [authError, setAuthError] = useState<string | null>(null)
   const [isLocalBypassPending, setIsLocalBypassPending] = useState(false)
   const [localBypassError, setLocalBypassError] = useState<string | null>(null)
-
-  const apiBaseUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:3001'
 
   const isAuthenticated = authStatus === 'authenticated' && authUser !== null
   const isAuthBootstrapPending = authStatus === 'unknown'
@@ -81,7 +74,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     return () => {
       isCancelled = true
     }
-  }, [apiBaseUrl, authStatus, dispatch])
+  }, [authStatus, dispatch])
 
   const login = useCallback(async (): Promise<void> => {
     if (isAuthBootstrapPending) {
@@ -139,7 +132,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     } finally {
       setIsAuthActionPending(false)
     }
-  }, [apiBaseUrl, dispatch, isAuthActionPending, isAuthBootstrapPending])
+  }, [dispatch, isAuthActionPending, isAuthBootstrapPending])
 
   const loginWithLocalBypass = useCallback(async (): Promise<void> => {
     if (isAuthBootstrapPending || isLocalBypassPending) {
@@ -172,7 +165,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     } finally {
       setIsLocalBypassPending(false)
     }
-  }, [apiBaseUrl, dispatch, isAuthBootstrapPending, isLocalBypassPending])
+  }, [dispatch, isAuthBootstrapPending, isLocalBypassPending])
 
   const refreshBalance = useCallback(async (): Promise<void> => {
     try {
@@ -190,7 +183,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     } catch {
       // silent — balance will update on next successful /auth/me
     }
-  }, [apiBaseUrl, dispatch])
+  }, [dispatch])
 
   const value = useMemo<AuthContextValue>(
     () => ({
