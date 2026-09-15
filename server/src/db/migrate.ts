@@ -130,11 +130,17 @@ const main = async (): Promise<void> => {
   await showStatus(databaseTarget)
 }
 
-main()
-  .catch((error) => {
-    logger.error('Migration command failed.', { error })
-    process.exitCode = 1
-  })
-  .finally(async () => {
-    await closePool()
-  })
+// Run the CLI only when this file is the entrypoint. `reset.ts` imports
+// `runMigrations` from here; without this guard that import used to kick off a
+// stray `status` run that raced the reset's `DROP SCHEMA` and closed the shared
+// pool mid-reset (A00c, 2026-09-15).
+if (process.argv[1]?.endsWith('/migrate.ts')) {
+  main()
+    .catch((error) => {
+      logger.error('Migration command failed.', { error })
+      process.exitCode = 1
+    })
+    .finally(async () => {
+      await closePool()
+    })
+}
