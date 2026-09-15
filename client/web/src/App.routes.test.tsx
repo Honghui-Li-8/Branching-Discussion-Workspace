@@ -5,9 +5,10 @@
  * renders with the right landmarks. Asserts by role and accessible name only;
  * never internal state, dispatch sequences, or component internals.
  */
-import { screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 
 import App from './App'
+import * as supabaseClient from './lib/supabaseClient'
 import { failingFetch, pendingFetch, renderWithProviders } from './testing/renderWithProviders'
 
 // The signed-in workspace subtree pulls ESM-only dependencies (@annotorious)
@@ -152,5 +153,59 @@ describe('route resolution (A06)', () => {
       expect(nav.queryByRole('link', { name: 'Sign in' })).toBeNull()
       expect(nav.queryByRole('link', { name: 'Open workspace' })).toBeNull()
     })
+  })
+})
+
+describe('sign-in flow surfaces (A06 Commit 5)', () => {
+  const okResponse = (payload: unknown): Response =>
+    ({ ok: true, status: 200, json: async () => payload }) as unknown as Response
+
+  it('/auth/callback renders the pending state only, inside the shell', () => {
+    // Hold the exchange open so the pending surface is what we observe.
+    const spy = jest.spyOn(supabaseClient, 'getSupabaseClient').mockReturnValue({
+      auth: { getSession: () => new Promise(() => {}) },
+    } as unknown as ReturnType<typeof supabaseClient.getSupabaseClient>)
+    renderWithProviders(<App />, { route: '/auth/callback', authStatus: 'unauthenticated' })
+
+    expect(screen.getByRole('status').textContent).toMatch(/completing sign-in/i)
+    expect(screen.getAllByRole('banner')).toHaveLength(1)
+    expect(screen.queryByRole('heading', { level: 1 })).toBeNull()
+    spy.mockRestore()
+  })
+
+  it('a failed callback lands on /login with the error as an alert beside the retry action', async () => {
+    // No Supabase configuration in tests → getSession throws → failure path.
+    renderWithProviders(<App />, { route: '/auth/callback', authStatus: 'unauthenticated' })
+
+    await waitFor(() => expect(screen.getByTestId('location').textContent).toBe('/login'))
+    const alert = screen.getByRole('alert')
+    expect(alert.textContent).toContain('Sign-in failed')
+    expect(alert.textContent).toContain('Sign-in is not configured yet.')
+    expect(screen.getByRole('button', { name: /sign in with google/i })).toBeTruthy()
+  })
+
+  it('the local bypass succeeds from /login and lands in the workspace through the shared seam', async () => {
+    const fetchImpl: typeof fetch = async (input) => {
+      const url = String(input)
+      if (url.endsWith('/auth/login')) {
+        return okResponse({
+          authenticated: true,
+          user: {
+            id: 'u',
+            authUserId: 'a',
+            email: null,
+            displayName: null,
+            creditBalance: 0,
+          },
+        })
+      }
+      return new Promise<Response>(() => {})
+    }
+    renderWithProviders(<App />, { route: '/login', authStatus: 'unauthenticated', fetchImpl })
+
+    fireEvent.click(screen.getByRole('button', { name: /continue as local developer/i }))
+
+    await waitFor(() => expect(screen.getByTestId('location').textContent).toBe('/'))
+    expect(screen.getByTestId('workspace-layout')).toBeTruthy()
   })
 })

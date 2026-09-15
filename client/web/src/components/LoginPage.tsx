@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import GoogleIcon from '@mui/icons-material/Google'
 import {
   describeLocalAuthBypassMisconfiguration,
@@ -7,6 +8,8 @@ import {
 } from '../devFlags'
 import { useAuth } from './useAuth'
 import { devAuthToken, isDev, localAuthBypassFlag } from '../lib/env'
+import { navigateAfterLogin } from './authCallbackLogic'
+import { AlertBanner } from './ui/alert-banner'
 import { Button } from './ui/button'
 import { Container, Stack } from './ui/layout'
 
@@ -25,6 +28,7 @@ const readLocalAuthBypassGateInput = (): LocalAuthBypassGateInput => ({
 
 export const LoginPage = () => {
   const { authError, login, loginWithLocalBypass, isLocalBypassPending, localBypassError } = useAuth()
+  const navigate = useNavigate()
   const [isLoginPending, setIsLoginPending] = useState(false)
   const localAuthBypassGateInput = useMemo(readLocalAuthBypassGateInput, [])
   const isBypassAvailable = isLocalAuthBypassAvailable(localAuthBypassGateInput)
@@ -43,6 +47,9 @@ export const LoginPage = () => {
   const handleLocalBypassLogin = async () => {
     try {
       await loginWithLocalBypass()
+      // Same seam the OAuth callback uses: the bypass now runs from /login,
+      // which renders regardless of auth state, so success must navigate.
+      navigateAfterLogin(navigate)
     } catch {
       // AuthProvider has already surfaced localBypassError.
     }
@@ -95,10 +102,12 @@ export const LoginPage = () => {
           Sign in with Google
         </Button>
 
+        {/* Assertive by role: an error that blocks the user (A-T3e §6), rendered
+            beside the action that retries it — message and retry share one screen. */}
         {authError ? (
-          <p className="m-0 text-label text-error-default" role="alert">
+          <AlertBanner tone="error" title="Sign-in failed" className="w-full text-left">
             {authError}
-          </p>
+          </AlertBanner>
         ) : null}
 
         {/*
@@ -122,9 +131,9 @@ export const LoginPage = () => {
               Continue as local developer
             </Button>
             {localBypassError ? (
-              <p className="m-0 text-label text-error-default" role="alert">
+              <AlertBanner tone="error" title="Local sign-in failed" className="w-full text-left">
                 {localBypassError}
-              </p>
+              </AlertBanner>
             ) : null}
           </>
         ) : null}

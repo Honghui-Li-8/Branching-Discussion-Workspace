@@ -1,5 +1,10 @@
 import { describe, expect, jest, test } from '@jest/globals'
-import { runAuthExchange, type AuthExchangeDeps } from './authCallbackLogic'
+import {
+  navigateAfterLogin,
+  navigateAfterLoginFailure,
+  runAuthExchange,
+  type AuthExchangeDeps,
+} from './authCallbackLogic'
 
 const validUser = {
   id: 'user-1',
@@ -32,18 +37,18 @@ const makeDeps = (overrides: Partial<AuthExchangeDeps> = {}): AuthExchangeDeps =
 })
 
 describe('runAuthExchange', () => {
-  test('null session calls setAuthError with non-empty message and navigates to /', async () => {
+  test('null session calls setAuthError with non-empty message and navigates to /login', async () => {
     const deps = makeDeps()
 
     await runAuthExchange(deps)
 
     expect(deps.setAuthError).toHaveBeenCalledWith(expect.stringMatching(/.+/))
-    expect(deps.navigate).toHaveBeenCalledWith('/', expect.anything())
+    expect(deps.navigate).toHaveBeenCalledWith('/login', { replace: true })
     expect(deps.dispatchAuthUser).not.toHaveBeenCalled()
     expect(deps.postLogin).not.toHaveBeenCalled()
   })
 
-  test('session error calls setAuthError with non-empty message and navigates to /', async () => {
+  test('session error calls setAuthError with non-empty message and navigates to /login', async () => {
     const deps = makeDeps({
       getSession: jest.fn<AuthExchangeDeps['getSession']>().mockResolvedValue({
         data: { session: null },
@@ -54,11 +59,11 @@ describe('runAuthExchange', () => {
     await runAuthExchange(deps)
 
     expect(deps.setAuthError).toHaveBeenCalledWith(expect.stringMatching(/.+/))
-    expect(deps.navigate).toHaveBeenCalledWith('/', expect.anything())
+    expect(deps.navigate).toHaveBeenCalledWith('/login', { replace: true })
     expect(deps.dispatchAuthUser).not.toHaveBeenCalled()
   })
 
-  test('server non-200 calls setAuthError with server error message and navigates to /', async () => {
+  test('server non-200 calls setAuthError with server error message and navigates to /login', async () => {
     const deps = makeDeps({
       ...makeSession('valid-token'),
       postLogin: jest.fn<AuthExchangeDeps['postLogin']>().mockResolvedValue({
@@ -70,7 +75,7 @@ describe('runAuthExchange', () => {
     await runAuthExchange(deps)
 
     expect(deps.setAuthError).toHaveBeenCalledWith('Invalid credential')
-    expect(deps.navigate).toHaveBeenCalledWith('/', expect.anything())
+    expect(deps.navigate).toHaveBeenCalledWith('/login', { replace: true })
     expect(deps.dispatchAuthUser).not.toHaveBeenCalled()
   })
 
@@ -85,5 +90,48 @@ describe('runAuthExchange', () => {
     expect(deps.dispatchAuthUser).toHaveBeenCalledWith(validUser)
     expect(deps.setAuthError).toHaveBeenCalledWith(null)
     expect(deps.navigate).toHaveBeenCalledWith('/', { replace: true })
+  })
+})
+
+describe('post-login navigation seam (A06)', () => {
+  test('navigateAfterLogin lands on the authenticated root, replacing history', () => {
+    const navigate = jest.fn()
+    navigateAfterLogin(navigate)
+    expect(navigate).toHaveBeenCalledWith('/', { replace: true })
+  })
+
+  test('navigateAfterLoginFailure lands on /login, replacing history', () => {
+    const navigate = jest.fn()
+    navigateAfterLoginFailure(navigate)
+    expect(navigate).toHaveBeenCalledWith('/login', { replace: true })
+  })
+
+  test('an unexpected success payload is a failure: no user dispatched, error set, /login', async () => {
+    const deps = makeDeps({
+      ...makeSession('valid-token'),
+      postLogin: jest.fn<AuthExchangeDeps['postLogin']>().mockResolvedValue({
+        ok: true,
+        payload: { authenticated: true, user: { id: 'missing-fields' } },
+      }),
+    })
+
+    await runAuthExchange(deps)
+
+    expect(deps.dispatchAuthUser).not.toHaveBeenCalled()
+    expect(deps.setAuthError).toHaveBeenCalledWith('Unexpected sign-in response.')
+    expect(deps.navigate).toHaveBeenCalledWith('/login', { replace: true })
+  })
+
+  test('a missing Supabase configuration reads as "not configured", not as a generic failure', async () => {
+    const deps = makeDeps({
+      getSession: jest.fn<AuthExchangeDeps['getSession']>().mockRejectedValue(
+        new Error('Supabase is not configured.'),
+      ),
+    })
+
+    await runAuthExchange(deps)
+
+    expect(deps.setAuthError).toHaveBeenCalledWith('Sign-in is not configured yet.')
+    expect(deps.navigate).toHaveBeenCalledWith('/login', { replace: true })
   })
 })

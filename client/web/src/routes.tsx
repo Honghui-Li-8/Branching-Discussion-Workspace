@@ -30,7 +30,14 @@ export const ROUTES: readonly AppRoute[] = [
       </PublicShell>
     ),
   },
-  { path: PATHS.authCallback, element: <AuthCallback /> },
+  {
+    path: PATHS.authCallback,
+    element: (
+      <PublicShell>
+        <AuthCallback />
+      </PublicShell>
+    ),
+  },
   // Catch-all: a real not-found surface with auth-aware recovery, replacing
   // the silent redirect to `/` that used to swallow unknown URLs.
   {
