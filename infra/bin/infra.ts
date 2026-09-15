@@ -1,15 +1,22 @@
 import { App } from 'aws-cdk-lib'
 import { FeasibilityStack } from '../lib/feasibility-stack.js'
 
-// Account and region come from the environment (`CDK_DEFAULT_ACCOUNT` /
-// `CDK_DEFAULT_REGION`, which the CDK CLI populates from the active AWS
-// profile). The region falls back to `cdk.json` context so `cdk synth` works
-// with no credentials at all; the account is never written into the repo.
+// Region: `cdk.json` context first (overridable with `-c region=…`), then
+// `CDK_DEFAULT_REGION`. The CLI always sets that variable — it falls back to
+// us-east-1 when no profile is configured — so env-first would make the
+// committed default dead and the synth depend on whose profile is active.
+// Account: `CDK_DEFAULT_ACCOUNT` only; never written into the repo. Synth
+// needs no credentials. The resolved environment is printed on every run.
 const app = new App()
 const environmentName = (app.node.tryGetContext('environment') as string | undefined) ?? 'feasibility'
-const region = process.env.CDK_DEFAULT_REGION ?? (app.node.tryGetContext('region') as string | undefined)
+const region = (app.node.tryGetContext('region') as string | undefined) ?? process.env.CDK_DEFAULT_REGION
+const account = process.env.CDK_DEFAULT_ACCOUNT
+
+console.error(
+  `[infra] environment=${environmentName} region=${region ?? '<unresolved>'} account=${account ? '<from env>' : '<agnostic>'}`,
+)
 
 new FeasibilityStack(app, `Trellis-${environmentName}-Feasibility`, {
   environmentName,
-  env: { account: process.env.CDK_DEFAULT_ACCOUNT, region },
+  env: { account, region },
 })

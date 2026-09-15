@@ -16,6 +16,7 @@ This project is a 0-to-1 MVP of a branching AI workspace. It is not a production
 - `client/web`: React + Vite frontend for workspace sync, discussion tree rendering, node conversation UI, OAuth entry, and SSE stream consumption.
 - `server`: Express + tRPC backend for auth, ownership-scoped API handlers, turn orchestration, SSE routes, branch services, database access, and postprocess jobs.
 - `shared`: Shared router schemas, metadata contracts, and common types used across the frontend/backend boundary.
+- `infra`: AWS CDK (TypeScript) workspace. Today it holds only the A-T1 feasibility stack — one SSM parameter proving the toolchain synthesizes; the production topology is Phase B work.
 
 The boundary is intentionally typed. The frontend calls tRPC procedures shaped by shared schemas; the backend owns persistence and workflow correctness.
 

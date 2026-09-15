@@ -1,5 +1,6 @@
 # Keep the build context to what the API image needs: workspace manifests,
-# server + shared source. Everything else is excluded explicitly.
+# server + shared source. Everything else is excluded explicitly. No `!`
+# re-includes: nothing under an excluded directory is needed.
 .git
 **/node_modules
 .yarn
@@ -19,8 +20,7 @@ client/**
 **/*.test.tsx
 **/.env
 **/.env.*
-!**/.env.example
-*.md
+**/*.md
 *.log
 test-results
 playwright-report
