@@ -77,7 +77,9 @@ export const PublicShell = ({ children }: { children: ReactNode }) => {
   // Section anchors target the landing, and `/` resolves to the workspace for a
   // signed-in user — so for them the section navigation (header, sheet, footer)
   // would be dead links. The shell keeps identity, CTA and the footer facts.
-  const showSections = authStatus !== 'authenticated'
+  // Rendered only once the visitor is known to be signed out — like the CTA,
+  // nothing is promised while status is unknown, so nothing flashes away.
+  const showSections = authStatus === 'unauthenticated'
   const MenuIcon = ICONS.menu
   const CloseIcon = ICONS.close
 

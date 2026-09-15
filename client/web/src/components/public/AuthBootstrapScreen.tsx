@@ -11,7 +11,7 @@ export const AuthBootstrapScreen = () => {
       <Stack gap="2" align="center" className="py-16 text-center">
         <h1 className="m-0 text-title font-medium text-text-default">Checking sign-in</h1>
         <p role="status" aria-live="polite" className="m-0 text-label text-text-muted">
-          Checking sign-in…
+          One moment while we confirm your session.
         </p>
       </Stack>
     </Container>

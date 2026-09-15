@@ -30,7 +30,7 @@ describe('route resolution (A06)', () => {
     it('unknown: shows the neutral bootstrap state and neither the landing nor the workspace', () => {
       renderWithProviders(<App />, { route: '/', authStatus: 'unknown', fetchImpl: pendingFetch })
 
-      expect(screen.getByRole('status').textContent).toMatch(/checking sign-in/i)
+      expect(screen.getByRole('status').textContent).toMatch(/confirm your session/i)
       expect(heading1()?.textContent).toBe('Checking sign-in')
       expect(screen.queryByRole('link', { name: 'Sign in' })).toBeNull()
     })
@@ -65,14 +65,14 @@ describe('route resolution (A06)', () => {
       expect(screen.getByTestId('workspace-layout')).toBeTruthy()
       expect(screen.queryByRole('heading', { level: 1, name: 'Trellis' })).toBeNull()
       expect(screen.queryByText(/sign in to continue/i)).toBeNull()
-      expect(screen.queryByText(/checking sign-in/i)).toBeNull()
+      expect(screen.queryByRole('heading', { name: 'Checking sign-in' })).toBeNull()
     })
 
     it('bootstrap resolves unauthenticated when the API is unreachable — the landing, never a spinner', async () => {
       renderWithProviders(<App />, { route: '/', authStatus: 'unknown', fetchImpl: failingFetch })
 
       await waitFor(() => expect(heading1()?.textContent).toBe('Trellis'))
-      expect(screen.queryByText(/checking sign-in/i)).toBeNull()
+      expect(screen.queryByRole('heading', { name: 'Checking sign-in' })).toBeNull()
     })
   })
 
@@ -167,7 +167,7 @@ describe('sign-in flow surfaces (A06 Commit 5)', () => {
     } as unknown as ReturnType<typeof supabaseClient.getSupabaseClient>)
     renderWithProviders(<App />, { route: '/auth/callback', authStatus: 'unauthenticated' })
 
-    expect(screen.getByRole('status').textContent).toMatch(/completing sign-in/i)
+    expect(screen.getByRole('status').textContent).toMatch(/hand-off/i)
     expect(screen.getAllByRole('banner')).toHaveLength(1)
     expect(heading1()?.textContent).toBe('Completing sign-in')
     spy.mockRestore()

@@ -74,11 +74,13 @@ describe('PublicShell (A06)', () => {
   })
 
   describe('auth-aware CTA', () => {
-    it('unknown: no action is offered', () => {
+    it('unknown: no action and no section navigation is offered yet', () => {
       renderWithProviders(<Page />, { authStatus: 'unknown' })
       const header = screen.getByRole('banner')
       expect(within(header).queryByRole('link', { name: 'Sign in' })).toBeNull()
       expect(within(header).queryByRole('link', { name: 'Open workspace' })).toBeNull()
+      expect(screen.queryByRole('navigation', { name: 'Sections' })).toBeNull()
+      expect(screen.queryByRole('button', { name: 'Open navigation menu' })).toBeNull()
     })
 
     it('unauthenticated: Sign in → /login', () => {
