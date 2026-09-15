@@ -53,6 +53,29 @@ export const assertSafeHostedAuthConfig = (): void => {
   }
 }
 
+// The credentials the server needs in order to verify a real sign-in. provider.ts reads both with
+// non-null assertions inside a lazy singleton; that is safe only because the process cannot reach a
+// request-serving state without this guard passing first. Without it a host missing its
+// service-role key boots cleanly, answers /health with status ok, and fails at the first
+// reviewer's login attempt -- late and quietly, on exactly the path a review environment exists to
+// exercise.
+const HOSTED_AUTH_CREDENTIALS = ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY'] as const
+
+export const assertHostedAuthCredentialsPresent = (): void => {
+  if (isDevelopmentAppEnv()) {
+    return
+  }
+
+  const missingNames = HOSTED_AUTH_CREDENTIALS.filter((name) => !process.env[name])
+  if (missingNames.length > 0) {
+    throw new Error(
+      `Refusing to start: ${missingNames.join(', ')} must be set outside APP_ENV=development; ` +
+        'without it the server cannot verify a real sign-in. ' +
+        'Set these in the host secret storage, or set APP_ENV=development to use the local bypass.',
+    )
+  }
+}
+
 // AUTH_BACKDOOR_TOKEN is no longer read as a credential. Outside development the startup guard
 // above rejects it outright; inside development it would otherwise be ignored in silence, leaving
 // a developer with a working-looking config and a bare 401.

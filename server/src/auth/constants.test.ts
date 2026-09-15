@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globals'
 import {
+  assertHostedAuthCredentialsPresent,
   assertSafeHostedAuthConfig,
   evaluateLocalAuthPolicy,
   isLoopbackOrigin,
@@ -119,6 +120,68 @@ describe('assertSafeHostedAuthConfig', () => {
   test('does not leak configured values into the failure message', () => {
     process.env.DEV_AUTH_TOKEN = 'dev-token-123'
     expect(() => assertSafeHostedAuthConfig()).not.toThrow(/dev-token-123/)
+  })
+})
+
+describe('assertHostedAuthCredentialsPresent', () => {
+  afterEach(() => {
+    delete process.env.APP_ENV
+    delete process.env.SUPABASE_URL
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY
+  })
+
+  test('throws naming SUPABASE_URL when only it is missing outside development', () => {
+    process.env.APP_ENV = 'review'
+    process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role-key'
+    expect(() => assertHostedAuthCredentialsPresent()).toThrow(/SUPABASE_URL/)
+    expect(() => assertHostedAuthCredentialsPresent()).not.toThrow(/SUPABASE_SERVICE_ROLE_KEY/)
+  })
+
+  test('throws naming SUPABASE_SERVICE_ROLE_KEY when only it is missing outside development', () => {
+    process.env.APP_ENV = 'review'
+    process.env.SUPABASE_URL = 'https://example.supabase.co'
+    expect(() => assertHostedAuthCredentialsPresent()).toThrow(/SUPABASE_SERVICE_ROLE_KEY/)
+  })
+
+  test('throws naming both variables when both are missing', () => {
+    process.env.APP_ENV = 'review'
+    expect(() => assertHostedAuthCredentialsPresent()).toThrow(
+      /SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY/,
+    )
+  })
+
+  test('throws when APP_ENV is unset and the credentials are missing', () => {
+    expect(() => assertHostedAuthCredentialsPresent()).toThrow(/SUPABASE_URL/)
+  })
+
+  test('does not throw when both credentials are present outside development', () => {
+    process.env.APP_ENV = 'review'
+    process.env.SUPABASE_URL = 'https://example.supabase.co'
+    process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role-key'
+    expect(() => assertHostedAuthCredentialsPresent()).not.toThrow()
+  })
+
+  test('does not throw in APP_ENV=development, which uses the bypass rather than real credentials', () => {
+    process.env.APP_ENV = 'development'
+    expect(() => assertHostedAuthCredentialsPresent()).not.toThrow()
+
+    process.env.SUPABASE_URL = 'https://example.supabase.co'
+    process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role-key'
+    expect(() => assertHostedAuthCredentialsPresent()).not.toThrow()
+  })
+
+  test('does not leak a configured value into the failure message', () => {
+    process.env.APP_ENV = 'review'
+    process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-sentinel-service-role-value'
+    expect(() => assertHostedAuthCredentialsPresent()).not.toThrow(
+      /test-sentinel-service-role-value/,
+    )
+  })
+
+  test('states the remedy for both local and hosted environments', () => {
+    process.env.APP_ENV = 'review'
+    expect(() => assertHostedAuthCredentialsPresent()).toThrow(/host secret storage/)
+    expect(() => assertHostedAuthCredentialsPresent()).toThrow(/set APP_ENV=development/)
   })
 })
 

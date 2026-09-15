@@ -11,6 +11,7 @@ import { createAppRouterContext } from './trpcContext.js'
 import { registerConversationStreamRoutes } from './chat/stream/routes.js'
 import { createLogger, getServerLogLevel } from './logging/logger.js'
 import {
+  assertHostedAuthCredentialsPresent,
   assertSafeHostedAuthConfig,
   isLoopbackOrigin,
   warnOnRetiredDevAuthAlias,
@@ -26,10 +27,15 @@ const app = express()
 const PORT = Number(process.env.PORT) || 3001
 const logger = createLogger('server')
 
+// One place in the codebase decides whether this server may serve traffic. Order matters: a host
+// that wrongly carries dev-auth configuration is rejected for that reason rather than for a
+// missing Supabase key. The thrown error names the offending or missing variables and never
+// prints their values.
 try {
   assertSafeHostedAuthConfig()
+  assertHostedAuthCredentialsPresent()
 } catch (error) {
-  logger.error('Refusing to start: unsafe development-auth configuration detected.', { error })
+  logger.error('Refusing to start: auth configuration rejected.', { error })
   process.exit(1)
 }
 
