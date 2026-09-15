@@ -4,6 +4,12 @@ on:
   pull_request:
     branches:
       - main
+  # The review branch is an environment pointer, not a feature branch: a push to it deploys the
+  # review API. fly-deploy.yml gates on this workflow via workflow_run, which needs a CI run on
+  # that push to observe -- without this trigger a push to review produces none.
+  push:
+    branches:
+      - review
 
 permissions:
   contents: read

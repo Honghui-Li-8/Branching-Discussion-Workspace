@@ -1,0 +1,43 @@
+name: Deploy review API to Fly
+
+# Fly has no native git-push deploy. This runs on CI's completion rather than on push, so a red
+# build never reaches reviewers. GitHub dispatches workflow_run only from the copy of this file on
+# the default branch, so it cannot be exercised end-to-end until it is on main.
+on:
+  workflow_run:
+    workflows: ["CI"] # matches ci.yml's `name:`, not its filename
+    types: [completed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fly-deploy-review
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy
+    # `event == 'push'` is load-bearing: without it a pull request whose *head* branch is review
+    # would also satisfy head_branch, and a green PR run would deploy a commit nobody pushed.
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'review'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the commit CI went green on
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      # Pinned to a full commit SHA, not @master and not a bare tag: a tag is mutable and can be
+      # repointed at new code without this workflow changing, and this action runs next to a
+      # deploy credential. Resolved from `gh api repos/superfly/flyctl-actions/tags`.
+      - name: Set up flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # 1.6
+
+      - name: Deploy
+        run: flyctl deploy --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

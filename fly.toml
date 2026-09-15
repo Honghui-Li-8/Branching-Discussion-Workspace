@@ -1,0 +1,58 @@
+# Fly.io configuration for the A00b review API.
+#
+# Non-secret configuration only. Every credential (DATABASE_URL, SUPABASE_URL,
+# SUPABASE_SERVICE_ROLE_KEY, CORS_ORIGIN, OPENAI_API_KEY) is set as Fly app configuration at
+# provisioning time and never appears here. CORS_ORIGIN is deliberately absent: the exact Vercel
+# origin does not exist until the owner provisions it, and no code change is needed for hosted CORS
+# -- isAllowedCorsOrigin in server/src/index.ts switches to an exact allowlist as soon as
+# CORS_ORIGIN is non-empty and never widens to a credentials-enabled wildcard.
+#
+# The image is authored by A-T1 (repo-root Dockerfile), not by this ticket. Its published contract:
+#   ENTRYPOINT ["node", "--import", "tsx"]   CMD ["src/index.ts"]
+#   WORKDIR /app/server   USER node   ENV PORT=3001   EXPOSE 3001
+# If that contract changes -- entrypoint, workdir, port, or which files are copied -- re-check
+# release_command, internal_port and [build] below before deploying.
+
+app = "trellis-review-api"          # owner confirms the created app name
+primary_region = "yyz"              # owner confirms the region
+
+[build]
+  dockerfile = "Dockerfile"         # repo-root Dockerfile from A-T1; build context is this file's directory
+
+[deploy]
+  # Appended to the image ENTRYPOINT ["node", "--import", "tsx"] and run from WORKDIR /app/server,
+  # so the whole command is: node --import tsx src/db/migrate.ts up
+  # A bare script path, not a `yarn workspace server db:migrate` string -- that would be appended
+  # to the entrypoint and fail. Runs in a one-off machine before the new version takes traffic; a
+  # failing migration aborts the deploy.
+  release_command = "src/db/migrate.ts up"
+  # Raised above Fly's 5-minute default: the predicted first failure is a cold Supabase free-tier
+  # project taking minutes to wake before the first migration can connect.
+  release_command_timeout = "10m"
+
+[env]
+  # Not a secret, and the single signal the cookie and startup guards key off. Committed here so
+  # "this host is never development" is auditable in the repository rather than a dashboard
+  # checkbox. PORT is deliberately not set: the image already exports PORT=3001, and internal_port
+  # below would have to move with it.
+  APP_ENV = "review"
+
+[http_service]
+  internal_port = 3001
+  force_https = true
+  auto_start_machines = true
+  # The session store is a process-local Map, so a stopped machine clears every session. Only a
+  # deploy should log reviewers out. ("off" is the current string form of the older `false`.)
+  auto_stop_machines = "off"
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    method = "GET"
+    path = "/health"
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "10s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
