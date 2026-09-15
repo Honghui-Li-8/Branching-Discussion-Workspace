@@ -35,6 +35,12 @@ describe('SystemShowcaseGallery (A-T3d)', () => {
     renderWithProviders(<SystemShowcaseGallery />)
 
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1)
+    // Outline is a tree: top-level sections are h2, component subsections h3.
+    expect(screen.getAllByRole('heading', { level: 2 })).toHaveLength(6)
+    expect(screen.getAllByRole('heading', { level: 3 }).length).toBeGreaterThanOrEqual(9)
+    // Every id in the document is unique (the swept card renders five times).
+    const ids = [...document.querySelectorAll('[id]')].map((el) => el.id)
+    expect(new Set(ids).size).toBe(ids.length)
     for (const id of ['type', 'spacing', 'layout', 'conventions', 'components', 'gaps']) {
       expect(document.getElementById(id)?.tagName).toBe('SECTION')
     }

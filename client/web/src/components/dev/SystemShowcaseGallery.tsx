@@ -1,4 +1,4 @@
-import { useLayoutEffect, useState, type ReactNode } from 'react'
+import { useId, useLayoutEffect, useState, type ReactNode } from 'react'
 import type { ColumnDef } from '@tanstack/react-table'
 import { Button } from '../ui/button'
 import { Link } from '../ui/link'
@@ -38,6 +38,14 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from '../ui/hover-card'
 import { ScrollArea } from '../ui/scroll-area'
 import { AlertBanner } from '../ui/alert-banner'
 import { AlertPopupProvider, useAlertPopup } from '../ui/alert-popup'
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuLabel,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from '../ui/context-menu'
 import { Checkbox, RadioGroup, RadioGroupItem, Switch, ToggleGroup, ToggleGroupItem } from '../ui/toggles'
 import { Progress } from '../ui/progress'
 import {
@@ -167,11 +175,25 @@ const COMBO_OPTIONS = [
   { value: 'auth', label: 'Auth flow' },
 ]
 
-function Section({ id, title, note, children }: { id: string; title: string; note?: string; children: ReactNode }) {
+function Section({
+  id,
+  title,
+  note,
+  level = 2,
+  children,
+}: {
+  id: string
+  title: string
+  note?: string
+  /** Heading level: sections nested inside another Section pass 3 so the outline stays a tree (A-T3e §4). */
+  level?: 2 | 3
+  children: ReactNode
+}) {
+  const Heading = level === 3 ? 'h3' : 'h2'
   return (
     <Stack as="section" id={id} aria-labelledby={`${id}-heading`} gap="4" className="rounded-lg border border-border-default bg-bg-subtle p-5">
       <div>
-        <h2 id={`${id}-heading`} className="text-heading font-medium text-text-default">{title}</h2>
+        <Heading id={`${id}-heading`} className="text-heading font-medium text-text-default">{title}</Heading>
         {note ? <p className="mt-1 max-w-prose text-caption text-text-muted">{note}</p> : null}
       </div>
       {children}
@@ -309,6 +331,9 @@ function LayoutPrimitives() {
 
 /** The composition swept across container widths: a real card, not a box. */
 function SweptCard() {
+  // Rendered once per sweep width; ids must be unique per instance or every
+  // label resolves to the first card's input.
+  const id = useId()
   return (
     <Stack gap="4" className="rounded-lg border border-border-default bg-bg-default p-4">
       <Cluster justify="between" gap="3">
@@ -316,8 +341,8 @@ function SweptCard() {
         <Badge status="exploring">exploring</Badge>
       </Cluster>
       <AlertBanner tone="warning" title="12 commits behind">This branch has not merged in a while.</AlertBanner>
-      <FormField id="swept-name" label="Workspace name">
-        <Input id="swept-name" defaultValue="Database selection" />
+      <FormField id={id} label="Workspace name">
+        <Input id={id} defaultValue="Database selection" />
       </FormField>
       <Cluster gap="2" justify="end">
         <Button variant="secondary" size="sm">Cancel</Button>
@@ -397,7 +422,7 @@ function Components() {
 
   return (
     <Stack gap="6">
-      <Section id="c-button" title="Button" note="primary / secondary / ghost / destructive · three sizes · disabled and width-stable pending.">
+      <Section id="c-button" level={3} title="Button" note="primary / secondary / ghost / destructive · three sizes · disabled and width-stable pending.">
         <Cluster gap="3">
           <Button variant="primary">Primary</Button>
           <Button variant="secondary">Secondary</Button>
@@ -410,7 +435,7 @@ function Components() {
         </Cluster>
       </Section>
 
-      <Section id="c-link" title="Link" note="Three render paths (A06): internal route, section anchor, external. Hover-underline for interactive contexts; always-underline for prose.">
+      <Section id="c-link" level={3} title="Link" note="Three render paths (A06): internal route, section anchor, external. Hover-underline for interactive contexts; always-underline for prose.">
         <Cluster gap="4">
           <Link to={PATHS.login}>Internal route</Link>
           <Link to="/#features">Section anchor</Link>
@@ -419,7 +444,7 @@ function Components() {
         </Cluster>
       </Section>
 
-      <Section id="c-form" title="Form — field, input, textarea, validation, combobox, toggles">
+      <Section id="c-form" level={3} title="Form — field, input, textarea, validation, combobox, toggles">
         <Stack gap="4" className="max-w-md">
           <FormField id="g-name" label="Workspace name">
             <Input id="g-name" placeholder="e.g. Database selection" />
@@ -449,11 +474,11 @@ function Components() {
         </Stack>
       </Section>
 
-      <Section id="c-badge" title="Badge" note="All 10 statuses. exploring/selected share accent deliberately; folded/read-only share the neutral treatment.">
+      <Section id="c-badge" level={3} title="Badge" note="All 10 statuses. exploring/selected share accent deliberately; folded/read-only share the neutral treatment.">
         <Cluster gap="2">{ALL_STATUSES.map((s) => <Badge key={s} status={s}>{s}</Badge>)}</Cluster>
       </Section>
 
-      <Section id="c-alert" title="Alert banner and popup" note="Persistent in-page status (error tone is role=alert), and the imperative popup.">
+      <Section id="c-alert" level={3} title="Alert banner and popup" note="Persistent in-page status (error tone is role=alert), and the imperative popup.">
         <Stack gap="2" className="max-w-xl">
           <AlertBanner tone="success" title="Success">Branch merged successfully.</AlertBanner>
           <AlertBanner tone="warning" title="Warning">This branch is 12 commits behind main.</AlertBanner>
@@ -463,7 +488,7 @@ function Components() {
         <PopupDemo />
       </Section>
 
-      <Section id="c-overlays" title="Overlays" note="dialog · alert-dialog · sheet · dropdown · popover · tooltip · hover card — shadow tokens, named z-index roles, 200ms motion.">
+      <Section id="c-overlays" level={3} title="Overlays" note="dialog · alert-dialog · sheet · dropdown · popover · tooltip · hover card — shadow tokens, named z-index roles, 200ms motion.">
         <Cluster gap="3">
           <Dialog>
             <DialogTrigger asChild><Button variant="secondary">Dialog</Button></DialogTrigger>
@@ -520,9 +545,25 @@ function Components() {
             </HoverCardContent>
           </HoverCard>
         </Cluster>
+        <div>
+          <p className="mb-1.5 text-label font-medium text-text-default">Context menu (right-click)</p>
+          <ContextMenu>
+            <ContextMenuTrigger asChild>
+              <div className="flex h-20 w-64 items-center justify-center rounded-md border border-dashed border-border-strong text-label text-text-muted">
+                Right-click me
+              </div>
+            </ContextMenuTrigger>
+            <ContextMenuContent>
+              <ContextMenuLabel>Database selection</ContextMenuLabel>
+              <ContextMenuItem><ICONS.rename className="size-4" /> Rename</ContextMenuItem>
+              <ContextMenuSeparator />
+              <ContextMenuItem destructive><ICONS.delete className="size-4" /> Delete</ContextMenuItem>
+            </ContextMenuContent>
+          </ContextMenu>
+        </div>
       </Section>
 
-      <Section id="c-data" title="Data display" note="table · data-table (sort/filter/paginate) · progress · skeleton / spinner · separator · scroll area.">
+      <Section id="c-data" level={3} title="Data display" note="table · data-table (sort/filter/paginate) · progress · skeleton / spinner · separator · scroll area.">
         <Stack gap="6">
           <div className="max-w-lg">
             <Table>
@@ -568,7 +609,7 @@ function Components() {
         </Stack>
       </Section>
 
-      <Section id="c-disclosure" title="Disclosure and navigation" note="tabs · accordion · breadcrumb · pagination.">
+      <Section id="c-disclosure" level={3} title="Disclosure and navigation" note="tabs · accordion · breadcrumb · pagination.">
         <Stack gap="6">
           <Tabs defaultValue="tree">
             <TabsList>
@@ -599,16 +640,16 @@ function Components() {
             </BreadcrumbList>
           </Breadcrumb>
           <Pagination>
-            <PaginationItem>‹</PaginationItem>
+            <PaginationItem aria-label="Previous page">‹</PaginationItem>
             <PaginationItem active>1</PaginationItem>
             <PaginationItem>2</PaginationItem>
             <PaginationItem>3</PaginationItem>
-            <PaginationItem>›</PaginationItem>
+            <PaginationItem aria-label="Next page">›</PaginationItem>
           </Pagination>
         </Stack>
       </Section>
 
-      <Section id="c-command" title="Command palette and resizable panels">
+      <Section id="c-command" level={3} title="Command palette and resizable panels">
         <Stack gap="6">
           <div className="max-w-md overflow-hidden rounded-lg border border-border-default">
             <Command>
@@ -701,6 +742,11 @@ export function SystemShowcaseGallery() {
                     cannot take its name from content, so the placeholder text is its value, not its
                     label, and the component exposes no `aria-label`/`id` route (axe `button-name`,
                     critical). Surfaced by this page's scan; routed to A13 rather than patched here.
+                  </li>
+                  <li>
+                    The shipped Pagination gives consumers no built-in previous/next control; the
+                    specimen names its glyph buttons itself with `aria-label`. A named pair belongs
+                    in the component (A13).
                   </li>
                   <li>
                     A11a still carries three pinned component widths from the sizing audit; they are not on this
