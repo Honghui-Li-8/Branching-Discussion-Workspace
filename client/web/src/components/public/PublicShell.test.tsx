@@ -53,7 +53,7 @@ describe('PublicShell (A06)', () => {
   it('header navigation lists the section anchors', () => {
     renderWithProviders(<Page />)
 
-    const nav = screen.getAllByRole('navigation', { name: 'Sections' })[0]
+    const nav = screen.getByRole('navigation', { name: 'Sections' })
     expect(within(nav).getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual([
       '/#features',
       '/#roadmap',
@@ -87,10 +87,15 @@ describe('PublicShell (A06)', () => {
       expect(cta.getAttribute('href')).toBe('/login')
     })
 
-    it('authenticated: Open workspace → /', () => {
+    it('authenticated: Open workspace → /, and no section navigation anywhere', () => {
       renderWithProviders(<Page />, { authStatus: 'authenticated' })
       const cta = within(screen.getByRole('banner')).getByRole('link', { name: 'Open workspace' })
       expect(cta.getAttribute('href')).toBe('/')
+      // `/` is the workspace for this user, so section anchors would be dead links.
+      expect(screen.queryByRole('navigation', { name: 'Sections' })).toBeNull()
+      expect(screen.queryByRole('button', { name: 'Open navigation menu' })).toBeNull()
+      expect(within(screen.getByRole('contentinfo')).queryByRole('link', { name: 'Features' })).toBeNull()
+      expect(within(screen.getByRole('contentinfo')).getByRole('link', { name: 'GitHub' })).toBeTruthy()
     })
   })
 

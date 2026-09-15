@@ -29,7 +29,7 @@ export const LandingRoute = () => {
             id={section.id}
             tabIndex={-1}
             aria-labelledby={`${section.id}-heading`}
-            className="scroll-mt-6 outline-none"
+            className="scroll-mt-6 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-accent-default focus-visible:ring-offset-2"
           >
             <h2 id={`${section.id}-heading`} className="text-heading font-medium text-text-default">
               {section.label}

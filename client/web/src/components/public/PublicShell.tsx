@@ -73,6 +73,11 @@ const SectionLinks = ({ onNavigate, className }: { onNavigate?: () => void; clas
 
 export const PublicShell = ({ children }: { children: ReactNode }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const authStatus = useAppSelector(selectAuthStatus)
+  // Section anchors target the landing, and `/` resolves to the workspace for a
+  // signed-in user — so for them the section navigation (header, sheet, footer)
+  // would be dead links. The shell keeps identity, CTA and the footer facts.
+  const showSections = authStatus !== 'authenticated'
   const MenuIcon = ICONS.menu
   const CloseIcon = ICONS.close
 
@@ -99,15 +104,18 @@ export const PublicShell = ({ children }: { children: ReactNode }) => {
               Trellis
             </Link>
 
-            <nav aria-label="Sections" className="hidden lg:block">
-              <Cluster as="ul" gap="6" className="list-none p-0">
-                <SectionLinks className={headerLinkClasses} />
-              </Cluster>
-            </nav>
+            {showSections ? (
+              <nav aria-label="Sections" className="hidden lg:block">
+                <Cluster as="ul" gap="6" className="list-none p-0">
+                  <SectionLinks className={headerLinkClasses} />
+                </Cluster>
+              </nav>
+            ) : null}
 
             <Cluster gap="3">
               <AuthCta />
 
+              {showSections ? (
               <Sheet open={isMenuOpen} onOpenChange={setIsMenuOpen}>
                 <SheetTrigger
                   className={cn(
@@ -130,7 +138,7 @@ export const PublicShell = ({ children }: { children: ReactNode }) => {
                       </SheetClose>
                     </Cluster>
                     <SheetDescription className="sr-only">Sections of this page</SheetDescription>
-                    <nav aria-label="Sections">
+                    <nav aria-label="Sections menu">
                       <Stack as="ul" gap="1" className="list-none p-0">
                         <SectionLinks onNavigate={() => setIsMenuOpen(false)} />
                       </Stack>
@@ -138,6 +146,7 @@ export const PublicShell = ({ children }: { children: ReactNode }) => {
                   </Stack>
                 </SheetContent>
               </Sheet>
+              ) : null}
             </Cluster>
           </Cluster>
         </Container>
@@ -152,7 +161,7 @@ export const PublicShell = ({ children }: { children: ReactNode }) => {
           <Stack gap="4" className="py-8">
             <nav aria-label="Footer">
               <Cluster as="ul" gap="6" className="list-none p-0">
-                <SectionLinks />
+                {showSections ? <SectionLinks /> : null}
                 <li>
                   <Link href={REPOSITORY_URL} target="_blank" className="inline-block py-2">
                     GitHub
