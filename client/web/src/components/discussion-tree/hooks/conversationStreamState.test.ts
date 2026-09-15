@@ -591,7 +591,7 @@ describe('regression: normal conversationSend flow unaffected by branch follow-u
       ],
     ]
 
-    for (const [label, buildPriorState] of scenarios) {
+    for (const [, buildPriorState] of scenarios) {
       const stateBeforeReset = buildPriorState()
       const stateAfterReset = conversationStreamReducer(stateBeforeReset, { type: 'reset' })
       expect(stateAfterReset).toEqual(initialConversationStreamState)

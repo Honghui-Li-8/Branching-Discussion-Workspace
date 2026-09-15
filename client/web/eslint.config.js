@@ -6,7 +6,7 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  globalIgnores(['dist', 'eslint-fixtures']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [
@@ -21,7 +21,7 @@ export default defineConfig([
     },
   },
   {
-    // A-T3b — fluid sizing convention, enforced.
+    // ADR-0003 (ticket A-T3b) — fluid sizing convention, enforced.
     //
     // Flags arbitrary pixel values on the six inline/block SIZING properties
     // (w, h, min-w, max-w, min-h, max-h). A component that pins its own size
@@ -38,9 +38,9 @@ export default defineConfig([
     //
     // 23 pre-existing violations were audited and deliberately left in place
     // rather than bulk-fixed — they belong to the surfaces that own them
-    // (A-T3c, then the A06–A11b rebuilds). So this is a ratchet on new code:
+    // (the surface rebuilds; the three that remain belong to A11a). So this is a ratchet on new code:
     // set to 'warn' so it does not fail a build that already carries the
-    // debt, to be raised to 'error' once A-T3c clears it.
+    // debt, to be raised to 'error' once A11a clears its three pins.
     files: ['**/*.{ts,tsx}'],
     rules: {
       'no-restricted-syntax': [
@@ -49,13 +49,13 @@ export default defineConfig([
           selector:
             'Literal[value=/(^|\\s)([a-z0-9-]+:)*!?(w|h)-\\[[0-9.]{2,}px\\]/]',
           message:
-            'Fluid sizing (A-T3b): do not pin width or height in px — it blocks container-query adoption. Minimums and maximums are constraints, not pins, and are not matched, nor are hairlines under 10px where px is the correct unit; page-level overflow risk from a large min-* is covered by the A-T3e no-horizontal-overflow rule and its reflow harness. Use a spacing-scale step (w-64, p-4), a relative unit (w-full, min-w-0), or a semantic max-width. px remains correct inside shadows, blurs and hairlines.',
+            'Fluid sizing (ADR-0003): do not pin width or height in px — it blocks container-query adoption. Minimums and maximums are constraints, not pins, and are not matched, nor are hairlines under 10px where px is the correct unit; page-level overflow risk from a large min-* is covered by ADR-0004\'s no-horizontal-overflow rule and its reflow harness. Use a spacing-scale step (w-64, p-4), a relative unit (w-full, min-w-0), or a semantic max-width. px remains correct inside shadows, blurs and hairlines.',
         },
         {
           selector:
             'TemplateElement[value.raw=/(^|\\s)([a-z0-9-]+:)*!?(w|h)-\\[[0-9.]{2,}px\\]/]',
           message:
-            'Fluid sizing (A-T3b): do not pin width or height in px — it blocks container-query adoption. Minimums and maximums are constraints, not pins, and are not matched, nor are hairlines under 10px where px is the correct unit; page-level overflow risk from a large min-* is covered by the A-T3e no-horizontal-overflow rule and its reflow harness. Use a spacing-scale step (w-64, p-4), a relative unit (w-full, min-w-0), or a semantic max-width. px remains correct inside shadows, blurs and hairlines.',
+            'Fluid sizing (ADR-0003): do not pin width or height in px — it blocks container-query adoption. Minimums and maximums are constraints, not pins, and are not matched, nor are hairlines under 10px where px is the correct unit; page-level overflow risk from a large min-* is covered by ADR-0004\'s no-horizontal-overflow rule and its reflow harness. Use a spacing-scale step (w-64, p-4), a relative unit (w-full, min-w-0), or a semantic max-width. px remains correct inside shadows, blurs and hairlines.',
         },
       ],
     },

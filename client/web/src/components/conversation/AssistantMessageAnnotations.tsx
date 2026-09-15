@@ -827,10 +827,6 @@ export const AssistantMessageAnnotationWrapper = ({
   const isPersistedMessageId = useMemo(() => isUuid(messageId), [messageId])
   const shouldEnableAnnotations = isPersistedMessageId
 
-  useEffect(() => {
-    setIsBranchPending(false)
-  }, [messageId])
-
   const annotationSource = useMemo(() => buildAnnotationSource(messageId), [messageId])
   const messageAnnotationsQuery = trpc.messageAnnotationsByMessage.useQuery(
     { messageId },

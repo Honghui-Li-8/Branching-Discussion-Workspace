@@ -21,7 +21,8 @@ import type { BranchFollowupBootstrap } from './discussion-tree/hooks/useDiscuss
 import { invalidateMessagesByNode, invalidateNodesByWorkspace } from './discussion-tree/hooks/mutationInvalidation'
 import { parseMergeProposalMetadata, STRUCTURAL_MESSAGE_TYPES } from '@branching/shared'
 import { isMergeProposalPending } from './merge/mergeProposalCardLogic'
-import { ConversationComposer, CHAT_INPUT_MAX_HEIGHT, CHAT_INPUT_MIN_HEIGHT, CHAT_MODELS } from './conversation/ConversationComposer'
+import { ConversationComposer } from './conversation/ConversationComposer'
+import { CHAT_INPUT_MAX_HEIGHT, CHAT_INPUT_MIN_HEIGHT, CHAT_MODELS } from './conversation/conversationComposerConstants'
 import { ConversationMessageList } from './conversation/ConversationMessageList'
 import { ConversationPanelHeader } from './conversation/ConversationPanelHeader'
 
@@ -152,6 +153,11 @@ export const NodeConversationPanel = ({
     await invalidateAfterMergeAction()
   }, [invalidateAfterMergeAction])
 
+  // Declared ahead of the callbacks and mutation handlers that capture them, so the
+  // React Compiler lint can see they are refs before a hook closes over them.
+  const mergeCompletionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const mergeActionTokenRef = useRef(0)
+
   const onMergeActionPending = useCallback((label: string): number => {
     mergeActionTokenRef.current += 1
     setMergeStatusLabel(label)
@@ -200,13 +206,10 @@ export const NodeConversationPanel = ({
 
   const startXRef = useRef(0)
   const startWidthRef = useRef(0)
-  const mergeCompletionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const mergeActionTokenRef = useRef(0)
   const conversationScrollRef = useRef<HTMLDivElement | null>(null)
   const conversationBottomAnchorRef = useRef<HTMLDivElement | null>(null)
   const conversationInputRef = useRef<HTMLTextAreaElement | null>(null)
   const isPinnedToBottomRef = useRef(true)
-  const stageOrderRef = useRef<TurnStage[]>([])
   const currentTimedStageRef = useRef<TurnStage | null>(null)
   const currentStageStartedAtMsRef = useRef<number | null>(null)
   const [statusTimerStartedAtMs, setStatusTimerStartedAtMs] = useState<number | null>(null)
@@ -228,7 +231,10 @@ export const NodeConversationPanel = ({
   const hasActiveStreamStatus =
     Boolean(streamStatusLabel) && !(streamStatusLabel?.startsWith('Error:') ?? false)
   const runtimeSummary = (() => {
-    const stageOrder = stageOrderRef.current
+    // Stage order is the insertion order of stageDurationsMs: a stage's key is added
+    // the first time it completes and both are cleared together, so no separate
+    // ordering ref is needed (and reading one during render would go stale).
+    const stageOrder = Object.keys(stageDurationsMs) as TurnStage[]
     if (stageOrder.length === 0) {
       return null
     }
@@ -378,9 +384,6 @@ export const NodeConversationPanel = ({
       currentStageStartedAtMsRef.current !== null
     ) {
       const elapsedMs = Math.max(0, now - currentStageStartedAtMsRef.current)
-      if (!stageOrderRef.current.includes(previousStage)) {
-        stageOrderRef.current.push(previousStage)
-      }
       setStageDurationsMs((current) => ({
         ...current,
         [previousStage]: (current[previousStage] ?? 0) + elapsedMs,
@@ -403,9 +406,9 @@ export const NodeConversationPanel = ({
   }, [conversation.streamStage, hasActiveStreamStatus])
 
   useEffect(() => {
-    stageOrderRef.current = []
     currentTimedStageRef.current = null
     currentStageStartedAtMsRef.current = null
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- deliberate reset on node.id change; the timer and stage state must clear together with the refs above. Restructuring belongs to A11a's conversation-panel rework, not a lint pass.
     setStageDurationsMs({})
     setStatusTimerStartedAtMs(null)
     setStatusTimerNowMs(0)
@@ -424,6 +427,7 @@ export const NodeConversationPanel = ({
     if (!mergeStatusLabel) {
       return
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- clears the prior completion message as this effect starts the merge timer; the two must not be visible together. Restructuring belongs to A11a's conversation-panel rework, not a lint pass.
     setMergeCompletionMessage(null)
     if (mergeCompletionTimeoutRef.current !== null) {
       clearTimeout(mergeCompletionTimeoutRef.current)
@@ -502,7 +506,6 @@ export const NodeConversationPanel = ({
 
     setSendBlockAlert(null)
     setConversationInputText('')
-    stageOrderRef.current = []
     currentTimedStageRef.current = null
     currentStageStartedAtMsRef.current = null
     setStageDurationsMs({})
