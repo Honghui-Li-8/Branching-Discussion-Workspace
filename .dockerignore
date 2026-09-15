@@ -1,6 +1,8 @@
 # Keep the build context to what the API image needs: workspace manifests,
-# server + shared source. Everything else is excluded explicitly. No `!`
-# re-includes: nothing under an excluded directory is needed.
+# server + shared source. Everything else is excluded explicitly. The only `!`
+# re-includes are the two non-installed workspace manifests the lockfile needs
+# to resolve (the Dockerfile COPYs exactly those); nothing else under an
+# excluded directory is required.
 .git
 **/node_modules
 .yarn

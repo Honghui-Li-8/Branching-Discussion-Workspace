@@ -7556,6 +7556,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "infra@workspace:infra"
   dependencies:
+    "@types/jest": "npm:^30.0.0"
     "@types/node": "npm:^25.5.0"
     aws-cdk: "npm:2.1141.0"
     aws-cdk-lib: "npm:2.269.0"

@@ -22,11 +22,13 @@ ARG NODE_VERSION=20
 # ---- deps: install the server workspace (and its workspace dep `shared`) ----
 FROM node:${NODE_VERSION}-bookworm-slim AS deps
 WORKDIR /app
-ENV COREPACK_HOME=/opt/corepack \
-    YARN_ENABLE_IMMUTABLE_INSTALLS=true
+ENV COREPACK_HOME=/opt/corepack
 RUN corepack enable && corepack prepare yarn@4.12.0 --activate
 # Every workspace manifest must be present for the lockfile to resolve, even
 # the ones that are not installed. Adding a workspace means adding a line here.
+# Lockfile immutability is enforced by CI (`yarn install --immutable`), not by
+# this build: `yarn workspaces focus` does not honour the immutable setting, so
+# a drifted lockfile would re-resolve here silently. Build from a CI-green commit.
 COPY package.json yarn.lock .yarnrc.yml ./
 COPY server/package.json server/
 COPY shared/package.json shared/
@@ -49,4 +51,8 @@ WORKDIR /app/server
 ENV PORT=3001
 EXPOSE 3001
 
+# No entrypoint of our own — declared explicitly so the base image's
+# docker-entrypoint.sh (which guesses `node` for unknown first tokens) is not
+# what makes the command contract work.
+ENTRYPOINT []
 CMD ["node", "--import", "tsx", "src/index.ts"]

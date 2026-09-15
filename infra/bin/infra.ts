@@ -1,10 +1,11 @@
 import { App } from 'aws-cdk-lib'
 import { FeasibilityStack } from '../lib/feasibility-stack.js'
 
-// Region: `cdk.json` context first (overridable with `-c region=…`), then
-// `CDK_DEFAULT_REGION`. The CLI always sets that variable — it falls back to
-// us-east-1 when no profile is configured — so env-first would make the
-// committed default dead and the synth depend on whose profile is active.
+// Region: `cdk.json` context (overridable with `-c region=…`). The CLI always
+// sets `CDK_DEFAULT_REGION` — falling back to us-east-1 with no profile — so
+// env-first would make the committed default dead and the synth depend on
+// whose profile is active. The env fallback below is defensive: it is reached
+// only if the `region` key is removed from cdk.json.
 // Account: `CDK_DEFAULT_ACCOUNT` only; never written into the repo. Synth
 // needs no credentials. The resolved environment is printed on every run.
 const app = new App()

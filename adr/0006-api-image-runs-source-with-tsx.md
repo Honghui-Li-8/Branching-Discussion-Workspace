@@ -24,5 +24,7 @@ the type-check script and jest, instead of a second install path.
   against `GET /health`, which today is liveness-only (200 even when the database is down).
 - Adding a yarn workspace means adding its manifest to the Dockerfile's `deps` stage, or the
   lockfile stops resolving inside the build.
-- `infra/` synthesizes with no AWS credentials; account comes from `CDK_DEFAULT_ACCOUNT`, region
-  from `CDK_DEFAULT_REGION` with a `cdk.json` default. Nothing account-specific is committed.
+- `infra/` synthesizes with no AWS credentials. Account comes from `CDK_DEFAULT_ACCOUNT`; region
+  from `cdk.json` context (overridable with `-c region=`), falling back to `CDK_DEFAULT_REGION`
+  only if that key is ever removed — the CLI always sets the variable, so env-first would make
+  the committed default dead. Nothing account-specific is committed.
