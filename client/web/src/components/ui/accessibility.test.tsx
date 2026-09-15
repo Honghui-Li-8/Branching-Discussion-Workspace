@@ -21,6 +21,7 @@ import { render } from '@testing-library/react'
 import { axe, toHaveNoViolations } from 'jest-axe'
 
 import { Button } from './button'
+import { Cluster, Container, Stack } from './layout'
 
 expect.extend(toHaveNoViolations)
 
@@ -97,6 +98,26 @@ describe('accessibility harness (ADR-0004)', () => {
   describe('real shipped components', () => {
     it('Button has no serious violations', async () => {
       const { container } = render(<Button>Approve and merge</Button>)
+
+      expect(await seriousViolations(container)).toHaveLength(0)
+    })
+
+    it('layout primitives compose into a landmark without serious violations', async () => {
+      // A06: registration, not evidence — inert containers pass axe by
+      // construction. Listed so the shell's building blocks are on record
+      // as scanned, and so an `as` misuse (a Stack rendered as an unlabeled
+      // region, say) would surface here.
+      const { container } = render(
+        <Container as="main">
+          <Stack as="section" aria-label="Facts" gap="6">
+            <h1>Trellis</h1>
+            <Cluster as="ul" gap="2">
+              <li>one</li>
+              <li>two</li>
+            </Cluster>
+          </Stack>
+        </Container>,
+      )
 
       expect(await seriousViolations(container)).toHaveLength(0)
     })

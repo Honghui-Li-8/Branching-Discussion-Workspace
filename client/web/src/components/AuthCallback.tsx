@@ -5,9 +5,13 @@ import { useAppDispatch } from '../store/hooks'
 import { setAuthenticatedUser } from '../store/slices/authSlice'
 import { useAuth } from './useAuth'
 import { runAuthExchange } from './authCallbackLogic'
+import { apiBaseUrl } from '../lib/env'
+import { Container, Stack } from './ui/layout'
 
-const apiBaseUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:3001'
-
+// A06 — the OAuth return. This surface renders the pending state only; every
+// terminal outcome is a navigation (success → authenticated root, cancel or
+// failure → /login with the error beside the retry action), decided in
+// authCallbackLogic. The text is the state: no motion-only indicator (A-T3e §7).
 export const AuthCallback = () => {
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
@@ -43,8 +47,13 @@ export const AuthCallback = () => {
   }, [dispatch, navigate, setAuthError])
 
   return (
-    <div className="grid min-h-screen place-items-center bg-[#f3fbff] px-4 text-sm text-[#456579]">
-      Completing sign-in...
-    </div>
+    <Container>
+      <Stack gap="2" align="center" className="py-16 text-center">
+        <h1 className="m-0 text-title font-medium text-text-default">Completing sign-in</h1>
+        <p role="status" aria-live="polite" className="m-0 text-label text-text-muted">
+          Finishing the hand-off from your sign-in provider.
+        </p>
+      </Stack>
+    </Container>
   )
 }
