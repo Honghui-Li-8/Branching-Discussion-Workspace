@@ -11,7 +11,7 @@
 //    build` output. Vite inlines `import.meta.env.DEV` as a literal, so the
 //    DEV-gated reads below fold to `undefined` and the strings drop out of the
 //    production bundle. The gate has to be *here*, at the read, not only at the
-//    call-site — an ungated read anywhere would put the value in the bundle.
+//    call-site — an unguarded read anywhere would put the value in the bundle.
 //    Verified by grepping the built bundle (A06 Commit 3).
 
 export const isDev: boolean = import.meta.env.DEV

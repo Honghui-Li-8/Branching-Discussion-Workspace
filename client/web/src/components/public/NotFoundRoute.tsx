@@ -18,8 +18,7 @@ export const NotFoundRoute = () => {
         </p>
         <h1 className="m-0 text-title font-semibold text-text-default">Page not found</h1>
         <p className="m-0 text-body text-text-secondary">
-          The page you&rsquo;re looking for doesn&rsquo;t exist or may have moved. Check the URL,
-          or head back.
+          {"The page you're looking for doesn't exist or may have moved. Check the URL, or head back."}
         </p>
         <Cluster as="nav" aria-label="Recovery" gap="4" justify="center">
           {authStatus === 'authenticated' ? (

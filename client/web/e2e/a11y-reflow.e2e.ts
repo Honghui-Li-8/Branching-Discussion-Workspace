@@ -13,7 +13,7 @@
  * push was a tax not worth paying. Reversed 2026-09-06 after five e2e specs sat
  * broken on `main` unnoticed, masking a real product bug.
  *
- * What it measures (A06 retarget, ticket scope addition 2026-09-04):
+ * What it measures (A06 re-target, ticket scope addition 2026-09-04):
  *   - every public route, driven from `src/routePaths.ts` — the same table the
  *     router renders, so a new route is measured the day it exists;
  *   - the public shell with its narrow-screen menu open;
