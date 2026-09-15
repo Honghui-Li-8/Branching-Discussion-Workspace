@@ -61,8 +61,8 @@ everything:
 
 | Harness | Runs | Covers |
 |---|---|---|
-| `src/components/ui/accessibility.test.tsx` (jest-axe) | `yarn test:unit`, and CI | Accessible names, ARIA validity, landmarks, heading order |
-| `e2e/a11y-reflow.e2e.ts` (Playwright) | `yarn test:e2e`, and CI via `yarn test` | No page-level horizontal overflow at sm/md/lg/xl/1440 and at 720px (the 200%-zoom equivalent) |
+| `src/components/ui/accessibility.test.tsx`, `src/App.a11y.test.tsx`, `src/components/public/PublicShell.test.tsx` (jest-axe) | `yarn test:unit`, and CI | Accessible names, ARIA validity, landmarks, heading order — over the ui primitives and every public route composition |
+| `e2e/a11y-reflow.e2e.ts` (Playwright) | `yarn test:e2e`, and CI via `yarn test` | No page-level horizontal overflow at sm/md/lg/xl/1440 and at 720px (the 200%-zoom equivalent) — over every public route (driven from `src/routePaths.ts`, sheet menu open below `lg`) and the signed-in workspace shell (auth and workspace-list requests intercepted, since CI runs no API); plus the cross-route section deep-link scroll-and-focus case |
 
 jsdom has no layout engine, so **contrast, target size, and reflow cannot be checked in the
 unit suite** — they are verified manually or in the Playwright harness. Treat a green unit run
