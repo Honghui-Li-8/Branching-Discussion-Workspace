@@ -7,6 +7,7 @@ import { buttonVariants } from '../ui/button'
 import { Link, useHashFocus } from '../ui/link'
 import { Container, Cluster, Stack } from '../ui/layout'
 import { HowItWorks } from './landing/HowItWorks'
+import { WhereThingsStand } from './landing/WhereThingsStand'
 
 // A07 — the public landing page, rendered inside PublicShell.
 //
@@ -95,6 +96,7 @@ const Hero = () => {
  */
 const SECTION_BODIES: Partial<Record<SectionId, ReactNode>> = {
   features: <HowItWorks />,
+  roadmap: <WhereThingsStand />,
 }
 
 export const LandingRoute = () => {

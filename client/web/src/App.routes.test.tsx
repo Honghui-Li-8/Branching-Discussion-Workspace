@@ -232,6 +232,21 @@ describe('landing content (A07)', () => {
     expect(screen.getByRole('link', { name: 'See how it works' }).getAttribute('href')).toBe('/#features')
   })
 
+  it('Where things stand lists what works now and all five limitations', () => {
+    renderWithProviders(<App />, { route: '/', authStatus: 'unauthenticated' })
+
+    const section = document.getElementById('roadmap')!
+    expect(within(section).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual([
+      'What works now',
+      'Limitations',
+    ])
+    const lists = within(section).getAllByRole('list')
+    expect(within(lists[1]).getAllByRole('listitem')).toHaveLength(5)
+    expect(section.textContent).toMatch(/private to the account/)
+    expect(section.textContent).toMatch(/Safari cannot sign in/)
+    expect(section.textContent).toMatch(/signs everyone out/)
+  })
+
   it('hero offers no action while auth is unknown', () => {
     renderWithProviders(<App />, { route: '/', authStatus: 'unknown', fetchImpl: pendingFetch })
     // The bootstrap surface renders instead of the landing; nothing promises a sign-in.

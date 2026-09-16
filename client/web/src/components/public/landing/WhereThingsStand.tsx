@@ -22,7 +22,7 @@ const LIMITATIONS = [
 ] as const
 
 const PlainList = ({ items }: { items: readonly string[] }) => (
-  <ul className="m-0 grid gap-2 pl-5 text-label text-text-secondary">
+  <ul className="m-0 grid list-disc gap-2 pl-5 text-label text-text-secondary">
     {items.map((item) => (
       <li key={item}>{item}</li>
     ))}
