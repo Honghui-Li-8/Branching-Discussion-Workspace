@@ -3,6 +3,7 @@ import { dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { query, closePool, resolveDatabaseTarget, type DatabaseTarget } from './client.js'
 import { createLogger } from '../logging/logger.js'
+import { isEntrypoint } from './entrypoint.js'
 
 const seedsDir = dirname(fileURLToPath(import.meta.url))
 const seedFile = `${seedsDir}/seeds/seed.sql`
@@ -17,7 +18,7 @@ export const runSeed = async (target: DatabaseTarget = 'app'): Promise<void> => 
 const getTarget = (): DatabaseTarget =>
   resolveDatabaseTarget(process.argv.includes('--dev') || process.env.DB_ENV === 'dev' ? 'dev' : undefined)
 
-if (process.argv[1]?.endsWith('/seed.ts')) {
+if (isEntrypoint(import.meta.url)) {
   const target = getTarget()
   if (target !== 'dev') {
     logger.error(

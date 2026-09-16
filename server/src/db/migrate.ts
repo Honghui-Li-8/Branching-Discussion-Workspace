@@ -3,6 +3,7 @@ import { readdir, readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { query, closePool, getClient, type DatabaseTarget, resolveDatabaseTarget } from './client.js'
 import { createLogger } from '../logging/logger.js'
+import { isEntrypoint } from './entrypoint.js'
 
 const dbDir = dirname(fileURLToPath(import.meta.url))
 const migrationsDir = join(dbDir, 'migrations')
@@ -14,9 +15,6 @@ type MigrationRecord = {
 }
 
 const MIGRATION_FILE_ORDER = /^\d+_.*\.sql$/
-
-const command = process.argv[2] ?? 'status'
-const databaseTarget = resolveDatabaseTarget(process.argv.includes('--dev') ? 'dev' : undefined)
 const logger = createLogger('db-migrate')
 
 const ensureMetadataTable = async (target: DatabaseTarget): Promise<void> => {
@@ -122,6 +120,8 @@ export const showStatus = async (target: DatabaseTarget = 'app'): Promise<void> 
 }
 
 const main = async (): Promise<void> => {
+  const command = process.argv[2] ?? 'status'
+  const databaseTarget = resolveDatabaseTarget(process.argv.includes('--dev') ? 'dev' : undefined)
   if (command === 'up') {
     await runMigrations(databaseTarget)
     return
@@ -130,11 +130,16 @@ const main = async (): Promise<void> => {
   await showStatus(databaseTarget)
 }
 
-main()
-  .catch((error) => {
-    logger.error('Migration command failed.', { error })
-    process.exitCode = 1
-  })
-  .finally(async () => {
-    await closePool()
-  })
+// Run the CLI only when this file is the entrypoint. `reset.ts` imports
+// `runMigrations` from here; an unguarded import would kick off a stray
+// `status` run that races the reset's `DROP SCHEMA` and closes the shared pool.
+if (isEntrypoint(import.meta.url)) {
+  main()
+    .catch((error) => {
+      logger.error('Migration command failed.', { error })
+      process.exitCode = 1
+    })
+    .finally(async () => {
+      await closePool()
+    })
+}
