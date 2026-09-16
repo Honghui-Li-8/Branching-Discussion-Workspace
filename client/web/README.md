@@ -62,6 +62,13 @@ The landing hero shows a screenshot of the seeded intro workspace, not an illust
 `LANDING_CAPTURE_URL` if Vite is not on :5173). Re-run it whenever the tree or its cards are
 restyled and review the new image like code. CI never runs it — there is no API there.
 
+### Brand assets
+
+`public/favicon.svg` is the Trellis mark (the Figma "Brand Mark": teal-tint disc, teal branch
+glyph). `yarn workspace web render:brand-assets` renders the PNG derivatives — the apple-touch and
+manifest icons and the 1200×630 Open Graph card — from that SVG and the palette, via Playwright.
+Re-run it after changing the mark, the palette or the descriptor, and review the PNGs like code.
+
 ### Accessibility
 
 The target is WCAG 2.2 AA. Two harnesses cover different halves of it, and neither covers

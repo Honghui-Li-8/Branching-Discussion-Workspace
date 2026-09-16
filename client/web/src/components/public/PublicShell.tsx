@@ -109,8 +109,10 @@ export const PublicShell = ({ children }: { children: ReactNode }) => {
             <Link
               to={PATHS.root}
               underline="hover"
-              className="text-label font-semibold text-text-inverse no-underline hover:text-text-inverse focus-visible:ring-accent-wash"
+              className="inline-flex items-center gap-2 text-label font-semibold text-text-inverse no-underline hover:text-text-inverse focus-visible:ring-accent-wash"
             >
+              {/* The mark is decorative beside the wordmark; the link's name is "Trellis". */}
+              <img src="/favicon.svg" alt="" aria-hidden="true" width={28} height={28} className="size-7" />
               Trellis
             </Link>
 
@@ -180,7 +182,10 @@ export const PublicShell = ({ children }: { children: ReactNode }) => {
               </Cluster>
             </nav>
             <Cluster justify="between" gap="4">
-              <p className="m-0">Trellis — a branching discussion workspace</p>
+              <p className="m-0 inline-flex items-center gap-2">
+                <img src="/favicon.svg" alt="" aria-hidden="true" width={20} height={20} className="size-5" />
+                Trellis — a branching discussion workspace
+              </p>
               {/* Verified contact is A08's fact; a placeholder is allowed until phase exit. */}
               <p className="m-0 text-text-muted">Contact: coming soon</p>
               <p className="m-0 text-text-muted">© {new Date().getFullYear()} Trellis</p>
