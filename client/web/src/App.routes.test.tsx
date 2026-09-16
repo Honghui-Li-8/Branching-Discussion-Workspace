@@ -45,10 +45,10 @@ describe('route resolution (A06)', () => {
       expect(screen.queryByText(/sign in to continue/i)).toBeNull()
     })
 
-    it('unauthenticated: the landing carries the three stub sections with stable ids', () => {
+    it('unauthenticated: the landing carries every section with a stable, focusable id', () => {
       renderWithProviders(<App />, { route: '/', authStatus: 'unauthenticated' })
 
-      for (const id of ['features', 'roadmap', 'about']) {
+      for (const id of ['features', 'roadmap', 'about', 'privacy', 'terms']) {
         const section = document.getElementById(id)
         expect(section?.tagName).toBe('SECTION')
         expect(section?.getAttribute('tabindex')).toBe('-1')
@@ -57,6 +57,8 @@ describe('route resolution (A06)', () => {
         'How it works',
         'Where things stand',
         'About',
+        'Privacy',
+        'Terms',
       ])
     })
 
@@ -240,7 +242,13 @@ describe('landing content (A07)', () => {
     expect(within(section).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual([
       'What works now',
       'Limitations',
+      'Changelog',
     ])
+    // Changelog (A08): two entries, newest first, with their statuses; MVP 1 records Google sign-in.
+    expect(within(section).getAllByRole('heading', { level: 4 }).map((h) => h.textContent)).toEqual(['MVP 1.5', 'MVP 1'])
+    expect(section.textContent).toContain('In progress')
+    expect(section.textContent).toContain('Shipped')
+    expect(section.textContent).not.toMatch(/email sign-in/i)
     const lists = within(section).getAllByRole('list')
     expect(within(lists[1]).getAllByRole('listitem')).toHaveLength(5)
     expect(section.textContent).toMatch(/private to the account/)
@@ -255,5 +263,73 @@ describe('landing content (A07)', () => {
     expect(screen.queryByRole('link', { name: 'Sign in with Google' })).toBeNull()
     expect(screen.queryByRole('link', { name: 'Open workspace' })).toBeNull()
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Trellis')
+  })
+})
+
+describe('document titles (A08)', () => {
+  it.each([
+    ['/', 'unauthenticated', 'Trellis'],
+    ['/login', 'unauthenticated', 'Sign in · Trellis'],
+    ['/this-does-not-exist', 'unauthenticated', 'Page not found · Trellis'],
+    ['/', 'authenticated', 'Trellis'],
+  ] as const)('%s when %s titles the document "%s"', (route, authStatus, title) => {
+    renderWithProviders(<App />, { route, authStatus })
+    expect(document.title).toBe(title)
+  })
+})
+
+describe('About section (A08)', () => {
+  it('carries the three project cards and points limitations at Where things stand', () => {
+    renderWithProviders(<App />, { route: '/', authStatus: 'unauthenticated' })
+    const section = document.getElementById('about')!
+    expect(within(section).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual([
+      'Why branching',
+      'About this project',
+      'Current limitations',
+    ])
+    expect(within(section).getByRole('link', { name: 'See where things stand' }).getAttribute('href')).toBe('/#roadmap')
+    expect(section.textContent).not.toMatch(/single account/i)
+  })
+})
+
+describe('Privacy and Terms (A08)', () => {
+  it('are footer-only sections; the header keeps three items and the footer gains a Legal group', () => {
+    renderWithProviders(<App />, { route: '/', authStatus: 'unauthenticated' })
+
+    const headerNav = within(screen.getByRole('banner')).getByRole('navigation', { name: 'Sections' })
+    expect(within(headerNav).getAllByRole('link')).toHaveLength(3)
+
+    const footer = screen.getByRole('contentinfo')
+    expect(within(footer).getByRole('link', { name: 'Privacy' }).getAttribute('href')).toBe('/#privacy')
+    expect(within(footer).getByRole('link', { name: 'Terms' }).getAttribute('href')).toBe('/#terms')
+    expect(within(footer).getByRole('link', { name: 'Contact via GitHub' }).getAttribute('href')).toMatch(/\/issues$/)
+    expect(footer.textContent).not.toMatch(/coming soon/)
+
+    expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual([
+      'How it works',
+      'Where things stand',
+      'About',
+      'Privacy',
+      'Terms',
+    ])
+  })
+
+  it('Privacy names the stored data and exactly the five third parties; Terms has four parts', () => {
+    renderWithProviders(<App />, { route: '/', authStatus: 'unauthenticated' })
+
+    const privacy = document.getElementById('privacy')!
+    for (const party of ['Google', 'Supabase', 'OpenAI', 'Vercel', 'Fly.io']) {
+      expect(privacy.textContent).toContain(party)
+    }
+    expect(privacy.textContent).toMatch(/no automated deletion or retention/i)
+    expect(privacy.textContent).not.toMatch(/encrypt|compliant|GDPR|never trained/i)
+
+    const terms = document.getElementById('terms')!
+    expect(within(terms).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual([
+      'Beta expectations',
+      'Acceptable use',
+      'No guarantee',
+      'Contact',
+    ])
   })
 })
