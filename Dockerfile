@@ -49,6 +49,13 @@ COPY server/src server/src
 USER node
 WORKDIR /app/server
 ENV PORT=3001
+# Load-bearing, not cosmetic: `server/src/auth/cookies.ts` adds `Secure` to the
+# session cookie only when NODE_ENV === 'production'. Left unset, the image as
+# documented above hands browsers a session cookie they also send over plaintext
+# HTTP. A00b re-keys that flag off APP_ENV fail-closed; this is the interim
+# default, not a substitute for that change. Override per container
+# (`-e NODE_ENV=…`); APP_ENV stays the app's own environment gate.
+ENV NODE_ENV=production
 EXPOSE 3001
 
 # No entrypoint of our own — declared explicitly so the base image's
