@@ -17,7 +17,11 @@
 # `yarn start`; see ADR-0006 and the A-T1 feasibility record for the Phase B
 # follow-ups this implies (no compile step for `server` or `shared`).
 
-ARG NODE_VERSION=20
+# Node 20 reached end of life on 2026-04-30 and no longer gets security fixes.
+# 24 is the current active LTS (maintenance from 2026-10, EOL 2028-04); 22 is
+# already maintenance-only, so it would need bumping again sooner. CI still runs
+# Node 20 — moving it is a CI-policy change and belongs on its own branch.
+ARG NODE_VERSION=24
 
 # ---- deps: install the server workspace (and its workspace dep `shared`) ----
 FROM node:${NODE_VERSION}-bookworm-slim AS deps
