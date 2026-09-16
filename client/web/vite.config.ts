@@ -18,7 +18,24 @@ const stubDevGalleryInBuild = (): Plugin => ({
   },
 })
 
+// Stubbing the module only changes Rollup's module graph. Tailwind scans the
+// filesystem, not the graph, so it still found the gallery's source and emitted
+// its literal utilities — including the arbitrary max-w-[16rem]…max-w-[48rem]
+// widths nothing else uses — into the production stylesheet. Tailwind v4 can
+// drop a path from source discovery with `@source not`, but writing it into
+// index.css would also drop it in `vite dev`, where the gallery has to render
+// correctly. Appending the directive at build time only keeps both true.
+const excludeDevGalleryFromCssScan = (): Plugin => ({
+  name: 'trellis:exclude-dev-gallery-from-css-scan',
+  apply: 'build',
+  enforce: 'pre',
+  transform(code, id) {
+    if (!id.endsWith('/src/index.css')) return null
+    return `${code}\n@source not "./components/dev";\n`
+  },
+})
+
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), stubDevGalleryInBuild()],
+  plugins: [react(), stubDevGalleryInBuild(), excludeDevGalleryFromCssScan()],
 })
