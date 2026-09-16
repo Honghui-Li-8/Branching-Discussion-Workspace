@@ -1,9 +1,10 @@
 import { Stack } from '../../ui/layout'
+import { Changelog } from './Changelog'
 
 // A07 — the "Where things stand" section (anchor id `roadmap`): what the
 // product does today and what it does not, stated plainly (A02's Claims
 // decision). The five limitations are the owner-approved list from the
-// 2026-09-15 decisions. A08 appends the changelog to this section.
+// 2026-09-15 decisions. The changelog (A08) follows the two lists.
 
 const WORKS_NOW = [
   'Branch a side conversation from any assistant message.',
@@ -30,14 +31,20 @@ const PlainList = ({ items }: { items: readonly string[] }) => (
 )
 
 export const WhereThingsStand = () => (
-  <div className="grid gap-8 lg:grid-cols-2 lg:gap-12">
+  <Stack gap="8">
+    <div className="grid gap-8 lg:grid-cols-2 lg:gap-12">
+      <Stack gap="3">
+        <h3 className="m-0 text-body font-semibold text-text-default">What works now</h3>
+        <PlainList items={WORKS_NOW} />
+      </Stack>
+      <Stack gap="3">
+        <h3 className="m-0 text-body font-semibold text-text-default">Limitations</h3>
+        <PlainList items={LIMITATIONS} />
+      </Stack>
+    </div>
     <Stack gap="3">
-      <h3 className="m-0 text-body font-semibold text-text-default">What works now</h3>
-      <PlainList items={WORKS_NOW} />
+      <h3 className="m-0 text-body font-semibold text-text-default">Changelog</h3>
+      <Changelog />
     </Stack>
-    <Stack gap="3">
-      <h3 className="m-0 text-body font-semibold text-text-default">Limitations</h3>
-      <PlainList items={LIMITATIONS} />
-    </Stack>
-  </div>
+  </Stack>
 )

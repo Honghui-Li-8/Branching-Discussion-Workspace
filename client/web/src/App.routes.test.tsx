@@ -241,7 +241,13 @@ describe('landing content (A07)', () => {
     expect(within(section).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual([
       'What works now',
       'Limitations',
+      'Changelog',
     ])
+    // Changelog (A08): two entries, newest first, with their statuses; MVP 1 records Google sign-in.
+    expect(within(section).getAllByRole('heading', { level: 4 }).map((h) => h.textContent)).toEqual(['MVP 1.5', 'MVP 1'])
+    expect(section.textContent).toContain('In progress')
+    expect(section.textContent).toContain('Shipped')
+    expect(section.textContent).not.toMatch(/email sign-in/i)
     const lists = within(section).getAllByRole('list')
     expect(within(lists[1]).getAllByRole('listitem')).toHaveLength(5)
     expect(section.textContent).toMatch(/private to the account/)
