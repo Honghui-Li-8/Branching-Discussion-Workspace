@@ -751,10 +751,19 @@ export function SystemShowcaseGallery() {
                 </p>
                 <Cluster gap="4">
                   <span className="text-caption text-text-muted">Review the same system in situ:</span>
-                  <Link to={PATHS.root}>public landing</Link>
                   <Link to={PATHS.login}>sign-in</Link>
                   <Link to="/definitely-not-a-route">not-found</Link>
+                  <Link to={PATHS.root}>public landing (signed out)</Link>
                 </Cluster>
+                {/* A06 decided `/` is auth-aware: RootRoute resolves it to the
+                    workspace once you are signed in. Say so rather than promise
+                    a landing page the link cannot deliver in a signed-in dev
+                    session; a preview route would be new scope, not this gate's. */}
+                <p className="max-w-prose text-caption text-text-muted">
+                  Sign-in and not-found render the public shell either way. The landing link only
+                  reaches the landing surface in a signed-out session — A06 resolves <code>/</code> to
+                  the workspace for an authenticated user.
+                </p>
               </Stack>
 
               <Section id="type" title="Type scale — as a ladder, and in prose" note="Six semantic roles over Tailwind's default primitive scale. Each role aliases both size and line height.">
