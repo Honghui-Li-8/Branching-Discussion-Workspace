@@ -61,7 +61,7 @@ describe('PublicShell (A06)', () => {
     ])
   })
 
-  it('footer carries the section links, the repository link and the contact placeholder', () => {
+  it('footer carries the section links, the legal links, the repository link and the contact link', () => {
     renderWithProviders(<Page />)
 
     const footer = screen.getByRole('contentinfo')
@@ -69,8 +69,9 @@ describe('PublicShell (A06)', () => {
     const github = within(footerNav).getByRole('link', { name: 'GitHub' })
     expect(github.getAttribute('rel')).toBe('noopener noreferrer')
     expect(github.getAttribute('target')).toBe('_blank')
-    expect(within(footerNav).getAllByRole('link')).toHaveLength(4)
-    expect(footer.textContent).toContain('Contact: coming soon')
+    // Three header sections + GitHub, then the two footer-only legal sections (A08).
+    expect(within(footerNav).getAllByRole('link')).toHaveLength(6)
+    expect(within(footer).getByRole('link', { name: 'Contact via GitHub' }).getAttribute('href')).toMatch(/\/issues$/)
   })
 
   describe('auth-aware CTA', () => {

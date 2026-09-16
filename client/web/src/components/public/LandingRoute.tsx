@@ -10,6 +10,8 @@ import { Container, Cluster, Stack } from '../ui/layout'
 import { HowItWorks } from './landing/HowItWorks'
 import { WhereThingsStand } from './landing/WhereThingsStand'
 import { About } from './landing/About'
+import { Privacy } from './landing/Privacy'
+import { Terms } from './landing/Terms'
 
 // A07 — the public landing page, rendered inside PublicShell.
 //
@@ -97,6 +99,8 @@ const SECTION_BODIES: Partial<Record<SectionId, ReactNode>> = {
   features: <HowItWorks />,
   roadmap: <WhereThingsStand />,
   about: <About />,
+  privacy: <Privacy />,
+  terms: <Terms />,
 }
 
 export const LandingRoute = () => {
