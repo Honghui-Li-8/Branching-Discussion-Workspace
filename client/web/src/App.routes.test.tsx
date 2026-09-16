@@ -253,3 +253,14 @@ describe('landing content (A07)', () => {
     expect(screen.queryByRole('link', { name: 'Sign in with Google' })).toBeNull()
   })
 })
+
+describe('document titles (A08)', () => {
+  it.each([
+    ['/', 'unauthenticated', 'Trellis'],
+    ['/login', 'unauthenticated', 'Sign in · Trellis'],
+    ['/this-does-not-exist', 'unauthenticated', 'Page not found · Trellis'],
+  ] as const)('%s when %s titles the document "%s"', (route, authStatus, title) => {
+    renderWithProviders(<App />, { route, authStatus })
+    expect(document.title).toBe(title)
+  })
+})

@@ -5,6 +5,7 @@ import type { ReactNode } from 'react'
 import { PATHS, SECTIONS, sectionHref, type SectionId } from '../../routePaths'
 import { buttonVariants } from '../ui/button'
 import { Link, useHashFocus } from '../ui/link'
+import { useDocumentTitle } from '../../lib/useDocumentTitle'
 import { Container, Cluster, Stack } from '../ui/layout'
 import { HowItWorks } from './landing/HowItWorks'
 import { WhereThingsStand } from './landing/WhereThingsStand'
@@ -101,6 +102,7 @@ const SECTION_BODIES: Partial<Record<SectionId, ReactNode>> = {
 
 export const LandingRoute = () => {
   useHashFocus()
+  useDocumentTitle()
 
   return (
     <Container>
