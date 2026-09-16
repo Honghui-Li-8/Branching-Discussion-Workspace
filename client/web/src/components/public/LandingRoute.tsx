@@ -9,6 +9,7 @@ import { useDocumentTitle } from '../../lib/useDocumentTitle'
 import { Container, Cluster, Stack } from '../ui/layout'
 import { HowItWorks } from './landing/HowItWorks'
 import { WhereThingsStand } from './landing/WhereThingsStand'
+import { About } from './landing/About'
 
 // A07 — the public landing page, rendered inside PublicShell.
 //
@@ -91,13 +92,11 @@ const Hero = () => {
   )
 }
 
-/**
- * Section bodies by anchor id. `about` stays A06's heading-only stub until A08
- * fills it (and appends the changelog to `roadmap`).
- */
+/** Section bodies by anchor id (A07: features, roadmap; A08: about, privacy, terms). */
 const SECTION_BODIES: Partial<Record<SectionId, ReactNode>> = {
   features: <HowItWorks />,
   roadmap: <WhereThingsStand />,
+  about: <About />,
 }
 
 export const LandingRoute = () => {

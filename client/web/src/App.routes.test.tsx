@@ -264,3 +264,17 @@ describe('document titles (A08)', () => {
     expect(document.title).toBe(title)
   })
 })
+
+describe('About section (A08)', () => {
+  it('carries the three project cards and points limitations at Where things stand', () => {
+    renderWithProviders(<App />, { route: '/', authStatus: 'unauthenticated' })
+    const section = document.getElementById('about')!
+    expect(within(section).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual([
+      'Why branching',
+      'About this project',
+      'Current limitations',
+    ])
+    expect(within(section).getByRole('link', { name: 'See where things stand' }).getAttribute('href')).toBe('/#roadmap')
+    expect(section.textContent).not.toMatch(/single account/i)
+  })
+})
