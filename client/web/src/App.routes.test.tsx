@@ -209,3 +209,32 @@ describe('sign-in flow surfaces (A06 Commit 5)', () => {
     expect(screen.getByTestId('workspace-layout')).toBeTruthy()
   })
 })
+
+describe('landing content (A07)', () => {
+  it('How it works carries the four-step proof sequence and the three use cases', () => {
+    renderWithProviders(<App />, { route: '/', authStatus: 'unauthenticated' })
+
+    const section = document.getElementById('features')!
+    const steps = within(section).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)
+    expect(steps).toEqual(['Branch', 'Explore', 'Approve and bring back', 'Resume', 'Use cases'])
+    expect(within(section).getAllByRole('heading', { level: 4 }).map((h) => h.textContent)).toEqual([
+      'Project decision',
+      'Database selection',
+      'Project walkthrough',
+    ])
+  })
+
+  it('hero shows the product visual with its alt text and the CTA per auth state', () => {
+    renderWithProviders(<App />, { route: '/', authStatus: 'unauthenticated' })
+    const img = screen.getByRole('img', { name: /project decision/i })
+    expect(img.getAttribute('src')).toBe('/landing/intro-workspace-tree.png')
+    expect(screen.getByRole('link', { name: 'Sign in with Google' }).getAttribute('href')).toBe('/login')
+    expect(screen.getByRole('link', { name: 'See how it works' }).getAttribute('href')).toBe('/#features')
+  })
+
+  it('hero offers no action while auth is unknown', () => {
+    renderWithProviders(<App />, { route: '/', authStatus: 'unknown', fetchImpl: pendingFetch })
+    // The bootstrap surface renders instead of the landing; nothing promises a sign-in.
+    expect(screen.queryByRole('link', { name: 'Sign in with Google' })).toBeNull()
+  })
+})

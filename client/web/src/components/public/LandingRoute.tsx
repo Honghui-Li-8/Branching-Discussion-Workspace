@@ -1,10 +1,12 @@
 import { useAppSelector } from '../../store/hooks'
 import { selectAuthStatus } from '../../store/slices/authSlice'
 import { cn } from '../../lib/utils'
-import { PATHS, SECTIONS, sectionHref } from '../../routePaths'
+import type { ReactNode } from 'react'
+import { PATHS, SECTIONS, sectionHref, type SectionId } from '../../routePaths'
 import { buttonVariants } from '../ui/button'
 import { Link, useHashFocus } from '../ui/link'
 import { Container, Cluster, Stack } from '../ui/layout'
+import { HowItWorks } from './landing/HowItWorks'
 
 // A07 — the public landing page, rendered inside PublicShell.
 //
@@ -87,6 +89,14 @@ const Hero = () => {
   )
 }
 
+/**
+ * Section bodies by anchor id. `about` stays A06's heading-only stub until A08
+ * fills it (and appends the changelog to `roadmap`).
+ */
+const SECTION_BODIES: Partial<Record<SectionId, ReactNode>> = {
+  features: <HowItWorks />,
+}
+
 export const LandingRoute = () => {
   useHashFocus()
 
@@ -103,9 +113,12 @@ export const LandingRoute = () => {
             aria-labelledby={`${section.id}-heading`}
             className="scroll-mt-6 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-accent-default focus-visible:ring-offset-2"
           >
-            <h2 id={`${section.id}-heading`} className="m-0 text-heading font-medium text-text-default">
-              {section.label}
-            </h2>
+            <Stack gap="6">
+              <h2 id={`${section.id}-heading`} className="m-0 text-heading font-medium text-text-default">
+                {section.label}
+              </h2>
+              {SECTION_BODIES[section.id]}
+            </Stack>
           </section>
         ))}
       </Stack>
