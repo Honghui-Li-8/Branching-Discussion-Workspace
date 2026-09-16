@@ -1,0 +1,35 @@
+# Keep the build context to what the API image needs: workspace manifests,
+# server + shared source. Everything else is excluded explicitly. The only `!`
+# re-includes are the two non-installed workspace manifests the lockfile needs
+# to resolve (the Dockerfile COPYs exactly those); nothing else under an
+# excluded directory is required.
+.git
+**/node_modules
+.yarn
+docs
+.claude
+.beads
+.dolt
+adr
+scripts
+.github
+.vscode
+infra/**
+!infra/package.json
+client/**
+!client/web/package.json
+**/*.test.ts
+**/*.test.tsx
+**/.env
+**/.env.*
+**/*.md
+*.log
+test-results
+playwright-report
+blob-report
+jest.config.cjs
+playwright.config.ts
+tsconfig.jest.json
+cspell.json
+Dockerfile
+.dockerignore
