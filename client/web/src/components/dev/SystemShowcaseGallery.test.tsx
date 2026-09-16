@@ -5,7 +5,7 @@
  * from, so a runtime throw or a structural accessibility violation in it must
  * be caught before anyone opens the page.
  */
-import { screen, within } from '@testing-library/react'
+import { fireEvent, screen, within } from '@testing-library/react'
 import { axe, toHaveNoViolations } from 'jest-axe'
 
 import { renderWithProviders } from '../../testing/renderWithProviders'
@@ -73,6 +73,22 @@ describe('SystemShowcaseGallery (A-T3d)', () => {
     const trigger = screen.getByRole('button', { name: /Right-click me/ })
     trigger.focus()
     expect(document.activeElement).toBe(trigger)
+  })
+
+  it('mounts no announcing live region on load', () => {
+    renderWithProviders(<SystemShowcaseGallery />)
+
+    // The gallery is lazily routed, so mounting a live region announces it on
+    // navigation. Nothing here may claim a branch merged before the reader has
+    // even reached the section.
+    expect(screen.queryAllByRole('alert')).toHaveLength(0)
+    expect(screen.queryByText('Branch merged successfully.')).toBeNull()
+    expect(screen.queryByText('This field is required.')).toBeNull()
+    expect(screen.queryByText('Merge conflict in 2 files.')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show banners' }))
+    expect(screen.getAllByRole('alert')).toHaveLength(1)
+    expect(screen.getByText('Branch merged successfully.')).toBeTruthy()
   })
 
   it('has no serious accessibility violations beyond the one recorded gap', async () => {

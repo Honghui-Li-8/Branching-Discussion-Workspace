@@ -395,6 +395,55 @@ function ConventionExamples() {
   )
 }
 
+// AlertBanner is a live region by design — role="alert" for the error tone,
+// role="status" for the rest. Mounting the four specimens on load therefore
+// announces fake merge events to a screen-reader user the moment they navigate
+// here, before they have reached this section. The shipped component is right
+// and stays unchanged; what is wrong is the gallery mounting it unprompted, so
+// the specimens render only after an explicit action.
+function AlertBannerDemo() {
+  const [shown, setShown] = useState(false)
+  return (
+    <Stack gap="2" className="max-w-xl">
+      <Cluster gap="2">
+        <Button variant="secondary" onClick={() => setShown((v) => !v)} aria-expanded={shown}>
+          {shown ? 'Hide banners' : 'Show banners'}
+        </Button>
+        <span className="text-caption text-text-muted">
+          Mounted on demand: these are live regions and would announce on page load.
+        </span>
+      </Cluster>
+      {shown && (
+        <Stack gap="2">
+          <AlertBanner tone="success" title="Success">Branch merged successfully.</AlertBanner>
+          <AlertBanner tone="warning" title="Warning">This branch is 12 commits behind main.</AlertBanner>
+          <AlertBanner tone="error" title="Error">Merge conflict in 2 files.</AlertBanner>
+          <AlertBanner tone="info" title="Info">New activity in this branch.</AlertBanner>
+        </Stack>
+      )}
+    </Stack>
+  )
+}
+
+// FormField's error text is role="alert" too, so a pre-filled invalid specimen
+// announces on load for the same reason. Validate on demand instead.
+function ValidationDemo() {
+  const [invalid, setInvalid] = useState(false)
+  return (
+    <Stack gap="2">
+      <FormField id="g-invalid" label="Required field" error={invalid ? 'This field is required.' : undefined}>
+        {/* FormField wires aria-invalid + aria-describedby itself when error is set. */}
+        <Input id="g-invalid" defaultValue="" />
+      </FormField>
+      <Cluster gap="2">
+        <Button variant="secondary" onClick={() => setInvalid((v) => !v)} aria-pressed={invalid}>
+          {invalid ? 'Clear validation error' : 'Validate (show error state)'}
+        </Button>
+      </Cluster>
+    </Stack>
+  )
+}
+
 function PopupDemo() {
   const { show } = useAlertPopup()
   return (
@@ -452,9 +501,7 @@ function Components() {
           <FormField id="g-desc" label="Description">
             <Textarea id="g-desc" placeholder="What is this workspace about?" />
           </FormField>
-          <FormField id="g-invalid" label="Required field" error="This field is required.">
-            <Input id="g-invalid" aria-invalid defaultValue="" />
-          </FormField>
+          <ValidationDemo />
           <div>
             <p className="mb-1.5 text-label font-medium text-text-default">Combobox</p>
             <Combobox options={COMBO_OPTIONS} value={combo} onValueChange={setCombo} placeholder="Pick a workspace…" />
@@ -481,13 +528,8 @@ function Components() {
         <Cluster gap="2">{ALL_STATUSES.map((s) => <Badge key={s} status={s}>{s}</Badge>)}</Cluster>
       </Section>
 
-      <Section id="c-alert" level={3} title="Alert banner and popup" note="Persistent in-page status (error tone is role=alert), and the imperative popup.">
-        <Stack gap="2" className="max-w-xl">
-          <AlertBanner tone="success" title="Success">Branch merged successfully.</AlertBanner>
-          <AlertBanner tone="warning" title="Warning">This branch is 12 commits behind main.</AlertBanner>
-          <AlertBanner tone="error" title="Error">Merge conflict in 2 files.</AlertBanner>
-          <AlertBanner tone="info" title="Info">New activity in this branch.</AlertBanner>
-        </Stack>
+      <Section id="c-alert" level={3} title="Alert banner and popup" note="Persistent in-page status (error tone is role=alert), and the imperative popup. Both are live regions, so both mount on demand rather than on page load.">
+        <AlertBannerDemo />
         <PopupDemo />
       </Section>
 
@@ -751,6 +793,14 @@ export function SystemShowcaseGallery() {
                     cannot take its name from content, so the placeholder text is its value, not its
                     label, and the component exposes no `aria-label`/`id` route (axe `button-name`,
                     critical). Surfaced by this page's scan; routed to A13 rather than patched here.
+                  </li>
+                  <li>
+                    The width sweep above renders the same card five times, and that card carries a real
+                    AlertBanner — five `role="status"` regions that still mount on load. The banner and
+                    validation specimens below were moved behind an explicit action for exactly this
+                    reason, but the sweep needs the card composed as shipped, and `AlertBanner` exposes no
+                    way to opt out of its live semantics. Routed to the component's owner (A13), not
+                    patched here.
                   </li>
                   <li>
                     The shipped Pagination gives consumers no built-in previous/next control; the
