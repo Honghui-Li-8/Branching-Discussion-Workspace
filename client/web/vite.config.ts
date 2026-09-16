@@ -35,7 +35,26 @@ const excludeDevGalleryFromCssScan = (): Plugin => ({
   },
 })
 
+// A08 — social scrapers require an absolute og:image / og:url, and a static
+// index.html cannot know its host. Resolve the public origin at build time:
+// an explicit VITE_PUBLIC_ORIGIN wins; on Vercel the project's production URL,
+// then the deployment URL; locally the dev server. Replaces __PUBLIC_ORIGIN__.
+const publicOrigin = (): string => {
+  const explicit = process.env.VITE_PUBLIC_ORIGIN
+  if (explicit) return explicit.replace(/\/$/, '')
+  const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL ?? process.env.VERCEL_URL
+  if (vercel) return `https://${vercel}`
+  return 'http://localhost:5173'
+}
+
+const injectPublicOrigin = (): Plugin => ({
+  name: 'trellis:public-origin',
+  transformIndexHtml(html) {
+    return html.replaceAll('__PUBLIC_ORIGIN__', publicOrigin())
+  },
+})
+
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), stubDevGalleryInBuild(), excludeDevGalleryFromCssScan()],
+  plugins: [react(), stubDevGalleryInBuild(), excludeDevGalleryFromCssScan(), injectPublicOrigin()],
 })

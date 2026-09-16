@@ -22,7 +22,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
     bullets: [
       'Public landing, sign-in and not-found pages inside one shared shell',
       'Design system rebuilt on semantic tokens, with accessibility and reflow checks in CI',
-      'Google sign-in, with a local development bypass for contributors',
+      'Sign-in surface, callback handling and a not-found page with recovery links',
     ],
   },
   {

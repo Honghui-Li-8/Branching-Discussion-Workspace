@@ -294,6 +294,8 @@ test.describe('identity assets (A08) — the favicon and social image resolve', 
     await page.goto(PATHS.root)
     await expect(page.locator('meta[name="description"]')).toHaveAttribute('content', /branch off any message/)
     await expect(page.locator('link[rel="icon"]')).toHaveAttribute('href', '/favicon.svg')
-    await expect(page.locator('meta[property="og:image"]')).toHaveAttribute('content', '/og-image.png')
+    // Absolute, whatever the origin: scrapers discard relative image URLs.
+    await expect(page.locator('meta[property="og:image"]')).toHaveAttribute('content', /^https?:\/\/[^/]+\/og-image\.png$/)
+    await expect(page.locator('meta[property="og:url"]')).toHaveAttribute('content', /^https?:\/\/[^/]+\/$/)
   })
 })

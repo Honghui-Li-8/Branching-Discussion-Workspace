@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useId, useState, type ReactNode } from 'react'
 import { useAppSelector } from '../../store/hooks'
 import { selectAuthStatus } from '../../store/slices/authSlice'
 import { ICONS } from '../../lib/icons'
@@ -37,15 +37,20 @@ import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle, SheetTri
 
 const REPOSITORY_URL = 'https://github.com/Honghui-Li-8/Branching-Discussion-Workspace'
 
-/** Footer link group: a visually hidden label, then the links. */
-const FooterGroup = ({ label, children }: { label: string; children: ReactNode }) => (
-  <div>
-    <span className="sr-only">{label}</span>
-    <Cluster as="ul" gap="6" className="list-none p-0">
-      {children}
-    </Cluster>
-  </div>
-)
+/** Footer link group: a list named by a visually hidden label (aria-labelledby). */
+const FooterGroup = ({ label, children }: { label: string; children: ReactNode }) => {
+  const id = useId()
+  return (
+    <div>
+      <span id={id} className="sr-only">
+        {label}
+      </span>
+      <Cluster as="ul" role="list" aria-labelledby={id} gap="6" className="list-none p-0">
+        {children}
+      </Cluster>
+    </div>
+  )
+}
 
 const headerLinkClasses = 'text-gray-200 hover:text-text-inverse focus-visible:ring-accent-wash'
 

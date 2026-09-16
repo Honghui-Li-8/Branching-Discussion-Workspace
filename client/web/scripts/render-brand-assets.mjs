@@ -31,18 +31,20 @@ const DESCRIPTOR =
   'A chat tool where you branch off any message into a side conversation, then bring the conclusion back to the main thread.'
 
 const mark = await readFile(pub('favicon.svg'), 'utf8')
+// Resize the canvas only: the opening <svg> tag, never the tint <rect> that shares the literal.
+const markAt = (size) => mark.replace(/^(\s*<svg[^>]*?)width="28" height="28"/, `$1width="${size}" height="${size}"`)
 
 /** The mark alone, filling the canvas — for app icons. */
 const iconHtml = (size) => `<!doctype html><html><body style="margin:0;background:${TOKENS.tealTint}">
 <div style="width:${size}px;height:${size}px;display:grid;place-items:center">
-  <div style="width:${size}px;height:${size}px">${mark.replace('width="28" height="28"', `width="${size}" height="${size}"`)}</div>
+  <div style="width:${size}px;height:${size}px">${markAt(size)}</div>
 </div></body></html>`
 
 /** The Open Graph card: near-black surface, mark + wordmark, the descriptor. */
 const ogHtml = () => `<!doctype html><html><body style="margin:0;background:${TOKENS.gray900};font-family:${FONT};color:${TOKENS.gray0}">
 <div style="box-sizing:border-box;width:1200px;height:630px;padding:96px;display:flex;flex-direction:column;justify-content:space-between">
   <div style="display:flex;align-items:center;gap:28px">
-    <div style="width:96px;height:96px">${mark.replace('width="28" height="28"', 'width="96" height="96"')}</div>
+    <div style="width:96px;height:96px">${markAt(96)}</div>
     <div style="font-size:72px;font-weight:600;letter-spacing:-0.02em">Trellis</div>
   </div>
   <div>
