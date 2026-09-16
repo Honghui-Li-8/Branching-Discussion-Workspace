@@ -3,7 +3,7 @@ import { useAppSelector } from '../../store/hooks'
 import { selectAuthStatus } from '../../store/slices/authSlice'
 import { ICONS } from '../../lib/icons'
 import { cn } from '../../lib/utils'
-import { PATHS, SECTIONS, sectionHref } from '../../routePaths'
+import { HEADER_SECTIONS, PATHS, SECTIONS, sectionHref, type Section } from '../../routePaths'
 import { buttonVariants } from '../ui/button'
 import { Cluster, Container, Stack } from '../ui/layout'
 import { Link } from '../ui/link'
@@ -59,9 +59,17 @@ const AuthCta = ({ className }: { className?: string }) => {
   )
 }
 
-const SectionLinks = ({ onNavigate, className }: { onNavigate?: () => void; className?: string }) => (
+const SectionLinks = ({
+  sections,
+  onNavigate,
+  className,
+}: {
+  sections: readonly Section[]
+  onNavigate?: () => void
+  className?: string
+}) => (
   <>
-    {SECTIONS.map((section) => (
+    {sections.map((section) => (
       <li key={section.id}>
         <Link to={sectionHref(section.id)} onClick={onNavigate} className={cn('inline-block py-2', className)}>
           {section.label}
@@ -109,7 +117,7 @@ export const PublicShell = ({ children }: { children: ReactNode }) => {
             {showSections ? (
               <nav aria-label="Sections" className="hidden lg:block">
                 <Cluster as="ul" gap="6" className="list-none p-0">
-                  <SectionLinks className={headerLinkClasses} />
+                  <SectionLinks sections={HEADER_SECTIONS} className={headerLinkClasses} />
                 </Cluster>
               </nav>
             ) : null}
@@ -142,7 +150,7 @@ export const PublicShell = ({ children }: { children: ReactNode }) => {
                     <SheetDescription className="sr-only">Sections of this page</SheetDescription>
                     <nav aria-label="Sections menu">
                       <Stack as="ul" gap="1" className="list-none p-0">
-                        <SectionLinks onNavigate={() => setIsMenuOpen(false)} />
+                        <SectionLinks sections={HEADER_SECTIONS} onNavigate={() => setIsMenuOpen(false)} />
                       </Stack>
                     </nav>
                   </Stack>
@@ -163,7 +171,7 @@ export const PublicShell = ({ children }: { children: ReactNode }) => {
           <Stack gap="4" className="py-8">
             <nav aria-label="Footer">
               <Cluster as="ul" gap="6" className="list-none p-0">
-                {showSections ? <SectionLinks /> : null}
+                {showSections ? <SectionLinks sections={SECTIONS} /> : null}
                 <li>
                   <Link href={REPOSITORY_URL} target="_blank" className="inline-block py-2">
                     GitHub

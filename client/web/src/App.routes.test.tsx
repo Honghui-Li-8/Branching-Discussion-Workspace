@@ -53,8 +53,8 @@ describe('route resolution (A06)', () => {
         expect(section?.getAttribute('tabindex')).toBe('-1')
       }
       expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual([
-        'Features',
-        'Roadmap',
+        'How it works',
+        'Where things stand',
         'About',
       ])
     })

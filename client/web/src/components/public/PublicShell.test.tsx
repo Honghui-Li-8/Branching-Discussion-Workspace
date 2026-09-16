@@ -96,7 +96,7 @@ describe('PublicShell (A06)', () => {
       // `/` is the workspace for this user, so section anchors would be dead links.
       expect(screen.queryByRole('navigation', { name: 'Sections' })).toBeNull()
       expect(screen.queryByRole('button', { name: 'Open navigation menu' })).toBeNull()
-      expect(within(screen.getByRole('contentinfo')).queryByRole('link', { name: 'Features' })).toBeNull()
+      expect(within(screen.getByRole('contentinfo')).queryByRole('link', { name: 'How it works' })).toBeNull()
       expect(within(screen.getByRole('contentinfo')).getByRole('link', { name: 'GitHub' })).toBeTruthy()
     })
   })
@@ -110,8 +110,8 @@ describe('PublicShell (A06)', () => {
 
       const dialog = screen.getByRole('dialog', { name: 'Navigation' })
       expect(within(dialog).getAllByRole('link').map((a) => a.textContent)).toEqual([
-        'Features',
-        'Roadmap',
+        'How it works',
+        'Where things stand',
         'About',
       ])
       expect(within(dialog).getByRole('button', { name: 'Close navigation menu' })).toBeTruthy()
@@ -123,7 +123,7 @@ describe('PublicShell (A06)', () => {
     it('closes after a section link is chosen', () => {
       renderWithProviders(<Page />)
       fireEvent.click(screen.getByRole('button', { name: 'Open navigation menu' }))
-      fireEvent.click(within(screen.getByRole('dialog')).getByRole('link', { name: 'Roadmap' }))
+      fireEvent.click(within(screen.getByRole('dialog')).getByRole('link', { name: 'Where things stand' }))
       expect(screen.queryByRole('dialog')).toBeNull()
       expect(screen.getByTestId('location').textContent).toBe('/#roadmap')
     })
