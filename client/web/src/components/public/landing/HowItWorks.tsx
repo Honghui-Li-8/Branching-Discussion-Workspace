@@ -20,7 +20,7 @@ const STEPS = [
   },
   {
     term: 'Resume',
-    text: 'The parent shows the merged conclusion where the branch began, and the branch becomes read-only.',
+    text: 'The merged conclusion appears in the parent conversation, labelled with the branch it came from, and the branch becomes read-only.',
   },
 ] as const
 
@@ -46,7 +46,8 @@ export const HowItWorks = () => (
       conclusion to the topic it came from. That loop has four steps.
     </p>
 
-    <ol className="m-0 grid list-none gap-6 p-0 md:grid-cols-2">
+    {/* role="list" restores list semantics that WebKit drops when list-style is none. */}
+    <ol role="list" className="m-0 grid list-none gap-6 p-0 md:grid-cols-2">
       {STEPS.map((step, index) => (
         <li key={step.term} className="flex gap-4">
           <span
@@ -65,7 +66,7 @@ export const HowItWorks = () => (
 
     <Stack gap="4">
       <h3 className="m-0 text-body font-semibold text-text-default">Use cases</h3>
-      <ul className="m-0 grid list-none gap-4 p-0 lg:grid-cols-3">
+      <ul role="list" className="m-0 grid list-none gap-4 p-0 lg:grid-cols-3">
         {USE_CASES.map((useCase) => (
           <li key={useCase.title}>
             <Stack gap="2" className="h-full rounded-lg border border-border-default bg-bg-default p-5">

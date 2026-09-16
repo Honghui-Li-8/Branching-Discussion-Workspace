@@ -24,8 +24,9 @@ const PADDING = 28
 
 const browser = await chromium.launch()
 try {
-  // Large enough that the whole seeded tree renders without the canvas scrolling;
-  // anything scrolled out of view would be missing from the capture.
+  // Large enough that every *unfolded* card renders without the canvas scrolling
+  // (the seed has 35 topics; most sit folded behind the "+N" pills, so seven cards
+  // show). Anything scrolled out of view would be missing from the capture.
   const page = await browser.newPage({ viewport: { width: 2400, height: 1400 }, deviceScaleFactor: 2 })
   await page.goto(`${baseUrl}/login`)
   await page.getByRole('button', { name: /continue as local developer/i }).click()

@@ -8,6 +8,7 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 
 import App from './App'
+import { LandingRoute } from './components/public/LandingRoute'
 import * as supabaseClient from './lib/supabaseClient'
 import { failingFetch, pendingFetch, renderWithProviders } from './testing/renderWithProviders'
 
@@ -251,14 +252,17 @@ describe('landing content (A07)', () => {
     const lists = within(section).getAllByRole('list')
     expect(within(lists[1]).getAllByRole('listitem')).toHaveLength(5)
     expect(section.textContent).toMatch(/private to the account/)
-    expect(section.textContent).toMatch(/Safari cannot sign in/)
+    expect(section.textContent).toMatch(/Safari is not supported/)
     expect(section.textContent).toMatch(/signs everyone out/)
   })
 
   it('hero offers no action while auth is unknown', () => {
-    renderWithProviders(<App />, { route: '/', authStatus: 'unknown', fetchImpl: pendingFetch })
-    // The bootstrap surface renders instead of the landing; nothing promises a sign-in.
+    // RootRoute never shows the landing while unknown; render the route directly so the
+    // hero's own guard is the thing under test.
+    renderWithProviders(<LandingRoute />, { route: '/', authStatus: 'unknown', fetchImpl: pendingFetch })
     expect(screen.queryByRole('link', { name: 'Sign in with Google' })).toBeNull()
+    expect(screen.queryByRole('link', { name: 'Open workspace' })).toBeNull()
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Trellis')
   })
 })
 
