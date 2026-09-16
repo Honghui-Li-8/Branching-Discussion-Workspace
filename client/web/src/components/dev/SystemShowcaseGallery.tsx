@@ -551,10 +551,16 @@ function Components() {
         <div>
           <p className="mb-1.5 text-label font-medium text-text-default">Context menu (right-click)</p>
           <ContextMenu>
+            {/* A plain div trigger is unreachable by keyboard, so the specimen
+                never exercises the primitive's Shift+F10 / Menu-key path. A
+                real button gives it native focus semantics and a focus ring. */}
             <ContextMenuTrigger asChild>
-              <div className="flex h-20 w-64 items-center justify-center rounded-md border border-dashed border-border-strong text-label text-text-muted">
-                Right-click me
-              </div>
+              <button
+                type="button"
+                className="flex h-20 w-64 items-center justify-center rounded-md border border-dashed border-border-strong px-3 text-center text-label text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default focus-visible:ring-offset-2"
+              >
+                Right-click me, or focus and press Shift+F10
+              </button>
             </ContextMenuTrigger>
             <ContextMenuContent>
               <ContextMenuLabel>Database selection</ContextMenuLabel>

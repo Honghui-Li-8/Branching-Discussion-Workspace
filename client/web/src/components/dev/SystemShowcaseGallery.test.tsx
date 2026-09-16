@@ -65,6 +65,16 @@ describe('SystemShowcaseGallery (A-T3d)', () => {
     expect(screen.getAllByRole('radiogroup', { name: 'Radio group specimen' })).toHaveLength(1)
   })
 
+  it('gives the context-menu specimen a keyboard-reachable trigger', () => {
+    renderWithProviders(<SystemShowcaseGallery />)
+
+    // asChild on a plain div leaves no focus semantics, so the specimen never
+    // exercises the primitive's Shift+F10 / Menu-key path.
+    const trigger = screen.getByRole('button', { name: /Right-click me/ })
+    trigger.focus()
+    expect(document.activeElement).toBe(trigger)
+  })
+
   it('has no serious accessibility violations beyond the one recorded gap', async () => {
     const { container } = renderWithProviders(<SystemShowcaseGallery />)
     const violations = await seriousViolations(container)
