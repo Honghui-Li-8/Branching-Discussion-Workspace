@@ -38,7 +38,7 @@ export const Privacy = () => (
       What Trellis collects, how it is stored, and which third parties are involved — described
       plainly, without claims the code cannot back.
     </p>
-    <ul className="m-0 grid list-none gap-4 p-0 md:grid-cols-2 lg:grid-cols-3">
+    <ul role="list" className="m-0 grid list-none gap-4 p-0 md:grid-cols-2 lg:grid-cols-3">
       {CARDS.map((card) => (
         <li key={card.title}>
           <Stack gap="2" className="h-full rounded-lg border border-border-default bg-bg-default p-5">

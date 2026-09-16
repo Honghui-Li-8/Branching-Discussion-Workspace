@@ -24,7 +24,7 @@ const CARDS = [
 ] as const
 
 export const About = () => (
-  <ul className="m-0 grid list-none gap-4 p-0 lg:grid-cols-3">
+  <ul role="list" className="m-0 grid list-none gap-4 p-0 lg:grid-cols-3">
     {CARDS.map((card) => (
       <li key={card.title}>
         <Stack gap="2" className="h-full rounded-lg border border-border-default bg-bg-default p-5">

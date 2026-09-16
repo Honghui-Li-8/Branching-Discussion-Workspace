@@ -10,7 +10,7 @@ const STATUS_LABEL: Record<ChangelogStatus, string> = {
 }
 
 export const Changelog = () => (
-  <Stack as="ol" gap="4" className="m-0 list-none p-0">
+  <Stack as="ol" role="list" gap="4" className="m-0 list-none p-0">
     {CHANGELOG.map((entry) => (
       <li key={entry.version} className="rounded-lg border border-border-default bg-bg-default p-5">
         <Stack gap="3">

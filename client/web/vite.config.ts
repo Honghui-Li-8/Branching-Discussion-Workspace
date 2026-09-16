@@ -1,4 +1,4 @@
-import { defineConfig, type Plugin } from 'vite'
+import { defineConfig, loadEnv, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 
 // A-T3d — keep the dev-only system showcase gallery out of production
@@ -39,22 +39,23 @@ const excludeDevGalleryFromCssScan = (): Plugin => ({
 // index.html cannot know its host. Resolve the public origin at build time:
 // an explicit VITE_PUBLIC_ORIGIN wins; on Vercel the project's production URL,
 // then the deployment URL; locally the dev server. Replaces __PUBLIC_ORIGIN__.
-const publicOrigin = (): string => {
-  const explicit = process.env.VITE_PUBLIC_ORIGIN
+const publicOrigin = (mode: string): string => {
+  // Read through Vite's own env loading so client/web/.env files count, like every other VITE_* var.
+  const explicit = loadEnv(mode, process.cwd(), 'VITE_').VITE_PUBLIC_ORIGIN ?? process.env.VITE_PUBLIC_ORIGIN
   if (explicit) return explicit.replace(/\/$/, '')
   const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL ?? process.env.VERCEL_URL
   if (vercel) return `https://${vercel}`
   return 'http://localhost:5173'
 }
 
-const injectPublicOrigin = (): Plugin => ({
+const injectPublicOrigin = (mode: string): Plugin => ({
   name: 'trellis:public-origin',
   transformIndexHtml(html) {
-    return html.replaceAll('__PUBLIC_ORIGIN__', publicOrigin())
+    return html.replaceAll('__PUBLIC_ORIGIN__', publicOrigin(mode))
   },
 })
 
 // https://vite.dev/config/
-export default defineConfig({
-  plugins: [react(), stubDevGalleryInBuild(), excludeDevGalleryFromCssScan(), injectPublicOrigin()],
-})
+export default defineConfig(({ mode }) => ({
+  plugins: [react(), stubDevGalleryInBuild(), excludeDevGalleryFromCssScan(), injectPublicOrigin(mode)],
+}))
