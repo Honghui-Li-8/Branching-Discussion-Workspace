@@ -462,7 +462,10 @@ function Components() {
           <Cluster gap="6">
             <label className="flex items-center gap-2 text-label text-text-default"><Checkbox defaultChecked /> Checkbox</label>
             <label className="flex items-center gap-2 text-label text-text-default"><Switch defaultChecked /> Switch</label>
-            <RadioGroup defaultValue="a" className="flex gap-4">
+            {/* Radix exposes a radiogroup. The per-option labels name "One" and
+                "Two" but nothing names the choice itself, so a screen-reader
+                user hears an unnamed group — name it explicitly. */}
+            <RadioGroup aria-label="Radio group specimen" defaultValue="a" className="flex gap-4">
               <label className="flex items-center gap-2 text-label text-text-default"><RadioGroupItem value="a" /> One</label>
               <label className="flex items-center gap-2 text-label text-text-default"><RadioGroupItem value="b" /> Two</label>
             </RadioGroup>

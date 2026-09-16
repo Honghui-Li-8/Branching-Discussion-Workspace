@@ -57,6 +57,14 @@ describe('SystemShowcaseGallery (A-T3d)', () => {
     }
   })
 
+  it('names the radio-group specimen so it is not an unnamed choice group', () => {
+    renderWithProviders(<SystemShowcaseGallery />)
+
+    // The per-option labels name "One"/"Two"; only the group's own name says
+    // what is being chosen. axe does not flag this, so pin it here.
+    expect(screen.getAllByRole('radiogroup', { name: 'Radio group specimen' })).toHaveLength(1)
+  })
+
   it('has no serious accessibility violations beyond the one recorded gap', async () => {
     const { container } = renderWithProviders(<SystemShowcaseGallery />)
     const violations = await seriousViolations(container)
