@@ -116,7 +116,7 @@ export const PublicShell = ({ children }: { children: ReactNode }) => {
 
             {showSections ? (
               <nav aria-label="Sections" className="hidden lg:block">
-                <Cluster as="ul" gap="6" className="list-none p-0">
+                <Cluster as="ul" role="list" gap="6" className="list-none p-0">
                   <SectionLinks sections={HEADER_SECTIONS} className={headerLinkClasses} />
                 </Cluster>
               </nav>
@@ -149,7 +149,7 @@ export const PublicShell = ({ children }: { children: ReactNode }) => {
                     </Cluster>
                     <SheetDescription className="sr-only">Sections of this page</SheetDescription>
                     <nav aria-label="Sections menu">
-                      <Stack as="ul" gap="1" className="list-none p-0">
+                      <Stack as="ul" role="list" gap="1" className="list-none p-0">
                         <SectionLinks sections={HEADER_SECTIONS} onNavigate={() => setIsMenuOpen(false)} />
                       </Stack>
                     </nav>
@@ -170,7 +170,7 @@ export const PublicShell = ({ children }: { children: ReactNode }) => {
         <Container>
           <Stack gap="4" className="py-8">
             <nav aria-label="Footer">
-              <Cluster as="ul" gap="6" className="list-none p-0">
+              <Cluster as="ul" role="list" gap="6" className="list-none p-0">
                 {showSections ? <SectionLinks sections={SECTIONS} /> : null}
                 <li>
                   <Link href={REPOSITORY_URL} target="_blank" className="inline-block py-2">
