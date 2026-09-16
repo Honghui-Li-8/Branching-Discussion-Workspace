@@ -29,7 +29,7 @@
  */
 import { expect, test, type Page } from '@playwright/test'
 
-import { PATHS, REFLOW_TARGETS, SECTIONS } from '../src/routePaths'
+import { HEADER_SECTIONS, PATHS, REFLOW_TARGETS, SECTIONS } from '../src/routePaths'
 
 /** ADR-0004 — Tailwind's default set. `lg` is the product's canonical boundary. */
 const BREAKPOINTS = [
@@ -183,7 +183,8 @@ test.describe('section deep-links (A06) — scroll and focus, across routes', ()
     await page.goto(PATHS.login)
     await page.waitForLoadState('networkidle')
 
-    const target = SECTIONS[SECTIONS.length - 1]
+    // The header shows the in-nav subset only; footer-only sections have their own loop below.
+    const target = HEADER_SECTIONS[HEADER_SECTIONS.length - 1]
     await page.getByRole('banner').getByRole('link', { name: target.label }).click()
 
     await expect(page).toHaveURL(new RegExp(`${PATHS.root}#${target.id}$`))
@@ -279,4 +280,20 @@ test.describe('landing content (A07) — the visual loads and every anchor focus
       expect(top).toBeLessThan(viewportHeight)
     })
   }
+})
+
+test.describe('identity assets (A08) — the favicon and social image resolve', () => {
+  for (const asset of ['/favicon.svg', '/og-image.png', '/icons/apple-touch-icon.png', '/site.webmanifest']) {
+    test(`${asset} is served`, async ({ request }) => {
+      const response = await request.get(asset)
+      expect(response.status()).toBe(200)
+    })
+  }
+
+  test('the document head declares the description, icon and Open Graph image', async ({ page }) => {
+    await page.goto(PATHS.root)
+    await expect(page.locator('meta[name="description"]')).toHaveAttribute('content', /branch off any message/)
+    await expect(page.locator('link[rel="icon"]')).toHaveAttribute('href', '/favicon.svg')
+    await expect(page.locator('meta[property="og:image"]')).toHaveAttribute('content', '/og-image.png')
+  })
 })
