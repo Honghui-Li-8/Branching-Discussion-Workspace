@@ -29,7 +29,7 @@
  */
 import { expect, test, type Page } from '@playwright/test'
 
-import { HEADER_SECTIONS, PATHS, REFLOW_TARGETS, SECTIONS } from '../src/routePaths'
+import { PATHS, REFLOW_TARGETS, SECTIONS } from '../src/routePaths'
 
 /** ADR-0004 — Tailwind's default set. `lg` is the product's canonical boundary. */
 const BREAKPOINTS = [
@@ -183,8 +183,8 @@ test.describe('section deep-links (A06) — scroll and focus, across routes', ()
     await page.goto(PATHS.login)
     await page.waitForLoadState('networkidle')
 
-    // The header shows the in-nav subset only; footer-only sections have their own loop below.
-    const target = HEADER_SECTIONS[HEADER_SECTIONS.length - 1]
+    // The header lists every section; the footer's own loop is below.
+    const target = SECTIONS[SECTIONS.length - 1]
     await page.getByRole('banner').getByRole('link', { name: target.label }).click()
 
     await expect(page).toHaveURL(new RegExp(`${PATHS.root}#${target.id}$`))
@@ -209,6 +209,19 @@ test.describe('section deep-links (A06) — scroll and focus, across routes', ()
     const target = SECTIONS[0]
     await page.getByRole('contentinfo').getByRole('link', { name: target.label }).click()
     await expect(page.locator(`#${target.id}`)).toBeFocused()
+  })
+})
+
+test.describe('legal routes (A08b) — reachable from the footer of every surface', () => {
+  test('the footer "Privacy" link on / lands on /privacy', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 })
+    await page.goto(PATHS.root)
+    await page.waitForLoadState('networkidle')
+
+    await page.getByRole('contentinfo').getByRole('link', { name: 'Privacy' }).click()
+
+    await expect(page).toHaveURL(new RegExp(`${PATHS.privacy}$`))
+    await expect(page.getByRole('heading', { level: 1, name: 'Privacy' })).toBeVisible()
   })
 })
 

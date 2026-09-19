@@ -69,8 +69,10 @@ describe('PublicShell (A06)', () => {
     const github = within(footerNav).getByRole('link', { name: 'GitHub' })
     expect(github.getAttribute('rel')).toBe('noopener noreferrer')
     expect(github.getAttribute('target')).toBe('_blank')
-    // Three header sections + GitHub, then the two footer-only legal sections (A08).
+    // Three sections + GitHub, then the two legal pages (A08b: routes, not anchors).
     expect(within(footerNav).getAllByRole('link')).toHaveLength(6)
+    expect(within(footerNav).getByRole('link', { name: 'Privacy' }).getAttribute('href')).toBe('/privacy')
+    expect(within(footerNav).getByRole('link', { name: 'Terms' }).getAttribute('href')).toBe('/terms')
     expect(within(footer).getByRole('link', { name: 'Contact via GitHub' }).getAttribute('href')).toMatch(/\/issues$/)
   })
 
@@ -99,6 +101,10 @@ describe('PublicShell (A06)', () => {
       expect(screen.queryByRole('button', { name: 'Open navigation menu' })).toBeNull()
       expect(within(screen.getByRole('contentinfo')).queryByRole('link', { name: 'How it works' })).toBeNull()
       expect(within(screen.getByRole('contentinfo')).getByRole('link', { name: 'GitHub' })).toBeTruthy()
+      // The legal pages are routes, so they stay reachable while the dead anchors go.
+      const footer = within(screen.getByRole('contentinfo'))
+      expect(footer.getByRole('link', { name: 'Privacy' }).getAttribute('href')).toBe('/privacy')
+      expect(footer.getByRole('link', { name: 'Terms' }).getAttribute('href')).toBe('/terms')
     })
   })
 

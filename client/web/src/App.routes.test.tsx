@@ -48,7 +48,7 @@ describe('route resolution (A06)', () => {
     it('unauthenticated: the landing carries every section with a stable, focusable id', () => {
       renderWithProviders(<App />, { route: '/', authStatus: 'unauthenticated' })
 
-      for (const id of ['features', 'roadmap', 'about', 'privacy', 'terms']) {
+      for (const id of ['features', 'roadmap', 'about']) {
         const section = document.getElementById(id)
         expect(section?.tagName).toBe('SECTION')
         expect(section?.getAttribute('tabindex')).toBe('-1')
@@ -57,8 +57,6 @@ describe('route resolution (A06)', () => {
         'How it works',
         'Where things stand',
         'About',
-        'Privacy',
-        'Terms',
       ])
     })
 
@@ -85,6 +83,10 @@ describe('route resolution (A06)', () => {
       ['/', 'unknown'],
       ['/login', 'unauthenticated'],
       ['/login', 'authenticated'],
+      ['/privacy', 'unauthenticated'],
+      ['/privacy', 'authenticated'],
+      ['/terms', 'unauthenticated'],
+      ['/terms', 'authenticated'],
       ['/nope', 'unauthenticated'],
     ] as const)('%s when %s: banner, one main, contentinfo, skip link', (route, authStatus) => {
       const { container } = renderWithProviders(<App />, { route, authStatus })
@@ -270,6 +272,8 @@ describe('document titles (A08)', () => {
   it.each([
     ['/', 'unauthenticated', 'Trellis'],
     ['/login', 'unauthenticated', 'Sign in · Trellis'],
+    ['/privacy', 'unauthenticated', 'Privacy · Trellis'],
+    ['/terms', 'unauthenticated', 'Terms · Trellis'],
     ['/this-does-not-exist', 'unauthenticated', 'Page not found · Trellis'],
     ['/', 'authenticated', 'Trellis'],
   ] as const)('%s when %s titles the document "%s"', (route, authStatus, title) => {
@@ -292,44 +296,77 @@ describe('About section (A08)', () => {
   })
 })
 
-describe('Privacy and Terms (A08)', () => {
-  it('are footer-only sections; the header keeps three items and the footer gains a Legal group', () => {
+describe('Privacy and Terms pages (A08b)', () => {
+  it('the header keeps its three section links and the footer Legal group points at the routes', () => {
     renderWithProviders(<App />, { route: '/', authStatus: 'unauthenticated' })
 
     const headerNav = within(screen.getByRole('banner')).getByRole('navigation', { name: 'Sections' })
     expect(within(headerNav).getAllByRole('link')).toHaveLength(3)
 
     const footer = screen.getByRole('contentinfo')
-    expect(within(footer).getByRole('link', { name: 'Privacy' }).getAttribute('href')).toBe('/#privacy')
-    expect(within(footer).getByRole('link', { name: 'Terms' }).getAttribute('href')).toBe('/#terms')
+    expect(within(footer).getByRole('link', { name: 'Privacy' }).getAttribute('href')).toBe('/privacy')
+    expect(within(footer).getByRole('link', { name: 'Terms' }).getAttribute('href')).toBe('/terms')
     expect(within(footer).getByRole('link', { name: 'Contact via GitHub' }).getAttribute('href')).toMatch(/\/issues$/)
     expect(footer.textContent).not.toMatch(/coming soon/)
-
-    expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual([
-      'How it works',
-      'Where things stand',
-      'About',
-      'Privacy',
-      'Terms',
-    ])
   })
 
-  it('Privacy names the stored data and exactly the five third parties; Terms has four parts', () => {
-    renderWithProviders(<App />, { route: '/', authStatus: 'unauthenticated' })
+  it.each(['unauthenticated', 'authenticated'] as const)(
+    'the legal links are in the footer when %s',
+    (authStatus) => {
+      // /login is a shell surface that exists in both auth states, unlike `/`.
+      renderWithProviders(<App />, { route: '/login', authStatus })
 
-    const privacy = document.getElementById('privacy')!
+      const footer = screen.getByRole('contentinfo')
+      expect(within(footer).getByRole('link', { name: 'Privacy' }).getAttribute('href')).toBe('/privacy')
+      expect(within(footer).getByRole('link', { name: 'Terms' }).getAttribute('href')).toBe('/terms')
+    },
+  )
+
+  it('/privacy names the stored data and exactly the five third parties', () => {
+    renderWithProviders(<App />, { route: '/privacy', authStatus: 'unauthenticated' })
+
+    expect(heading1()?.textContent).toBe('Privacy')
+    expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual([
+      'What we collect',
+      'How it is stored',
+      'Processing',
+      'Retention and deletion',
+      'Third parties involved',
+    ])
+
+    const main = screen.getByRole('main')
     for (const party of ['Google', 'Supabase', 'OpenAI', 'Vercel', 'Fly.io']) {
-      expect(privacy.textContent).toContain(party)
+      expect(main.textContent).toContain(party)
     }
-    expect(privacy.textContent).toMatch(/no automated deletion or retention/i)
-    expect(privacy.textContent).not.toMatch(/encrypt|compliant|GDPR|never trained/i)
+    expect(main.textContent).toMatch(/no automated deletion or retention/i)
+    expect(main.textContent).not.toMatch(/encrypt|compliant|GDPR|never trained/i)
+    expect(
+      within(main).getByRole('link', { name: 'Request deletion via GitHub' }).getAttribute('href'),
+    ).toMatch(/\/issues$/)
+  })
 
-    const terms = document.getElementById('terms')!
-    expect(within(terms).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual([
+  it('/terms carries its four parts in order', () => {
+    renderWithProviders(<App />, { route: '/terms', authStatus: 'unauthenticated' })
+
+    expect(heading1()?.textContent).toBe('Terms')
+    expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual([
       'Beta expectations',
       'Acceptable use',
       'No guarantee',
       'Contact',
     ])
+  })
+
+  it('a signed-in visitor reads /privacy instead of being sent to the workspace', () => {
+    renderWithProviders(<App />, { route: '/privacy', authStatus: 'authenticated' })
+
+    expect(heading1()?.textContent).toBe('Privacy')
+    expect(screen.queryByTestId('workspace-layout')).toBeNull()
+  })
+
+  it('the landing no longer carries the legal copy', () => {
+    renderWithProviders(<App />, { route: '/', authStatus: 'unauthenticated' })
+
+    expect(screen.getByRole('main').textContent).not.toMatch(/What we collect/)
   })
 })

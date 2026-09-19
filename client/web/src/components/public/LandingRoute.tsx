@@ -10,8 +10,6 @@ import { Container, Cluster, Stack } from '../ui/layout'
 import { HowItWorks } from './landing/HowItWorks'
 import { WhereThingsStand } from './landing/WhereThingsStand'
 import { About } from './landing/About'
-import { Privacy } from './landing/Privacy'
-import { Terms } from './landing/Terms'
 
 // A07 — the public landing page, rendered inside PublicShell.
 //
@@ -94,13 +92,12 @@ const Hero = () => {
   )
 }
 
-/** Section bodies by anchor id (A07: features, roadmap; A08: about, privacy, terms). */
+/** Section bodies by anchor id (A07: features, roadmap; A08: about). Privacy and
+ *  Terms left the landing with A08b — they are routes now, not sections. */
 const SECTION_BODIES: Partial<Record<SectionId, ReactNode>> = {
   features: <HowItWorks />,
   roadmap: <WhereThingsStand />,
   about: <About />,
-  privacy: <Privacy />,
-  terms: <Terms />,
 }
 
 export const LandingRoute = () => {
