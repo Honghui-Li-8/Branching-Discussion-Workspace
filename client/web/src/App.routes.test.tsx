@@ -235,6 +235,10 @@ describe('landing content (A07)', () => {
     expect(img.getAttribute('src')).toBe('/landing/intro-workspace-tree.png')
     expect(screen.getByRole('link', { name: 'Sign in with Google' }).getAttribute('href')).toBe('/login')
     expect(screen.getByRole('link', { name: 'See how it works' }).getAttribute('href')).toBe('/#features')
+    // A08b — the descriptor claims only what the product does: branching starts at a reply.
+    const main = screen.getByRole('main')
+    expect(main.textContent).toContain('branch off an assistant reply into a side conversation')
+    expect(main.textContent).not.toMatch(/any message|any point/i)
   })
 
   it('Where things stand lists what works now and all five limitations', () => {
@@ -293,6 +297,9 @@ describe('About section (A08)', () => {
     ])
     expect(within(section).getByRole('link', { name: 'See where things stand' }).getAttribute('href')).toBe('/#roadmap')
     expect(section.textContent).not.toMatch(/single account/i)
+    // A08b — same correction as the hero: you branch from a reply, not from anywhere.
+    expect(section.textContent).toContain('branch from any assistant reply')
+    expect(section.textContent).not.toMatch(/any message|any point/i)
   })
 })
 

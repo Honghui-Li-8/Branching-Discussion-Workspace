@@ -10,7 +10,7 @@ import { sectionHref } from '../../../routePaths'
 const CARDS = [
   {
     title: 'Why branching',
-    body: 'Linear chat threads make it hard to explore an alternate direction without losing the original context. Trellis treats exploration as a first-class action: branch from any point, follow it as far as it is useful, and decide afterwards whether it belongs in the main thread.',
+    body: 'Linear chat threads make it hard to explore an alternate direction without losing the original context. Trellis treats exploration as a first-class action: branch from any assistant reply, follow it as far as it is useful, and decide afterwards whether it belongs in the main thread.',
   },
   {
     title: 'About this project',

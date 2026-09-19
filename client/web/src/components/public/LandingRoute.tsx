@@ -14,8 +14,9 @@ import { About } from './landing/About'
 // A07 — the public landing page, rendered inside PublicShell.
 //
 // Voice and vocabulary come from A02's approved narrative package: the
-// descriptor is verbatim, every noun is in its glossary, and nothing here is a
-// pitch. The hero shows the real product — a screenshot of the seeded intro
+// descriptor is A02's, corrected 2026-09-18 (A08b) to say "an assistant reply"
+// because that is the only thing the product branches from; every noun is in
+// its glossary, and nothing here is a pitch. The hero shows the real product — a screenshot of the seeded intro
 // workspace produced by scripts/capture-landing-visual.mjs — never an
 // illustration. The primary action is a link: /login owns sign-in and its
 // pending and failure states (A06).
@@ -44,8 +45,8 @@ const Hero = () => {
         <Stack gap="3">
           <h1 className="m-0 text-display font-semibold text-text-default">Trellis</h1>
           <p className="m-0 max-w-narrow text-body text-text-secondary">
-            A chat tool where you branch off any message into a side conversation, then bring the
-            conclusion back to the main thread.
+            A chat tool where you branch off an assistant reply into a side conversation, then
+            bring the conclusion back to the main thread.
           </p>
           <p className="m-0 max-w-narrow text-label text-text-muted">
             An early beta and a solo side project.{' '}
