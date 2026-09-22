@@ -70,7 +70,7 @@ describe('route resolution (A06)', () => {
       renderWithProviders(<App />, { route: '/', authStatus: 'unauthenticated' })
 
       // Driven from the block list rather than a copy table repeated here: the
-      // head copy is draft until checkpoint 1 and must stay swappable in one
+      // head copy is owner-approved (checkpoint 1) but must stay swappable in one
       // file. What this asserts is the mechanism — every head renders both.
       for (const block of LANDING_BLOCKS) {
         const section = screen

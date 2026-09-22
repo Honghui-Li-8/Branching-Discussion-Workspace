@@ -269,7 +269,7 @@ function TypeScale() {
         <p className="text-heading font-medium text-text-default">What you can do</p>
         <p className="text-body text-text-secondary">
           Compare branches side by side, then approve and merge back only the responses that move
-          you forward. Explore multiple directions from any point in the conversation without
+          you forward. Explore multiple directions from any assistant reply in the conversation without
           losing the original thread.
         </p>
         <Cluster gap="3">

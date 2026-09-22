@@ -38,6 +38,8 @@ describe('public route compositions pass the A-T3e structural scan', () => {
     ['/login', 'authenticated'],
     ['/this-does-not-exist', 'unauthenticated'],
     ['/this-does-not-exist', 'authenticated'],
+    ['/privacy', 'unauthenticated'],
+    ['/terms', 'authenticated'],
   ] as const)('%s when %s', async (route, authStatus) => {
     const { container } = renderWithProviders(<App />, { route, authStatus, fetchImpl: pendingFetch })
     expect(await seriousViolations(container)).toHaveLength(0)

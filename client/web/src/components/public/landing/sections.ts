@@ -10,8 +10,8 @@ import type { BandTone } from './Band'
 // has one renders with that id, tabIndex={-1} and the focus ring, and a block
 // that does not is an ordinary labelled <section>.
 //
-// DRAFT COPY — the eyebrows and subtitles are not owner-approved yet (A08b
-// checkpoint 1). They are deliberately all in this file so the table can be
+// The eyebrows and subtitles are A08b's — owner-approved at checkpoint 1
+// (2026-09-22). They are deliberately all in this file so the table can be
 // swapped in one edit; nothing here is duplicated into a component or a test.
 // Titles are different: those are A07's approved section labels.
 //
