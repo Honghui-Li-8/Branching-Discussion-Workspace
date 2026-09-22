@@ -23,15 +23,57 @@ export const isAuthUser = (value: unknown): value is AuthUser => {
 export type NavigateFn = (path: string, opts?: { replace?: boolean }) => void
 
 /**
- * The single post-login navigation seam (A06). Every successful sign-in —
- * the OAuth callback and the local dev bypass — lands through here.
- *
- * Requested-destination preservation across OAuth is deferred to A10 (no deep
- * authenticated URLs exist yet); when it arrives, this is the function that
- * grows a destination parameter, and nothing else has to change.
+ * Requested-destination preservation (A10, round 2 Q3). The page a sign-in
+ * was started from is remembered in session storage — it survives the OAuth
+ * round-trip in the same tab and needs no change to the provider's redirect
+ * allow-list — and consumed exactly once by whichever path completes the
+ * sign-in: the callback or the local bypass.
  */
-export const navigateAfterLogin = (navigate: NavigateFn): void => {
-  navigate(PATHS.root, { replace: true })
+export const DESTINATION_STORAGE_KEY = 'trellis.requestedDestination'
+
+/** Pages that are never a destination: they are the flow itself, or the default. */
+const NEVER_DESTINATIONS: ReadonlySet<string> = new Set([PATHS.root, PATHS.login, PATHS.authCallback])
+
+/**
+ * Only a same-origin relative path is honoured. Anything else — absolute,
+ * protocol-relative, one of the flow's own pages, or nothing — falls back to
+ * the authenticated root, so a remembered value can never redirect off-site
+ * or into a sign-in loop.
+ */
+export const resolvePostLoginDestination = (candidate: string | null | undefined): string => {
+  if (!candidate || !candidate.startsWith('/') || candidate.startsWith('//')) {
+    return PATHS.root
+  }
+  const pathOnly = candidate.split(/[?#]/)[0]
+  return NEVER_DESTINATIONS.has(pathOnly) ? PATHS.root : candidate
+}
+
+export const rememberRequestedDestination = (path: string): void => {
+  try {
+    window.sessionStorage.setItem(DESTINATION_STORAGE_KEY, path)
+  } catch {
+    // Storage can be unavailable (private mode, blocked); the fallback is the root.
+  }
+}
+
+/** Reads and clears the remembered destination, so it is used at most once. */
+export const takeRequestedDestination = (): string | null => {
+  try {
+    const value = window.sessionStorage.getItem(DESTINATION_STORAGE_KEY)
+    window.sessionStorage.removeItem(DESTINATION_STORAGE_KEY)
+    return value
+  } catch {
+    return null
+  }
+}
+
+/**
+ * The single post-login navigation seam (A06). Every successful sign-in —
+ * the OAuth callback and the local dev bypass — lands through here, with the
+ * destination the sign-in was started from (A10), resolved by the rule above.
+ */
+export const navigateAfterLogin = (navigate: NavigateFn, destination?: string | null): void => {
+  navigate(resolvePostLoginDestination(destination), { replace: true })
 }
 
 /**
@@ -55,6 +97,8 @@ export interface AuthExchangeDeps {
   dispatchAuthUser: (user: AuthUser) => void
   setAuthError: (message: string | null) => void
   navigate: NavigateFn
+  /** The remembered pre-sign-in page, if any; resolved by `navigateAfterLogin`. */
+  destination?: string | null
 }
 
 export const runAuthExchange = async ({
@@ -63,6 +107,7 @@ export const runAuthExchange = async ({
   dispatchAuthUser,
   setAuthError,
   navigate,
+  destination,
 }: AuthExchangeDeps): Promise<void> => {
   try {
     const {
@@ -87,7 +132,7 @@ export const runAuthExchange = async ({
 
     dispatchAuthUser(payload.user)
     setAuthError(null)
-    navigateAfterLogin(navigate)
+    navigateAfterLogin(navigate, destination)
   } catch (error) {
     const message =
       error instanceof Error && error.message === 'Supabase is not configured.'

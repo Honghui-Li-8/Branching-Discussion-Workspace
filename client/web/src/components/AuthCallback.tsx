@@ -4,7 +4,7 @@ import { getSupabaseClient } from '../lib/supabaseClient'
 import { useAppDispatch } from '../store/hooks'
 import { setAuthenticatedUser } from '../store/slices/authSlice'
 import { useAuth } from './useAuth'
-import { runAuthExchange } from './authCallbackLogic'
+import { runAuthExchange, takeRequestedDestination } from './authCallbackLogic'
 import { apiBaseUrl } from '../lib/env'
 import { Container, Stack } from './ui/layout'
 import { useDocumentTitle } from '../lib/useDocumentTitle'
@@ -45,6 +45,7 @@ export const AuthCallback = () => {
       dispatchAuthUser: (user) => dispatch(setAuthenticatedUser(user)),
       setAuthError,
       navigate,
+      destination: takeRequestedDestination(),
     })
   }, [dispatch, navigate, setAuthError])
 

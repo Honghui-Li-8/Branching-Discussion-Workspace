@@ -27,6 +27,30 @@ jest.mock('./components/WorkspaceLayout', () => ({
 
 const heading1 = () => screen.queryByRole('heading', { level: 1 })
 
+describe('requested-destination preservation (A10)', () => {
+  afterEach(() => {
+    window.sessionStorage.clear()
+  })
+
+  it('the shell CTA remembers the page sign-in was started from', () => {
+    renderWithProviders(<App />, { route: '/terms', authStatus: 'unauthenticated' })
+
+    fireEvent.click(screen.getByRole('link', { name: 'Sign in' }))
+
+    expect(screen.getByTestId('location').textContent).toBe('/login')
+    expect(window.sessionStorage.getItem('trellis.requestedDestination')).toBe('/terms')
+  })
+
+  it('the not-found page does not remember itself', () => {
+    renderWithProviders(<App />, { route: '/nope', authStatus: 'unauthenticated' })
+
+    fireEvent.click(within(screen.getByRole('main')).getByRole('link', { name: 'Sign in' }))
+
+    expect(screen.getByTestId('location').textContent).toBe('/login')
+    expect(window.sessionStorage.getItem('trellis.requestedDestination')).toBeNull()
+  })
+})
+
 describe('route resolution (A06)', () => {
   describe('/ — auth-aware root', () => {
     it('unknown: shows the neutral bootstrap state and neither the landing nor the workspace', () => {

@@ -1,8 +1,12 @@
-import { describe, expect, jest, test } from '@jest/globals'
+import { beforeEach, describe, expect, jest, test } from '@jest/globals'
 import {
+  DESTINATION_STORAGE_KEY,
   navigateAfterLogin,
   navigateAfterLoginFailure,
+  rememberRequestedDestination,
+  resolvePostLoginDestination,
   runAuthExchange,
+  takeRequestedDestination,
   type AuthExchangeDeps,
 } from './authCallbackLogic'
 
@@ -133,5 +137,106 @@ describe('post-login navigation seam (A06)', () => {
 
     expect(deps.setAuthError).toHaveBeenCalledWith('Sign-in is not configured yet.')
     expect(deps.navigate).toHaveBeenCalledWith('/login', { replace: true })
+  })
+})
+
+describe('requested-destination preservation (A10)', () => {
+  test.each([
+    ['/terms', '/terms'],
+    ['/terms?from=footer#top', '/terms?from=footer#top'],
+    ['/privacy', '/privacy'],
+  ])('accepts the same-origin relative path %s', (candidate, expected) => {
+    expect(resolvePostLoginDestination(candidate)).toBe(expected)
+  })
+
+  test.each([
+    ['absolute URL', 'https://evil.example/steal'],
+    ['protocol-relative URL', '//evil.example'],
+    ['the sign-in page', '/login'],
+    ['the sign-in page with a query', '/login?next=/terms'],
+    ['the callback', '/auth/callback'],
+    ['the root', '/'],
+    ['nothing', undefined],
+    ['null', null],
+    ['a bare word', 'terms'],
+  ])('falls back to the root for %s', (_label, candidate) => {
+    expect(resolvePostLoginDestination(candidate)).toBe('/')
+  })
+
+  test('navigateAfterLogin honours an accepted destination and replaces history', () => {
+    const navigate = jest.fn()
+    navigateAfterLogin(navigate, '/terms')
+    expect(navigate).toHaveBeenCalledWith('/terms', { replace: true })
+  })
+
+  test('navigateAfterLogin without a destination still lands on the root', () => {
+    const navigate = jest.fn()
+    navigateAfterLogin(navigate, null)
+    expect(navigate).toHaveBeenCalledWith('/', { replace: true })
+  })
+
+  test('the exchange success path navigates to the destination', async () => {
+    const deps = makeDeps({
+      ...makeSession('valid-token'),
+      postLogin: makeSuccessPostLogin(),
+      destination: '/terms',
+    })
+
+    await runAuthExchange(deps)
+
+    expect(deps.navigate).toHaveBeenCalledWith('/terms', { replace: true })
+  })
+
+  test('the exchange failure path ignores the destination and lands on /login', async () => {
+    const deps = makeDeps({ destination: '/terms' })
+
+    await runAuthExchange(deps)
+
+    expect(deps.navigate).toHaveBeenCalledWith('/login', { replace: true })
+  })
+})
+
+describe('destination storage (A10)', () => {
+  const store = new Map<string, string>()
+  const sessionStorage = {
+    getItem: (key: string) => store.get(key) ?? null,
+    setItem: (key: string, value: string) => void store.set(key, value),
+    removeItem: (key: string) => void store.delete(key),
+  }
+
+  beforeEach(() => {
+    store.clear()
+    Object.defineProperty(globalThis, 'window', {
+      value: { sessionStorage },
+      configurable: true,
+      writable: true,
+    })
+  })
+
+  test('remember then take returns the path once and clears it', () => {
+    rememberRequestedDestination('/terms')
+    expect(store.get(DESTINATION_STORAGE_KEY)).toBe('/terms')
+    expect(takeRequestedDestination()).toBe('/terms')
+    expect(takeRequestedDestination()).toBeNull()
+  })
+
+  test('a throwing storage is swallowed: remember is a no-op and take yields null', () => {
+    Object.defineProperty(globalThis, 'window', {
+      value: {
+        sessionStorage: {
+          getItem: () => {
+            throw new Error('blocked')
+          },
+          setItem: () => {
+            throw new Error('blocked')
+          },
+          removeItem: () => {},
+        },
+      },
+      configurable: true,
+      writable: true,
+    })
+    expect(() => rememberRequestedDestination('/terms')).not.toThrow()
+    expect(takeRequestedDestination()).toBeNull()
   })
 })

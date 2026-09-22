@@ -8,7 +8,7 @@ import {
 } from '../devFlags'
 import { useAuth } from './useAuth'
 import { devAuthToken, isDev, localAuthBypassFlag } from '../lib/env'
-import { navigateAfterLogin } from './authCallbackLogic'
+import { navigateAfterLogin, takeRequestedDestination } from './authCallbackLogic'
 import { AlertBanner } from './ui/alert-banner'
 import { Button } from './ui/button'
 import { Container, Stack } from './ui/layout'
@@ -58,7 +58,7 @@ export const LoginPage = () => {
       // renders regardless of auth state, so success must navigate. Only a
       // confirmed session navigates — the provider declines (without throwing)
       // while bootstrap is still resolving.
-      if (signedIn) navigateAfterLogin(navigate)
+      if (signedIn) navigateAfterLogin(navigate, takeRequestedDestination())
     } catch {
       // AuthProvider has already surfaced localBypassError.
     }
