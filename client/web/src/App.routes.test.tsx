@@ -8,6 +8,7 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 
 import App from './App'
+import { LandingRoute } from './components/public/LandingRoute'
 import * as supabaseClient from './lib/supabaseClient'
 import { failingFetch, pendingFetch, renderWithProviders } from './testing/renderWithProviders'
 
@@ -53,8 +54,8 @@ describe('route resolution (A06)', () => {
         expect(section?.getAttribute('tabindex')).toBe('-1')
       }
       expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual([
-        'Features',
-        'Roadmap',
+        'How it works',
+        'Where things stand',
         'About',
       ])
     })
@@ -207,5 +208,52 @@ describe('sign-in flow surfaces (A06 Commit 5)', () => {
 
     await waitFor(() => expect(screen.getByTestId('location').textContent).toBe('/'))
     expect(screen.getByTestId('workspace-layout')).toBeTruthy()
+  })
+})
+
+describe('landing content (A07)', () => {
+  it('How it works carries the four-step proof sequence and the three use cases', () => {
+    renderWithProviders(<App />, { route: '/', authStatus: 'unauthenticated' })
+
+    const section = document.getElementById('features')!
+    const steps = within(section).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)
+    expect(steps).toEqual(['Branch', 'Explore', 'Approve and bring back', 'Resume', 'Use cases'])
+    expect(within(section).getAllByRole('heading', { level: 4 }).map((h) => h.textContent)).toEqual([
+      'Project decision',
+      'Database selection',
+      'Project walkthrough',
+    ])
+  })
+
+  it('hero shows the product visual with its alt text and the CTA per auth state', () => {
+    renderWithProviders(<App />, { route: '/', authStatus: 'unauthenticated' })
+    const img = screen.getByRole('img', { name: /project decision/i })
+    expect(img.getAttribute('src')).toBe('/landing/intro-workspace-tree.png')
+    expect(screen.getByRole('link', { name: 'Sign in with Google' }).getAttribute('href')).toBe('/login')
+    expect(screen.getByRole('link', { name: 'See how it works' }).getAttribute('href')).toBe('/#features')
+  })
+
+  it('Where things stand lists what works now and all five limitations', () => {
+    renderWithProviders(<App />, { route: '/', authStatus: 'unauthenticated' })
+
+    const section = document.getElementById('roadmap')!
+    expect(within(section).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual([
+      'What works now',
+      'Limitations',
+    ])
+    const lists = within(section).getAllByRole('list')
+    expect(within(lists[1]).getAllByRole('listitem')).toHaveLength(5)
+    expect(section.textContent).toMatch(/private to the account/)
+    expect(section.textContent).toMatch(/Safari is not supported/)
+    expect(section.textContent).toMatch(/signs everyone out/)
+  })
+
+  it('hero offers no action while auth is unknown', () => {
+    // RootRoute never shows the landing while unknown; render the route directly so the
+    // hero's own guard is the thing under test.
+    renderWithProviders(<LandingRoute />, { route: '/', authStatus: 'unknown', fetchImpl: pendingFetch })
+    expect(screen.queryByRole('link', { name: 'Sign in with Google' })).toBeNull()
+    expect(screen.queryByRole('link', { name: 'Open workspace' })).toBeNull()
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Trellis')
   })
 })

@@ -54,6 +54,14 @@ shadows, blurs, and hairline borders.
 ESLint enforces this at `warn` — a ratchet on new code, not a gate, since the existing
 violations are tracked against their own tickets.
 
+### Landing visual
+
+The landing hero shows a screenshot of the seeded intro workspace, not an illustration.
+`public/landing/intro-workspace-tree.png` is produced by `yarn workspace web capture:landing-visual`
+(Playwright against the local dev servers with the auth bypass configured; set
+`LANDING_CAPTURE_URL` if Vite is not on :5173). Re-run it whenever the tree or its cards are
+restyled and review the new image like code. CI never runs it — there is no API there.
+
 ### Accessibility
 
 The target is WCAG 2.2 AA. Two harnesses cover different halves of it, and neither covers

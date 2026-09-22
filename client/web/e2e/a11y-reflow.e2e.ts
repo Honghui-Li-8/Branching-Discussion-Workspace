@@ -251,3 +251,32 @@ test.describe('reflow harness self-check (ADR-0004) — these must be able to fa
     await page.evaluate(() => document.getElementById('__seeded_named')?.remove())
   })
 })
+
+test.describe('landing content (A07) — the visual loads and every anchor focuses its section', () => {
+  test('the hero image decodes and carries its alt text', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 })
+    await page.goto(PATHS.root)
+    await page.waitForLoadState('networkidle')
+
+    const img = page.getByRole('img', { name: /project decision/i })
+    await expect(img).toBeVisible()
+    // A broken path renders an alt-text box with naturalWidth 0; this is the assertion that catches it.
+    expect(await img.evaluate((el) => (el as HTMLImageElement).naturalWidth)).toBeGreaterThan(0)
+  })
+
+  for (const section of SECTIONS) {
+    test(`footer link "${section.label}" scrolls to and focuses #${section.id}`, async ({ page }) => {
+      await page.setViewportSize({ width: 1280, height: 500 })
+      await page.goto(PATHS.root)
+      await page.waitForLoadState('networkidle')
+
+      await page.getByRole('contentinfo').getByRole('link', { name: section.label }).click()
+      await expect(page.locator(`#${section.id}`)).toBeFocused()
+      const { top, viewportHeight } = await page
+        .locator(`#${section.id}`)
+        .evaluate((el) => ({ top: el.getBoundingClientRect().top, viewportHeight: window.innerHeight }))
+      expect(top).toBeGreaterThanOrEqual(0)
+      expect(top).toBeLessThan(viewportHeight)
+    })
+  }
+})

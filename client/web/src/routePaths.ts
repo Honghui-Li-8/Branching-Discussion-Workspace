@@ -12,17 +12,22 @@ export const PATHS = {
 } as const
 
 /**
- * Landing-page sections. A06 ships heading-only stubs with these ids so header
- * and footer anchors have real targets; A07 owns the final list, the labels
- * and all content, and renames here in one place.
+ * Landing-page sections — one list, two views. The header (and the narrow
+ * sheet) show the `inHeaderNav` subset; the footer lists them all. Ids are
+ * stable anchors and never change; labels are A07's (2026-09-15 decisions).
+ * A08 adds footer-only `privacy` and `terms` here with `inHeaderNav: false`.
  */
 export const SECTIONS = [
-  { id: 'features', label: 'Features' },
-  { id: 'roadmap', label: 'Roadmap' },
-  { id: 'about', label: 'About' },
+  { id: 'features', label: 'How it works', inHeaderNav: true },
+  { id: 'roadmap', label: 'Where things stand', inHeaderNav: true },
+  { id: 'about', label: 'About', inHeaderNav: true },
 ] as const
 
-export type SectionId = (typeof SECTIONS)[number]['id']
+export type Section = (typeof SECTIONS)[number]
+export type SectionId = Section['id']
+
+/** The sections the header and sheet navigation show. */
+export const HEADER_SECTIONS: readonly Section[] = SECTIONS.filter((s) => s.inHeaderNav)
 
 export const sectionHref = (id: SectionId): string => `${PATHS.root}#${id}`
 
