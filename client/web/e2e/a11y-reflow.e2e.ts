@@ -200,7 +200,8 @@ test.describe('reflow contract (ADR-0004) — signed-in workspace shell', () => 
       await page.goto(PATHS.root)
       await page.waitForLoadState('networkidle')
 
-      await expect(page.getByRole('button', { name: /MVP Branching Decisions/ })).toBeVisible()
+      // Anchored: the row's name starts with the title; its actions button is "Actions for …".
+      await expect(page.getByRole('button', { name: /^MVP Branching Decisions/ })).toBeVisible()
       await expect(page.getByRole('heading', { name: /opening or creating a workspace/i })).toHaveCount(0)
       await expect(page.getByRole('banner')).toHaveCount(0)
 

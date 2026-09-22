@@ -1,9 +1,8 @@
 import { useRef, useState } from 'react'
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
-import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import { useAppDispatch, useAppSelector } from '../store/hooks'
-import { WorkspaceContextMenu } from './WorkspaceContextMenu'
+import { WorkspaceItemActions } from './WorkspaceItemActions'
 import { CreateWorkspacePopover } from './CreateWorkspacePopover'
+import { BrandMark } from './BrandMark'
 import {
   selectActiveWorkspaceId,
   selectSidebarCollapsed,
@@ -15,7 +14,19 @@ import {
 import { useAuth } from './useAuth'
 import { trpc } from '../trpc'
 import { CreditBalanceIndicator } from './CreditBalanceIndicator'
+import { Button } from './ui/button'
+import { Input } from './ui/form-field'
+import { Link } from './ui/link'
+import { Skeleton } from './ui/skeleton'
+import { ICONS, PANEL_TOGGLE_ICONS } from '../lib/icons'
+import { PATHS } from '../routePaths'
+import { cn } from '../lib/utils'
 
+/**
+ * The signed-in navigation frame (A10): identity, the workspace list with a
+ * visible per-row menu, and the account row. Behaviour is the pre-A10 sidebar's;
+ * only the markup moved onto the A05 roles and the ui primitives.
+ */
 export const AppSidebar = () => {
   const dispatch = useAppDispatch()
   const workspaces = useAppSelector(selectWorkspaces)
@@ -55,19 +66,13 @@ export const AppSidebar = () => {
     },
   })
 
-  const workspaceMutations = {
-    create: createWorkspaceMutation,
-    update: updateWorkspaceMutation,
-    delete: deleteWorkspaceMutation,
-  }
-
   const createWorkspace = () => {
-    if (!isAuthenticated || workspaceMutations.create.isPending) {
+    if (!isAuthenticated || createWorkspaceMutation.isPending) {
       return
     }
 
     const nextNumber = workspaces.length + 1
-    workspaceMutations.create.mutate({
+    createWorkspaceMutation.mutate({
       title: `New Workspace ${nextNumber}`,
       rootNodeTitle: 'Root decision',
       rootNodeSummary: '',
@@ -108,167 +113,200 @@ export const AppSidebar = () => {
     setIsPopoverOpen((current) => !current)
   }
 
-  const currentUserName = isAuthBootstrapPending ? '...' : (authUser?.displayName ?? 'Guest')
+  const currentUserName = isAuthBootstrapPending ? '…' : (authUser?.displayName ?? 'Guest')
   const avatarInitial = currentUserName.trim().slice(0, 1).toUpperCase() || '?'
-  const workspaceActionError = workspaceMutations.create.error?.message ?? null
+  const workspaceActionError =
+    createWorkspaceMutation.error?.message ??
+    updateWorkspaceMutation.error?.message ??
+    deleteWorkspaceMutation.error?.message ??
+    null
+  const ExpandIcon = PANEL_TOGGLE_ICONS.left.open
+  const CollapseIcon = PANEL_TOGGLE_ICONS.left.close
+
+  const avatar = (
+    <span
+      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-bg-emphasis text-caption font-semibold text-text-inverse"
+      aria-hidden="true"
+    >
+      {avatarInitial}
+    </span>
+  )
 
   return (
     <>
-    <aside
-      className={`flex min-h-0 flex-col border-b border-slate-200 bg-white transition-[width] duration-300 ease-in-out lg:min-h-screen lg:border-r lg:border-b-0 ${isCollapsed ? 'lg:w-10 lg:overflow-hidden' : 'lg:w-[272px]'}`}
-      aria-label="Workspace navigation"
-    >
-      {/* Collapsed strip — desktop only */}
-      <div className={`hidden flex-1 flex-col items-center justify-between py-2.5 ${isCollapsed ? 'lg:flex' : ''}`}>
-        <button
-          type="button"
-          className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
-          onClick={() => setIsCollapsed(false)}
-          aria-label="Expand sidebar"
-          title="Expand sidebar"
-        >
-          <ChevronRightIcon sx={{ fontSize: 16 }} />
-        </button>
-
-        <span
-          className="inline-flex h-8 w-8 cursor-default items-center justify-center rounded-full bg-slate-900 text-[13px] font-bold text-white shadow-sm"
-          title={currentUserName}
-          aria-label={currentUserName}
-        >
-          {avatarInitial}
-        </span>
-      </div>
-
-      <section className={`flex min-h-0 flex-1 flex-col ${isCollapsed ? 'lg:hidden' : ''}`}>
-        <header className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
-          <h2 className="m-0 text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">
-            Workspaces
-          </h2>
-          <div className="flex items-center gap-1">
-            <button
-              ref={createButtonRef}
-              type="button"
-              className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-slate-950 bg-slate-950 text-xl text-white shadow-sm transition-colors duration-150 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 disabled:cursor-not-allowed disabled:opacity-50"
-              onClick={toggleCreatePopover}
-              aria-label="Create workspace"
-              disabled={!isAuthenticated || isAuthBootstrapPending}
+      <aside
+        aria-label="Workspace navigation"
+        className={cn(
+          'flex min-h-0 flex-col border-b border-border-default bg-bg-default transition-[width] duration-300 ease-in-out motion-reduce:transition-none lg:min-h-screen lg:border-r lg:border-b-0',
+          isCollapsed ? 'lg:w-12 lg:overflow-hidden' : 'lg:w-72',
+        )}
+      >
+        {/* Collapsed strip — desktop only. Rendered only while collapsed so the
+            expand control is the one recovery path and is observable as such. */}
+        {isCollapsed ? (
+          <div className="hidden flex-1 flex-col items-center justify-between py-3 lg:flex">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="px-2"
+              onClick={() => setIsCollapsed(false)}
+              aria-label="Expand sidebar"
+              title="Expand sidebar"
             >
-              +
-            </button>
-            <button
-              type="button"
-              className="hidden h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white text-sm leading-none text-slate-600 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 lg:flex"
+              <ExpandIcon className="h-4 w-4" aria-hidden="true" />
+            </Button>
+            <span title={currentUserName}>{avatar}</span>
+          </div>
+        ) : null}
+
+        <div className={cn('flex min-h-0 flex-1 flex-col', isCollapsed && 'lg:hidden')}>
+          <div className="flex items-center justify-between gap-2 border-b border-border-default px-4 py-3">
+            <BrandMark tone="light" />
+            <Button
+              variant="ghost"
+              size="sm"
+              className="hidden px-2 lg:inline-flex"
               onClick={() => setIsCollapsed(true)}
               aria-label="Collapse sidebar"
               title="Collapse sidebar"
             >
-              <ChevronLeftIcon sx={{ fontSize: 16 }} />
-            </button>
+              <CollapseIcon className="h-4 w-4" aria-hidden="true" />
+            </Button>
           </div>
-        </header>
 
-        <ul className="m-0 flex max-h-[220px] list-none flex-col gap-2 overflow-y-auto p-3 lg:max-h-none">
-          {isWorkspacesLoading && workspaces.length === 0 ? (
-            <li className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-[12px] text-slate-500">
-              Loading workspaces...
-            </li>
-          ) : workspaces.length === 0 ? (
-            <li className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-2.5 text-[12px] text-slate-500">
-              No workspaces yet.
-            </li>
-          ) : (
-            workspaces.map((workspace) => {
-              const isActive = workspace.id === activeWorkspaceId
-              const workspaceSummary = workspace.summary?.trim() || 'No summary yet.'
-              const isRenaming = renamingId === workspace.id
+          <nav aria-label="Workspaces" className="flex min-h-0 flex-1 flex-col">
+            <div className="flex items-center justify-between gap-2 px-4 pt-3 pb-2">
+              <h2 className="m-0 text-caption font-medium uppercase tracking-wide text-text-muted">
+                Workspaces
+              </h2>
+              <Button
+                ref={createButtonRef}
+                size="sm"
+                onClick={toggleCreatePopover}
+                aria-label="Create workspace"
+                aria-expanded={isPopoverOpen}
+                disabled={!isAuthenticated || isAuthBootstrapPending}
+              >
+                <ICONS.create className="h-4 w-4" aria-hidden="true" />
+                New
+              </Button>
+            </div>
 
-              return (
-                <li key={workspace.id}>
-                  {isRenaming ? (
-                    <input
-                      autoFocus
-                      value={renameValue}
-                      onChange={(e) => setRenameValue(e.target.value)}
-                      onBlur={saveRename}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') e.currentTarget.blur()
-                        if (e.key === 'Escape') setRenamingId(null)
-                      }}
-                      className="w-full rounded-lg border border-blue-300 bg-blue-50 px-3 py-2.5 text-[13px] font-semibold text-slate-900 outline-none ring-4 ring-blue-500/10"
-                    />
-                  ) : (
-                    <WorkspaceContextMenu
-                      workspaceTitle={workspace.title}
-                      onRename={() => startRename(workspace.id, workspace.title)}
-                      onDelete={() => handleDelete(workspace.id)}
-                      isDeletePending={deleteWorkspaceMutation.isPending}
-                    >
-                      <button
-                        type="button"
-                        className={`flex w-full cursor-pointer flex-col gap-1.5 rounded-lg border px-3 py-2.5 text-left transition ${
-                          isActive
-                            ? 'border-blue-200 bg-blue-50 shadow-sm'
-                            : 'border-transparent bg-transparent hover:border-slate-200 hover:bg-slate-50'
-                        }`}
-                        onClick={() => dispatch(setActiveWorkspaceId(workspace.id))}
-                      >
-                        <span className="truncate text-[13px] font-semibold text-slate-900">
-                          {workspace.title}
-                        </span>
-                        <small className="line-clamp-2 text-[11px] leading-snug text-slate-500">{workspaceSummary}</small>
-                      </button>
-                    </WorkspaceContextMenu>
-                  )}
+            <ul className="m-0 flex max-h-56 list-none flex-col gap-1 overflow-y-auto px-2 pb-2 lg:max-h-none">
+              {isWorkspacesLoading && workspaces.length === 0 ? (
+                <li className="flex flex-col gap-1 px-1 py-1">
+                  <span role="status" className="sr-only">
+                    Loading workspaces
+                  </span>
+                  <Skeleton className="h-11 w-full" />
+                  <Skeleton className="h-11 w-full" />
                 </li>
-              )
-            })
-          )}
-        </ul>
-      </section>
+              ) : workspaces.length === 0 ? (
+                <li className="rounded-md border border-dashed border-border-default px-3 py-2.5 text-caption text-text-muted">
+                  No workspaces yet.
+                </li>
+              ) : (
+                workspaces.map((workspace) => {
+                  const isActive = workspace.id === activeWorkspaceId
+                  const workspaceSummary = workspace.summary?.trim() || 'No summary yet.'
+                  const isRenaming = renamingId === workspace.id
 
-      <section className={`border-t border-slate-200 px-4 py-3 ${isCollapsed ? 'lg:hidden' : ''}`}>
-        <div className="flex items-center justify-between gap-2.5">
-          <div className="flex min-w-0 items-center gap-2.5">
-            <span
-              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-900 text-[13px] font-bold text-white"
-              aria-hidden="true"
-            >
-              {avatarInitial}
-            </span>
-            <p className="m-0 truncate text-sm font-semibold text-slate-900">{currentUserName}</p>
+                  return (
+                    <li key={workspace.id}>
+                      {isRenaming ? (
+                        <Input
+                          autoFocus
+                          aria-label="Workspace name"
+                          value={renameValue}
+                          onChange={(e) => setRenameValue(e.target.value)}
+                          onBlur={saveRename}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') e.currentTarget.blur()
+                            if (e.key === 'Escape') setRenamingId(null)
+                          }}
+                          className="text-label font-medium"
+                        />
+                      ) : (
+                        <WorkspaceItemActions
+                          workspaceTitle={workspace.title}
+                          onRename={() => startRename(workspace.id, workspace.title)}
+                          onDelete={() => handleDelete(workspace.id)}
+                          isDeletePending={deleteWorkspaceMutation.isPending}
+                        >
+                          <button
+                            type="button"
+                            aria-current={isActive ? 'true' : undefined}
+                            className={cn(
+                              'flex min-w-0 flex-1 cursor-pointer flex-col gap-0.5 rounded-md border-l-2 px-3 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default focus-visible:ring-offset-2',
+                              isActive
+                                ? 'border-accent-default bg-accent-tint'
+                                : 'border-transparent hover:bg-bg-subtle',
+                            )}
+                            onClick={() => dispatch(setActiveWorkspaceId(workspace.id))}
+                          >
+                            <span className="truncate text-label font-medium text-text-default">
+                              {workspace.title}
+                            </span>
+                            <span className="line-clamp-2 text-caption text-text-muted">
+                              {workspaceSummary}
+                            </span>
+                          </button>
+                        </WorkspaceItemActions>
+                      )}
+                    </li>
+                  )
+                })
+              )}
+            </ul>
+          </nav>
+
+          <div className="border-t border-border-default px-4 py-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex min-w-0 items-center gap-2">
+                {avatar}
+                <p className="m-0 truncate text-label font-medium text-text-default">{currentUserName}</p>
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={isAuthenticated ? () => void logout() : () => void login()}
+                disabled={isAuthActionPending || isAuthBootstrapPending}
+              >
+                {isAuthBootstrapPending
+                  ? 'Checking…'
+                  : isAuthActionPending
+                    ? 'Working…'
+                    : isAuthenticated
+                      ? 'Logout'
+                      : 'Login'}
+              </Button>
+            </div>
+            <CreditBalanceIndicator />
+            {authError && !isAuthBootstrapPending ? (
+              <p role="alert" className="mt-2 mb-0 text-caption text-error-default">
+                {authError}
+              </p>
+            ) : workspaceActionError ? (
+              <p role="alert" className="mt-2 mb-0 text-caption text-error-default">
+                {workspaceActionError}
+              </p>
+            ) : null}
+            <nav aria-label="Legal" className="mt-3 flex gap-3 text-caption">
+              <Link to={PATHS.privacy}>Privacy</Link>
+              <Link to={PATHS.terms}>Terms</Link>
+            </nav>
           </div>
-          <button
-            type="button"
-            className="cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.04em] text-slate-600 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 disabled:cursor-not-allowed disabled:opacity-60"
-            onClick={isAuthenticated ? () => void logout() : () => void login()}
-            disabled={isAuthActionPending || isAuthBootstrapPending}
-          >
-            {isAuthBootstrapPending
-              ? 'Checking...'
-              : isAuthActionPending
-                ? 'Working...'
-                : isAuthenticated
-                  ? 'Logout'
-                  : 'Login'}
-          </button>
         </div>
-        <CreditBalanceIndicator />
-        {authError && !isAuthBootstrapPending ? (
-          <p className="mt-2 mb-0 text-[11px] text-red-700">{authError}</p>
-        ) : workspaceActionError ? (
-          <p className="mt-2 mb-0 text-[11px] text-red-700">{workspaceActionError}</p>
-        ) : null}
-      </section>
-    </aside>
+      </aside>
 
-    {isPopoverOpen && (
-      <CreateWorkspacePopover
-        anchorRef={createButtonRef}
-        position={popoverPosition}
-        onCreateBlank={createWorkspace}
-        onClose={() => setIsPopoverOpen(false)}
-      />
-    )}
+      {isPopoverOpen && (
+        <CreateWorkspacePopover
+          anchorRef={createButtonRef}
+          position={popoverPosition}
+          onCreateBlank={createWorkspace}
+          onClose={() => setIsPopoverOpen(false)}
+        />
+      )}
     </>
   )
 }

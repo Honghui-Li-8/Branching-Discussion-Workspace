@@ -13,7 +13,7 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { axe, toHaveNoViolations } from 'jest-axe'
 
 import { WorkspaceLayout } from './WorkspaceLayout'
-import { pendingFetch, renderWithProviders } from '../testing/renderWithProviders'
+import { TEST_USER, pendingFetch, renderWithProviders } from '../testing/renderWithProviders'
 
 expect.extend(toHaveNoViolations)
 
@@ -83,10 +83,24 @@ const WORKSPACES = [
   { id: 'w2', title: 'Choose a Database', summary: null },
 ]
 
+/** A row's accessible name starts with its title; the actions button starts with "Actions for". */
+const rowName = (workspace: { title: string }) => new RegExp(`^${workspace.title}`)
+
 const sidebar = () => screen.getByRole('complementary', { name: 'Workspace navigation' })
 const mockedTree = () => screen.queryByRole('region', { name: 'Discussion tree (mocked)' })
 
 describe('signed-in shell layout (A10)', () => {
+  beforeAll(() => {
+    // Radix menus position through Popper, which observes size; jsdom has no
+    // ResizeObserver and no layout, so an inert stand-in is enough.
+    class InertResizeObserver {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+    Object.defineProperty(globalThis, 'ResizeObserver', { value: InertResizeObserver, configurable: true })
+  })
+
   it('bootstrap: account row reports the check and create is disabled', async () => {
     const { container } = renderWithProviders(<WorkspaceLayout />, {
       authStatus: 'unknown',
@@ -128,11 +142,14 @@ describe('signed-in shell layout (A10)', () => {
     })
 
     await waitFor(() =>
-      expect(within(sidebar()).getByRole('button', { name: new RegExp(WORKSPACES[0].title) })).toBeTruthy(),
+      expect(within(sidebar()).getByRole('button', { name: rowName(WORKSPACES[0]) })).toBeTruthy(),
     )
-    expect(within(sidebar()).getByRole('button', { name: new RegExp(WORKSPACES[1].title) })).toBeTruthy()
+    expect(within(sidebar()).getByRole('button', { name: rowName(WORKSPACES[1]) })).toBeTruthy()
     expect(mockedTree()).toBeTruthy()
-    // Commit 3 replaces this store read with `aria-current` on the row.
+    const first = within(sidebar()).getByRole('button', { name: rowName(WORKSPACES[0]) })
+    expect(first.getAttribute('aria-current')).toBe('true')
+    expect(within(sidebar()).getByRole('button', { name: rowName(WORKSPACES[1]) }).getAttribute('aria-current')).toBeNull()
+    expect(within(sidebar()).getByRole('navigation', { name: 'Workspaces' })).toBeTruthy()
     expect(store.getState().appShell.activeWorkspaceId).toBe('w1')
     expect(await seriousViolations(container)).toHaveLength(0)
   })
@@ -143,10 +160,11 @@ describe('signed-in shell layout (A10)', () => {
       fetchImpl: trpcFetch({ workspacesList: () => WORKSPACES }),
     })
 
-    const second = await within(sidebar()).findByRole('button', { name: new RegExp(WORKSPACES[1].title) })
+    const second = await within(sidebar()).findByRole('button', { name: rowName(WORKSPACES[1]) })
     fireEvent.click(second)
 
-    await waitFor(() => expect(store.getState().appShell.activeWorkspaceId).toBe('w2'))
+    await waitFor(() => expect(second.getAttribute('aria-current')).toBe('true'))
+    expect(store.getState().appShell.activeWorkspaceId).toBe('w2')
     expect(mockedTree()).toBeTruthy()
     expect(await seriousViolations(container)).toHaveLength(0)
   })
@@ -156,14 +174,63 @@ describe('signed-in shell layout (A10)', () => {
       authStatus: 'authenticated',
       fetchImpl: trpcFetch({ workspacesList: () => WORKSPACES }),
     })
-    await within(sidebar()).findByRole('button', { name: new RegExp(WORKSPACES[0].title) })
+    await within(sidebar()).findByRole('button', { name: rowName(WORKSPACES[0]) })
 
+    expect(within(sidebar()).queryByRole('button', { name: 'Expand sidebar' })).toBeNull()
     fireEvent.click(within(sidebar()).getByRole('button', { name: 'Collapse sidebar' }))
-    // Commit 3 renders the strip conditionally; until then the store is the observable.
     expect(store.getState().appShell.isSidebarCollapsed).toBe(true)
     fireEvent.click(within(sidebar()).getByRole('button', { name: 'Expand sidebar' }))
     expect(store.getState().appShell.isSidebarCollapsed).toBe(false)
+    expect(within(sidebar()).queryByRole('button', { name: 'Expand sidebar' })).toBeNull()
     expect(await seriousViolations(container)).toHaveLength(0)
+  })
+
+  it('row actions: a visible menu offers Rename and Delete, and Delete confirms as immediate', async () => {
+    const { container } = renderWithProviders(<WorkspaceLayout />, {
+      authStatus: 'authenticated',
+      fetchImpl: trpcFetch({ workspacesList: () => WORKSPACES }),
+    })
+    const trigger = await within(sidebar()).findByRole('button', { name: `Actions for ${WORKSPACES[0].title}` })
+
+    fireEvent.keyDown(trigger, { key: 'Enter' })
+    const menu = await screen.findByRole('menu')
+    expect(within(menu).getByRole('menuitem', { name: /rename/i })).toBeTruthy()
+    fireEvent.click(within(menu).getByRole('menuitem', { name: /delete/i }))
+
+    const dialog = await screen.findByRole('alertdialog')
+    expect(dialog.textContent).toMatch(/immediately/)
+    expect(within(dialog).getByRole('button', { name: 'Delete' })).toBeTruthy()
+    // axe over an open modal (portal + aria-hidden siblings) takes several
+    // seconds under jsdom; the budget is for the scan, nothing here is slow.
+    expect(await seriousViolations(container)).toHaveLength(0)
+  }, 15000)
+
+  it('account row: legal links, credit line and logout are present', async () => {
+    renderWithProviders(<WorkspaceLayout />, {
+      authStatus: 'authenticated',
+      // TEST_USER's 100 credits round down to zero turns; give this one a few.
+      user: { ...TEST_USER, creditBalance: 4000 },
+      fetchImpl: trpcFetch({ workspacesList: () => WORKSPACES }),
+    })
+    await within(sidebar()).findByRole('button', { name: rowName(WORKSPACES[0]) })
+
+    const legal = within(sidebar()).getByRole('navigation', { name: 'Legal' })
+    expect(within(legal).getByRole('link', { name: 'Privacy' }).getAttribute('href')).toBe('/privacy')
+    expect(within(legal).getByRole('link', { name: 'Terms' }).getAttribute('href')).toBe('/terms')
+    expect(within(sidebar()).getByRole('link', { name: 'Trellis' }).getAttribute('href')).toBe('/')
+    expect(within(sidebar()).getByText(/turns remaining/)).toBeTruthy()
+    expect(within(sidebar()).getByRole('button', { name: 'Logout' })).toBeTruthy()
+  })
+
+  it('zero credit: the credit line says sending will fail', async () => {
+    renderWithProviders(<WorkspaceLayout />, {
+      authStatus: 'authenticated',
+      user: { ...TEST_USER, creditBalance: 0 },
+      fetchImpl: trpcFetch({ workspacesList: () => WORKSPACES }),
+    })
+    await within(sidebar()).findByRole('button', { name: rowName(WORKSPACES[0]) })
+
+    expect(within(sidebar()).getByRole('status').textContent).toMatch(/no credit left/i)
   })
 
   it('seeded: an unnamed icon button inside the shell turns the scan red', async () => {
@@ -171,7 +238,7 @@ describe('signed-in shell layout (A10)', () => {
       authStatus: 'authenticated',
       fetchImpl: trpcFetch({ workspacesList: () => WORKSPACES }),
     })
-    await within(sidebar()).findByRole('button', { name: new RegExp(WORKSPACES[0].title) })
+    await within(sidebar()).findByRole('button', { name: rowName(WORKSPACES[0]) })
 
     const rogue = document.createElement('button')
     rogue.innerHTML = '<svg aria-hidden="true" focusable="false" width="16" height="16"></svg>'
