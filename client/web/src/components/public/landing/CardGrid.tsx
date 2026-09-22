@@ -12,7 +12,8 @@ import { Stack } from '../../ui/layout'
 //
 // It lives under landing/ rather than ui/ deliberately — one surface's pattern
 // stays local until a second surface needs it, the same rule the layout
-// primitives followed (A06).
+// primitives followed (A06). MarkedList sits here for the same reason: it is
+// the body two of these cards take, not a component in its own right.
 
 /** How many cards a row holds at the widest width; narrower widths step down. */
 export type CardColumns = 1 | 2 | 3 | 4
@@ -90,4 +91,32 @@ export const Card = ({
     </Stack>
     {footer ? <div className="mt-auto">{footer}</div> : null}
   </li>
+)
+
+/** Marker colour. Never the only signal — the card's title says which list this
+ *  is, so the tone only reinforces it (A05b's third accessibility rule). */
+export type MarkerTone = 'accent' | 'success' | 'warning'
+
+const MARKER_TONE: Record<MarkerTone, string> = {
+  accent: 'text-accent-strong',
+  success: 'text-success-strong',
+  warning: 'text-warning-strong',
+}
+
+export type MarkedListProps = {
+  items: readonly string[]
+  icon: LucideIcon
+  tone: MarkerTone
+}
+
+/** A card body that is a list: one icon marker per item instead of a disc. */
+export const MarkedList = ({ items, icon: Icon, tone }: MarkedListProps) => (
+  <ul role="list" className="m-0 grid list-none gap-2 p-0 text-label text-text-secondary">
+    {items.map((item) => (
+      <li key={item} className="flex gap-2">
+        <Icon className={cn('mt-0.5 size-4 shrink-0', MARKER_TONE[tone])} aria-hidden="true" />
+        <span>{item}</span>
+      </li>
+    ))}
+  </ul>
 )

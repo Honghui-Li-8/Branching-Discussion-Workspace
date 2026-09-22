@@ -298,12 +298,14 @@ describe('landing content (A07)', () => {
     renderWithProviders(<App />, { route: '/', authStatus: 'unauthenticated' })
 
     const section = document.getElementById('roadmap')!
-    expect(within(section).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual([
-      'What works now',
-      'Limitations',
-    ])
-    const lists = within(section).getAllByRole('list')
-    expect(within(lists[1]).getAllByRole('listitem')).toHaveLength(5)
+    const headings = within(section).getAllByRole('heading', { level: 3 })
+    expect(headings.map((h) => h.textContent)).toEqual(['What works now', 'Limitations'])
+    // A08b — one card per list, each item marked rather than bulleted. The
+    // markers are aria-hidden, so the count is still the five items themselves.
+    const [worksNow, limitations] = headings.map((h) => h.closest('li')!)
+    expect(within(worksNow).getAllByRole('listitem')).toHaveLength(5)
+    expect(within(limitations).getAllByRole('listitem')).toHaveLength(5)
+    expect(section.textContent).toMatch(/read-only history/)
     expect(section.textContent).toMatch(/private to the account/)
     expect(section.textContent).toMatch(/Safari is not supported/)
     expect(section.textContent).toMatch(/signs everyone out/)
@@ -323,6 +325,13 @@ describe('landing content (A07)', () => {
     ])
     expect(section.textContent).toContain('In progress')
     expect(section.textContent).toContain('Shipped')
+    // A08b — one card per entry. No entry is planned work: the only "planned"
+    // on the page is the head saying so (A08: no promises of dates or features).
+    const entries = within(section)
+      .getAllByRole('heading', { level: 3 })
+      .map((h) => h.closest('li')!.textContent)
+    expect(entries).toHaveLength(2)
+    expect(entries.join(' ')).not.toMatch(/planned/i)
     expect(section.textContent).not.toMatch(/email sign-in/i)
     expect(document.getElementById('roadmap')!.textContent).not.toContain('MVP 1.5')
   })
