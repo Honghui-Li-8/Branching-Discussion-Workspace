@@ -15,6 +15,10 @@ import type { BandTone } from './Band'
 // swapped in one edit; nothing here is duplicated into a component or a test.
 // Titles are different: those are A07's approved section labels.
 //
+// No subtitle states a count. The use-case cards are A07 decision 4's three
+// seed workspaces, but the signed-in Create Workspace popover offers four, so a
+// number here is a claim that goes stale the moment a seed is added.
+//
 // Eyebrows are written in normal case and uppercased by CSS (SectionHead).
 
 export type LandingBlock = {
@@ -43,7 +47,7 @@ export const LANDING_BLOCKS = [
     anchorId: undefined,
     eyebrow: 'Examples',
     title: 'Use cases',
-    subtitle: 'Three seed workspaces, available as starting examples after sign-in.',
+    subtitle: 'Seed workspaces, available as starting examples after sign-in.',
     tone: 'subtle',
   },
   {
