@@ -1,5 +1,5 @@
 import { Link } from '../../ui/link'
-import { Stack } from '../../ui/layout'
+import { Card, CardGrid } from './CardGrid'
 import { sectionHref } from '../../../routePaths'
 
 // A08 — the About section (anchor id `about`): the three cards from the
@@ -24,19 +24,21 @@ const CARDS = [
 ] as const
 
 export const About = () => (
-  <ul role="list" className="m-0 grid list-none gap-4 p-0 lg:grid-cols-3">
+  <CardGrid columns={3}>
     {CARDS.map((card) => (
-      <li key={card.title}>
-        <Stack gap="2" className="h-full rounded-lg border border-border-default bg-bg-default p-5">
-          <h3 className="m-0 text-body font-semibold text-text-default">{card.title}</h3>
-          <p className="m-0 text-label text-text-secondary">{card.body}</p>
-          {'link' in card ? (
-            <p className="m-0 mt-auto text-label">
+      <Card
+        key={card.title}
+        title={card.title}
+        footer={
+          'link' in card ? (
+            <p className="m-0 text-label">
               <Link to={card.link.to}>{card.link.label}</Link>
             </p>
-          ) : null}
-        </Stack>
-      </li>
+          ) : undefined
+        }
+      >
+        <p className="m-0 text-label text-text-secondary">{card.body}</p>
+      </Card>
     ))}
-  </ul>
+  </CardGrid>
 )

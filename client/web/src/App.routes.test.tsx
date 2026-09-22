@@ -247,6 +247,14 @@ describe('landing content (A07)', () => {
     const features = document.getElementById('features')!
     const steps = within(features).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)
     expect(steps).toEqual(['Branch', 'Explore', 'Approve and bring back', 'Resume'])
+    // A08b — the number is visible text on the card, not a decorative badge, so
+    // the order survives for a reader who meets the cards one at a time.
+    expect(within(features).getAllByText(/^Step \d$/).map((n) => n.textContent)).toEqual([
+      'Step 1',
+      'Step 2',
+      'Step 3',
+      'Step 4',
+    ])
 
     const useCases = screen.getByRole('heading', { level: 2, name: 'Use cases' }).closest('section')!
     expect(useCases.id).toBe('')
