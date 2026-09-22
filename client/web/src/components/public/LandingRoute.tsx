@@ -8,7 +8,7 @@ import { Link, useHashFocus } from '../ui/link'
 import { useDocumentTitle } from '../../lib/useDocumentTitle'
 import { Cluster, Stack } from '../ui/layout'
 import { Band } from './landing/Band'
-import { SectionHead } from './landing/SectionHead'
+import { Eyebrow, SectionHead } from './landing/SectionHead'
 import { LANDING_BLOCKS, type LandingBlockKey } from './landing/sections'
 import { ProofSteps, UseCases } from './landing/HowItWorks'
 import { WhereThingsStand } from './landing/WhereThingsStand'
@@ -35,15 +35,19 @@ import { About } from './landing/About'
 // two that do not (use cases, the changelog) are still labelled regions — they
 // are simply not navigation targets, so they take no tabIndex.
 
-/** Produced by `yarn workspace web capture:landing-visual`; see the client README. */
+/** Produced by `yarn workspace web capture:landing-visual`; see the client README.
+ *  A08b — the capture is cropped to five named topics, so the card text is
+ *  readable at hero width; the alt text tracks that crop, not the whole tree. */
 const HERO_VISUAL = {
   src: '/landing/intro-workspace-tree.png',
-  width: 2540,
+  width: 1260,
   height: 760,
   alt:
-    'The Trellis workspace for the seed example "Project Decision": a tree of topics branching from ' +
-    'the question "Should I build this project now?". Three branches are marked Exploring, two are ' +
-    'Approved, and folded counts show further topics beneath each.',
+    'A detail of the Trellis tree for the seed workspace "Project Decision": three topics marked ' +
+    'Exploring — "Personal value vs team value", "Will this create strong interview signal?" and ' +
+    '"Execution and sustainability risks" — two of them leading to an Approved topic, "Personal ' +
+    'productivity gain" and "Visibility of decision process artifact". A count beside each card ' +
+    'shows the topics folded beneath it.',
 }
 
 const Hero = () => {
@@ -53,14 +57,14 @@ const Hero = () => {
     <div className="grid gap-8 lg:grid-cols-2 lg:items-center lg:gap-12">
       <Stack gap="5">
         <Stack gap="3">
-          <h1 className="m-0 text-display font-semibold text-text-default">Trellis</h1>
+          {/* The same eyebrow treatment the section heads use — the beta/solo
+              status is a standing qualifier on the product, not a sentence the
+              reader has to get past to reach the descriptor. */}
+          <Eyebrow>Early beta · solo side project</Eyebrow>
+          <h1 className="m-0 text-hero font-semibold text-text-default">Trellis</h1>
           <p className="m-0 max-w-narrow text-body text-text-secondary">
             A chat tool where you branch off an assistant reply into a side conversation, then
             bring the conclusion back to the main thread.
-          </p>
-          <p className="m-0 max-w-narrow text-label text-text-muted">
-            An early beta and a solo side project.{' '}
-            <Link to={sectionHref('roadmap')}>See where things stand.</Link>
           </p>
         </Stack>
 

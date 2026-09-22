@@ -49,7 +49,8 @@ describe('SystemShowcaseGallery (A-T3d)', () => {
     // line-height column; this is the regression guard.)
     const table = within(document.getElementById('type')!).getAllByRole('table')[0]
     const rows = within(table).getAllByRole('row').slice(1)
-    expect(rows).toHaveLength(6)
+    // Seven roles since A08b added text-hero; the gallery is the full inventory.
+    expect(rows).toHaveLength(7)
     for (const row of rows) {
       for (const cell of within(row).getAllByRole('cell')) {
         expect(cell.textContent?.trim()).not.toBe('')

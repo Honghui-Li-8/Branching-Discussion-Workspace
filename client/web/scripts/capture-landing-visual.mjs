@@ -22,6 +22,20 @@ const WORKSPACE_TITLE = /Project Decision/
 const ROOT_TOPIC = 'Should I build this project now?'
 const PADDING = 28
 
+// A08b — the crop is a named set of topics, not the tree's bounding box, so the
+// framing is a reviewed choice and stays stable when the seed grows. Owner pick
+// (checkpoint 1, crop C): the root's three Exploring branches plus the two
+// Approved topics beside them — roughly 1.66:1, which reads at hero width and
+// balances the copy column. The root card and the depth-3 card to its right are
+// deliberately outside it.
+const CROP_TOPICS = [
+  'Personal value vs team value',
+  'Will this create strong interview signal?',
+  'Execution and sustainability risks',
+  'Personal productivity gain',
+  'Visibility of decision process artifact',
+]
+
 const browser = await chromium.launch()
 try {
   // Large enough that every *unfolded* card renders without the canvas scrolling
@@ -39,15 +53,23 @@ try {
   // Let the tree layout settle (card measurement runs after mount).
   await page.waitForTimeout(600)
 
-  // Clip to the cards, not the canvas: the union of every topic card (each is
-  // an <article>), plus room on the right for the folded-count pills.
-  const boxes = await page.locator('main article').evaluateAll((els) =>
+  // Clip to the cards, not the canvas: the union of the CROP_TOPICS cards (each
+  // topic is an <article> titled by its h3), plus room on the right for the
+  // folded-count pills, which sit outside the card box.
+  const found = await page.locator('main article').evaluateAll((els) =>
     els.map((el) => {
       const r = el.getBoundingClientRect()
-      return { x: r.left, y: r.top, w: r.width, h: r.height }
+      return { title: el.querySelector('h3')?.textContent?.trim() ?? '', x: r.left, y: r.top, w: r.width, h: r.height }
     }),
   )
-  if (boxes.length === 0) throw new Error('no topic cards found — is the intro workspace rendered?')
+  if (found.length === 0) throw new Error('no topic cards found — is the intro workspace rendered?')
+  // Loudly, not silently: a reseeded or refolded tree must not quietly crop to
+  // whatever happens to be on screen.
+  const missing = CROP_TOPICS.filter((t) => !found.some((c) => c.title === t))
+  if (missing.length > 0) {
+    throw new Error(`crop topics missing from the rendered tree: ${missing.map((t) => `"${t}"`).join(', ')}`)
+  }
+  const boxes = found.filter((c) => CROP_TOPICS.includes(c.title))
   const x0 = Math.min(...boxes.map((b) => b.x)) - PADDING
   const y0 = Math.min(...boxes.map((b) => b.y)) - PADDING
   const x1 = Math.max(...boxes.map((b) => b.x + b.w)) + PADDING + 24
@@ -58,7 +80,10 @@ try {
     clip: { x: Math.max(0, x0), y: Math.max(0, y0), width: x1 - Math.max(0, x0), height: y1 - Math.max(0, y0) },
   })
   const { size } = await stat(out)
-  console.log(`wrote ${out} (${Math.round(size / 1024)} KB, ${boxes.length} cards)`)
+  console.log(
+    `wrote ${out} (${Math.round(size / 1024)} KB, ${boxes.length} of ${found.length} cards, ` +
+      `${Math.round(x1 - Math.max(0, x0))}×${Math.round(y1 - Math.max(0, y0))} CSS px)`,
+  )
 } finally {
   await browser.close()
 }

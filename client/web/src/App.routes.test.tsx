@@ -262,12 +262,28 @@ describe('landing content (A07)', () => {
     renderWithProviders(<App />, { route: '/', authStatus: 'unauthenticated' })
     const img = screen.getByRole('img', { name: /project decision/i })
     expect(img.getAttribute('src')).toBe('/landing/intro-workspace-tree.png')
+    // A08b — the capture is cropped to five named topics, so the alt text names
+    // those and no longer describes the root card the crop leaves out.
+    expect(img.getAttribute('alt')).toContain('Will this create strong interview signal?')
+    expect(img.getAttribute('alt')).not.toContain('Should I build this project now?')
     expect(screen.getByRole('link', { name: 'Sign in with Google' }).getAttribute('href')).toBe('/login')
     expect(screen.getByRole('link', { name: 'See how it works' }).getAttribute('href')).toBe('/#features')
     // A08b — the descriptor claims only what the product does: branching starts at a reply.
     const main = screen.getByRole('main')
     expect(main.textContent).toContain('branch off an assistant reply into a side conversation')
     expect(main.textContent).not.toMatch(/any message|any point/i)
+  })
+
+  it('the hero states the project status as an eyebrow, not a sentence with a link', () => {
+    renderWithProviders(<App />, { route: '/', authStatus: 'unauthenticated' })
+
+    // Stored in normal case — CSS does the uppercasing, so this is what a
+    // screen reader reads out.
+    expect(screen.getByText('Early beta · solo side project')).toBeTruthy()
+    const main = screen.getByRole('main')
+    expect(main.textContent).not.toContain('An early beta and a solo side project')
+    // The status link left the hero with the sentence; About's is now the only one.
+    expect(within(main).getAllByRole('link', { name: 'See where things stand' })).toHaveLength(1)
   })
 
   it('Where things stand lists what works now and all five limitations', () => {
