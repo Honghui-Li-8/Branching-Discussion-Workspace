@@ -2,13 +2,17 @@ import { useAppSelector } from '../../store/hooks'
 import { selectAuthStatus } from '../../store/slices/authSlice'
 import { cn } from '../../lib/utils'
 import type { ReactNode } from 'react'
-import { PATHS, SECTIONS, sectionHref, type SectionId } from '../../routePaths'
+import { PATHS, sectionHref } from '../../routePaths'
 import { buttonVariants } from '../ui/button'
 import { Link, useHashFocus } from '../ui/link'
 import { useDocumentTitle } from '../../lib/useDocumentTitle'
-import { Container, Cluster, Stack } from '../ui/layout'
-import { HowItWorks } from './landing/HowItWorks'
+import { Cluster, Stack } from '../ui/layout'
+import { Band } from './landing/Band'
+import { SectionHead } from './landing/SectionHead'
+import { LANDING_BLOCKS, type LandingBlockKey } from './landing/sections'
+import { ProofSteps, UseCases } from './landing/HowItWorks'
 import { WhereThingsStand } from './landing/WhereThingsStand'
+import { Changelog } from './landing/Changelog'
 import { About } from './landing/About'
 
 // A07 — the public landing page, rendered inside PublicShell.
@@ -24,6 +28,12 @@ import { About } from './landing/About'
 // Section ids are stable anchors shared with the shell's navigation
 // (routePaths.ts); each section keeps tabIndex={-1} and aria-labelledby so
 // deep links can scroll and focus it (useHashFocus).
+//
+// A08b composition: the page is a sequence of full-bleed Bands, not one
+// container-wrapped Stack. landing/sections.ts lists the five blocks in order
+// with their head copy and band tone; three of them carry an anchor, and the
+// two that do not (use cases, the changelog) are still labelled regions — they
+// are simply not navigation targets, so they take no tabIndex.
 
 /** Produced by `yarn workspace web capture:landing-visual`; see the client README. */
 const HERO_VISUAL = {
@@ -93,40 +103,56 @@ const Hero = () => {
   )
 }
 
-/** Section bodies by anchor id (A07: features, roadmap; A08: about). Privacy and
- *  Terms left the landing with A08b — they are routes now, not sections. */
-const SECTION_BODIES: Partial<Record<SectionId, ReactNode>> = {
-  features: <HowItWorks />,
-  roadmap: <WhereThingsStand />,
+/** Block bodies by block key. Privacy and Terms left the landing with A08b —
+ *  they are routes now, not sections. */
+const SECTION_BODIES: Record<LandingBlockKey, ReactNode> = {
+  'how-it-works': <ProofSteps />,
+  'use-cases': <UseCases />,
+  'where-things-stand': <WhereThingsStand />,
+  changelog: <Changelog />,
   about: <About />,
 }
+
+/** Only an anchored section is a focus target, so only it carries a ring. */
+const ANCHOR_CLASSES =
+  'scroll-mt-6 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-accent-default focus-visible:ring-offset-2'
 
 export const LandingRoute = () => {
   useHashFocus()
   useDocumentTitle()
 
   return (
-    <Container>
-      <Stack gap="16" className="py-12">
+    <>
+      <Band tone="subtle">
         <Hero />
+      </Band>
 
-        {SECTIONS.map((section) => (
-          <section
-            key={section.id}
-            id={section.id}
-            tabIndex={-1}
-            aria-labelledby={`${section.id}-heading`}
-            className="scroll-mt-6 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-accent-default focus-visible:ring-offset-2"
-          >
-            <Stack gap="6">
-              <h2 id={`${section.id}-heading`} className="m-0 text-heading font-medium text-text-default">
-                {section.label}
-              </h2>
-              {SECTION_BODIES[section.id]}
-            </Stack>
-          </section>
-        ))}
-      </Stack>
-    </Container>
+      {LANDING_BLOCKS.map((block) => {
+        // The three anchored blocks keep the heading ids their deep links and
+        // the shell's navigation have always pointed at.
+        const headingId = `${block.anchorId ?? block.key}-heading`
+
+        return (
+          <Band key={block.key} tone={block.tone}>
+            <section
+              id={block.anchorId}
+              tabIndex={block.anchorId ? -1 : undefined}
+              aria-labelledby={headingId}
+              className={cn(block.anchorId && ANCHOR_CLASSES)}
+            >
+              <Stack gap="12">
+                <SectionHead
+                  id={headingId}
+                  eyebrow={block.eyebrow}
+                  title={block.title}
+                  subtitle={block.subtitle}
+                />
+                {SECTION_BODIES[block.key]}
+              </Stack>
+            </section>
+          </Band>
+        )
+      })}
+    </>
   )
 }

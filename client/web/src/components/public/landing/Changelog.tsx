@@ -2,7 +2,9 @@ import { Badge } from '../../ui/badge'
 import { Cluster, Stack } from '../../ui/layout'
 import { CHANGELOG, type ChangelogStatus } from '../../../content/changelog'
 
-// A08 — renders content/changelog.ts inside "Where things stand".
+// A08 — renders content/changelog.ts. A08b promoted it out of "Where things
+// stand" into a block of its own, so the entry version is the block's first
+// heading level below the head (h3), not an h4 under a wrapper heading.
 
 const STATUS_LABEL: Record<ChangelogStatus, string> = {
   shipped: 'Shipped',
@@ -16,7 +18,7 @@ export const Changelog = () => (
         <Stack gap="3">
           <Cluster justify="between" gap="3">
             <div>
-              <h4 className="m-0 text-body font-semibold text-text-default">{entry.version}</h4>
+              <h3 className="m-0 text-body font-semibold text-text-default">{entry.version}</h3>
               <p className="m-0 text-caption text-text-muted">{entry.label}</p>
             </div>
             <Badge status={entry.status === 'shipped' ? 'success' : 'pending'}>{STATUS_LABEL[entry.status]}</Badge>

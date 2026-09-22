@@ -9,6 +9,7 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 
 import App from './App'
 import { LandingRoute } from './components/public/LandingRoute'
+import { LANDING_BLOCKS } from './components/public/landing/sections'
 import * as supabaseClient from './lib/supabaseClient'
 import { failingFetch, pendingFetch, renderWithProviders } from './testing/renderWithProviders'
 
@@ -53,11 +54,33 @@ describe('route resolution (A06)', () => {
         expect(section?.tagName).toBe('SECTION')
         expect(section?.getAttribute('tabindex')).toBe('-1')
       }
+      // A08b — five heads in page order; use cases and the changelog gained a
+      // head without gaining an anchor, so they are not navigation targets.
       expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual([
         'How it works',
+        'Use cases',
         'Where things stand',
+        'Changelog',
         'About',
       ])
+      expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1)
+    })
+
+    it('unauthenticated: every section head renders its eyebrow and subtitle (A08b)', () => {
+      renderWithProviders(<App />, { route: '/', authStatus: 'unauthenticated' })
+
+      // Driven from the block list rather than a copy table repeated here: the
+      // head copy is draft until checkpoint 1 and must stay swappable in one
+      // file. What this asserts is the mechanism — every head renders both.
+      for (const block of LANDING_BLOCKS) {
+        const section = screen
+          .getByRole('heading', { level: 2, name: block.title })
+          .closest('section')!
+        expect(section.getAttribute('aria-labelledby')).toBeTruthy()
+        // Stored in normal case; the uppercasing is CSS, not the text.
+        expect(section.textContent).toContain(block.eyebrow)
+        expect(section.textContent).toContain(block.subtitle)
+      }
     })
 
     it('authenticated: resolves to the workspace with no landing flash', () => {
@@ -216,13 +239,19 @@ describe('sign-in flow surfaces (A06 Commit 5)', () => {
 })
 
 describe('landing content (A07)', () => {
-  it('How it works carries the four-step proof sequence and the three use cases', () => {
+  it('How it works carries the four-step proof sequence, and use cases are their own block', () => {
     renderWithProviders(<App />, { route: '/', authStatus: 'unauthenticated' })
 
-    const section = document.getElementById('features')!
-    const steps = within(section).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)
-    expect(steps).toEqual(['Branch', 'Explore', 'Approve and bring back', 'Resume', 'Use cases'])
-    expect(within(section).getAllByRole('heading', { level: 4 }).map((h) => h.textContent)).toEqual([
+    // A08b — the wrapper h3s are gone, so the steps and the use-case cards are
+    // each the first heading level under their own head.
+    const features = document.getElementById('features')!
+    const steps = within(features).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)
+    expect(steps).toEqual(['Branch', 'Explore', 'Approve and bring back', 'Resume'])
+
+    const useCases = screen.getByRole('heading', { level: 2, name: 'Use cases' }).closest('section')!
+    expect(useCases.id).toBe('')
+    expect(useCases.getAttribute('tabindex')).toBeNull()
+    expect(within(useCases).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual([
       'Project decision',
       'Database selection',
       'Project walkthrough',
@@ -248,18 +277,30 @@ describe('landing content (A07)', () => {
     expect(within(section).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual([
       'What works now',
       'Limitations',
-      'Changelog',
     ])
-    // Changelog (A08): two entries, newest first, with their statuses; MVP 1 records Google sign-in.
-    expect(within(section).getAllByRole('heading', { level: 4 }).map((h) => h.textContent)).toEqual(['MVP 1.5', 'MVP 1'])
-    expect(section.textContent).toContain('In progress')
-    expect(section.textContent).toContain('Shipped')
-    expect(section.textContent).not.toMatch(/email sign-in/i)
     const lists = within(section).getAllByRole('list')
     expect(within(lists[1]).getAllByRole('listitem')).toHaveLength(5)
     expect(section.textContent).toMatch(/private to the account/)
     expect(section.textContent).toMatch(/Safari is not supported/)
     expect(section.textContent).toMatch(/signs everyone out/)
+  })
+
+  it('the changelog is its own block: two entries, newest first, with their statuses', () => {
+    renderWithProviders(<App />, { route: '/', authStatus: 'unauthenticated' })
+
+    // A08 content, A08b placement: out of "Where things stand" into a block of
+    // its own, so the entry versions are h3 and #roadmap no longer contains them.
+    const section = screen.getByRole('heading', { level: 2, name: 'Changelog' }).closest('section')!
+    expect(section.id).toBe('')
+    expect(section.getAttribute('tabindex')).toBeNull()
+    expect(within(section).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual([
+      'MVP 1.5',
+      'MVP 1',
+    ])
+    expect(section.textContent).toContain('In progress')
+    expect(section.textContent).toContain('Shipped')
+    expect(section.textContent).not.toMatch(/email sign-in/i)
+    expect(document.getElementById('roadmap')!.textContent).not.toContain('MVP 1.5')
   })
 
   it('hero offers no action while auth is unknown', () => {
