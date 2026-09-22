@@ -196,8 +196,15 @@ export const PublicShell = ({ children }: { children: ReactNode }) => {
           <Stack gap="4" className="py-8">
             <nav aria-label="Footer">
               <Cluster gap="8" align="start">
-                <FooterGroup label="Sections">
-                  {showSections ? <SectionLinks sections={SECTIONS} /> : null}
+                {/* The section links are the only members of this group, so it
+                    goes when they do — a list named "Sections" that holds no
+                    section link would misname what it contains (A-T3e). */}
+                {showSections ? (
+                  <FooterGroup label="Sections">
+                    <SectionLinks sections={SECTIONS} />
+                  </FooterGroup>
+                ) : null}
+                <FooterGroup label="Project">
                   <li>
                     <Link href={REPOSITORY_URL} target="_blank" className="inline-block py-2">
                       GitHub
