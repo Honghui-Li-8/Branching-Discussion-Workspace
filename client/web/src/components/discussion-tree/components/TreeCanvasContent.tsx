@@ -40,11 +40,11 @@ export const TreeCanvasContent = ({
       style={layout ? { width: `${layout.width}px`, height: `${layout.height}px` } : undefined}
     >
       {isLoading && !layout ? (
-        <p className="m-0 p-6 text-sm text-[#326079]">Loading workspace tree...</p>
+        <p className="m-0 p-6 text-body text-text-muted">Loading workspace tree...</p>
       ) : error && !layout ? (
-        <p className="m-0 p-6 text-sm text-[#8a3f2b]">Failed to load workspace tree: {error.message}</p>
+        <p className="m-0 p-6 text-body text-error-default">Failed to load workspace tree: {error.message}</p>
       ) : !layout ? (
-        <p className="m-0 p-6 text-sm text-[#326079]">No nodes in this workspace yet.</p>
+        <p className="m-0 p-6 text-body text-text-muted">No nodes in this workspace yet.</p>
       ) : (
         <TreeCanvasScene
           layout={layout}

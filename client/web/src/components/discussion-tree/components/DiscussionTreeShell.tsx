@@ -17,14 +17,14 @@ export const DiscussionTreeShell = ({ workspaceTitle, children }: DiscussionTree
 
   return (
     <section
-      className={`relative flex h-auto min-h-[430px] flex-col overflow-hidden border bg-white transition-all duration-300 ease-in-out lg:min-h-0 ${isSidebarCollapsed ? 'rounded-none border-transparent lg:h-screen' : 'rounded-xl border-slate-200 shadow-[0_18px_50px_rgba(15,23,42,0.08)] lg:h-[calc(100vh-32px)]'}`}
+      className={`relative flex min-h-96 flex-1 flex-col overflow-hidden border bg-bg-default transition-all duration-300 ease-in-out motion-reduce:transition-none lg:min-h-0 ${isSidebarCollapsed ? 'rounded-none border-transparent' : 'rounded-lg border-border-default shadow-panel'}`}
       aria-label="Discussion tree view"
     >
       <header
-        className="relative border-b border-slate-200 bg-white/95 px-5 py-3 backdrop-blur"
+        className="relative border-b border-border-default bg-bg-default/95 px-5 py-3 backdrop-blur"
         style={{ zIndex: zIndex.discussionHeader }}
       >
-        <h1 className="m-0 text-[20px] font-semibold leading-snug text-slate-950">{workspaceTitle}</h1>
+        <h1 className="m-0 text-heading font-medium text-text-default">{workspaceTitle}</h1>
       </header>
 
       {children}

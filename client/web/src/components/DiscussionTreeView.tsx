@@ -35,11 +35,7 @@ const WorkspaceTreeCanvas = ({ activeWorkspace }: WorkspaceTreeCanvasProps) => {
   return (
     <DiscussionTreeShell workspaceTitle={activeWorkspace.title}>
       <TreeCanvasFrame canvasRef={canvasRef}>
-        <TreeCanvasScrollArea
-          hasConversationPanel={conversationNode !== null}
-          conversationPanelFullscreen={ui.conversationPanelFullscreen}
-          conversationPanelWidth={ui.conversationPanelWidth}
-        >
+        <TreeCanvasScrollArea>
           <TreeCanvasContent
             layout={layout}
             isLoading={isTreeLoading}
