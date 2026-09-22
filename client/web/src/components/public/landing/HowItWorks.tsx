@@ -1,24 +1,34 @@
-import { Stack } from '../../ui/layout'
+import { ICONS } from '../../../lib/icons'
+import { Card, CardGrid } from './CardGrid'
 
-// A07 — the "How it works" section (anchor id `features`). The four steps are
-// A02's approved proof language, Branch → Explore → Approve → Resume, in the
+// A07 — the two blocks this file supplies bodies for. The four steps are A02's
+// approved proof language, Branch → Explore → Approve → Resume, in the
 // glossary's terms; the use cases are the seed workspaces that exist today.
 // Descriptive, not persuasive.
+//
+// A08b split them: "How it works" (anchor id `features`) and "Use cases" are
+// siblings now, each introduced by its own SectionHead, so neither owns a
+// wrapper heading. The intro paragraph that used to open the section became the
+// "How it works" subtitle — same sentence, one place.
 
 const STEPS = [
   {
+    icon: ICONS.branch,
     term: 'Branch',
     text: 'Select part of an assistant message and start a side conversation from it. The topic you branched from is untouched.',
   },
   {
+    icon: ICONS.explore,
     term: 'Explore',
     text: 'Work inside the branch for as long as it is useful. It stays attached to the point it came from, so nothing is lost or mixed into the main thread.',
   },
   {
+    icon: ICONS.approve,
     term: 'Approve and bring back',
     text: 'Ask for a conclusion, then edit, reject or approve it. Approving merges it into the parent topic; "merge" is the supporting term you will see in the interface.',
   },
   {
+    icon: ICONS.resume,
     term: 'Resume',
     text: 'The merged conclusion appears in the parent conversation, labelled with the branch it came from, and the branch becomes read-only.',
   },
@@ -39,44 +49,33 @@ const USE_CASES = [
   },
 ] as const
 
-export const HowItWorks = () => (
-  <Stack gap="8">
-    <p className="m-0 max-w-prose text-body text-text-secondary">
-      A branch is a side conversation that stays visible in the tree and can return a reviewed
-      conclusion to the topic it came from. That loop has four steps.
-    </p>
+// The step number stays visible text rather than a decorative badge: the order
+// is the content here, and a screen reader that meets the cards out of order
+// would otherwise have nothing to go on.
+export const ProofSteps = () => (
+  <CardGrid as="ol" columns={4}>
+    {STEPS.map((step, index) => (
+      <Card key={step.term} icon={step.icon} caption={`Step ${index + 1}`} title={step.term}>
+        <p className="m-0 text-label text-text-secondary">{step.text}</p>
+      </Card>
+    ))}
+  </CardGrid>
+)
 
-    {/* role="list" restores list semantics that WebKit drops when list-style is none. */}
-    <ol role="list" className="m-0 grid list-none gap-6 p-0 md:grid-cols-2">
-      {STEPS.map((step, index) => (
-        <li key={step.term} className="flex gap-4">
-          <span
-            aria-hidden="true"
-            className="mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-accent-tint text-label font-semibold text-accent-strong"
-          >
-            {index + 1}
-          </span>
-          <Stack gap="1">
-            <h3 className="m-0 text-body font-semibold text-text-default">{step.term}</h3>
-            <p className="m-0 text-label text-text-secondary">{step.text}</p>
-          </Stack>
-        </li>
-      ))}
-    </ol>
-
-    <Stack gap="4">
-      <h3 className="m-0 text-body font-semibold text-text-default">Use cases</h3>
-      <ul role="list" className="m-0 grid list-none gap-4 p-0 lg:grid-cols-3">
-        {USE_CASES.map((useCase) => (
-          <li key={useCase.title}>
-            <Stack gap="2" className="h-full rounded-lg border border-border-default bg-bg-default p-5">
-              <h4 className="m-0 text-body font-medium text-text-default">{useCase.title}</h4>
-              <p className="m-0 text-label text-text-secondary">{useCase.text}</p>
-              <p className="m-0 mt-auto text-caption text-text-muted">Available as a starting example after sign-in.</p>
-            </Stack>
-          </li>
-        ))}
-      </ul>
-    </Stack>
-  </Stack>
+export const UseCases = () => (
+  <CardGrid columns={3}>
+    {USE_CASES.map((useCase) => (
+      <Card
+        key={useCase.title}
+        title={useCase.title}
+        footer={
+          <p className="m-0 text-caption text-text-muted">
+            Available as a starting example after sign-in.
+          </p>
+        }
+      >
+        <p className="m-0 text-label text-text-secondary">{useCase.text}</p>
+      </Card>
+    ))}
+  </CardGrid>
 )

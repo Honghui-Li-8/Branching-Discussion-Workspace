@@ -101,9 +101,10 @@ import { useDocumentTitle } from '../../lib/useDocumentTitle'
    Gaps are flagged, not smoothed over — see the "Known gaps" section.
    ──────────────────────────────────────────────────────────────────────── */
 
-/* ADR-0001 — the six type roles. Class + token name only; sizes are read live. */
+/* ADR-0001 — the seven type roles. Class + token name only; sizes are read live. */
 const TYPE_ROLES = [
-  { role: 'display', cls: 'text-display', use: 'Landing hero — once per page' },
+  { role: 'hero', cls: 'text-hero', use: 'Landing hero title — once per product' },
+  { role: 'display', cls: 'text-display', use: 'Section titles on public pages' },
   { role: 'title', cls: 'text-title', use: 'Page and panel titles' },
   { role: 'heading', cls: 'text-heading', use: 'Section headings within a surface' },
   { role: 'body', cls: 'text-body', use: 'Prose and message content' },
@@ -268,7 +269,7 @@ function TypeScale() {
         <p className="text-heading font-medium text-text-default">What you can do</p>
         <p className="text-body text-text-secondary">
           Compare branches side by side, then approve and merge back only the responses that move
-          you forward. Explore multiple directions from any point in the conversation without
+          you forward. Explore multiple directions from any assistant reply in the conversation without
           losing the original thread.
         </p>
         <Cluster gap="3">
@@ -768,7 +769,7 @@ export function SystemShowcaseGallery() {
                 </p>
               </Stack>
 
-              <Section id="type" title="Type scale — as a ladder, and in prose" note="Six semantic roles over Tailwind's default primitive scale. Each role aliases both size and line height.">
+              <Section id="type" title="Type scale — as a ladder, and in prose" note="Seven semantic roles over Tailwind's default primitive scale. Each role aliases both size and line height.">
                 <TypeScale />
               </Section>
 

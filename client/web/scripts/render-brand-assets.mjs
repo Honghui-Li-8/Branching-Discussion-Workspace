@@ -28,7 +28,7 @@ const TOKENS = {
 }
 const FONT = "Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif"
 const DESCRIPTOR =
-  'A chat tool where you branch off any message into a side conversation, then bring the conclusion back to the main thread.'
+  'A chat tool where you branch off an assistant reply into a side conversation, then bring the conclusion back to the main thread.'
 
 const mark = await readFile(pub('favicon.svg'), 'utf8')
 // Resize the canvas only: the opening <svg> tag, never the tint <rect> that shares the literal.

@@ -5,9 +5,9 @@ import { ICONS } from '../../lib/icons'
 import { cn } from '../../lib/utils'
 import {
   CONTACT_URL,
-  FOOTER_ONLY_SECTIONS,
-  HEADER_SECTIONS,
+  LEGAL_PAGES,
   PATHS,
+  SECTIONS,
   sectionHref,
   type Section,
 } from '../../routePaths'
@@ -25,8 +25,9 @@ import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle, SheetTri
 //                (near-black, owner decision 2026-08-10; `data-surface="dark"`
 //                repoints the focus-ring offset so rings compose on it)
 //   main       → single landmark, focusable so the skip link lands on it
-//   footer     → section links, contact placeholder (allowed until phase
-//                exit; A08 supplies the fact), repository link, copyright
+//   footer     → section links, legal-page links (A08b), contact placeholder
+//                (allowed until phase exit; A08 supplies the fact),
+//                repository link, copyright
 //
 // Narrow widths (below `lg`, ADR-0004's canonical boundary) collapse the
 // section navigation into the Sheet primitive, inheriting its focus trap,
@@ -141,7 +142,7 @@ export const PublicShell = ({ children }: { children: ReactNode }) => {
             {showSections ? (
               <nav aria-label="Sections" className="hidden lg:block">
                 <Cluster as="ul" role="list" gap="6" className="list-none p-0">
-                  <SectionLinks sections={HEADER_SECTIONS} className={headerLinkClasses} />
+                  <SectionLinks sections={SECTIONS} className={headerLinkClasses} />
                 </Cluster>
               </nav>
             ) : null}
@@ -174,7 +175,7 @@ export const PublicShell = ({ children }: { children: ReactNode }) => {
                     <SheetDescription className="sr-only">Sections of this page</SheetDescription>
                     <nav aria-label="Sections menu">
                       <Stack as="ul" role="list" gap="1" className="list-none p-0">
-                        <SectionLinks sections={HEADER_SECTIONS} onNavigate={() => setIsMenuOpen(false)} />
+                        <SectionLinks sections={SECTIONS} onNavigate={() => setIsMenuOpen(false)} />
                       </Stack>
                     </nav>
                   </Stack>
@@ -195,20 +196,31 @@ export const PublicShell = ({ children }: { children: ReactNode }) => {
           <Stack gap="4" className="py-8">
             <nav aria-label="Footer">
               <Cluster gap="8" align="start">
-                <FooterGroup label="Sections">
-                  {showSections ? <SectionLinks sections={HEADER_SECTIONS} /> : null}
+                {/* The section links are the only members of this group, so it
+                    goes when they do — a list named "Sections" that holds no
+                    section link would misname what it contains (A-T3e). */}
+                {showSections ? (
+                  <FooterGroup label="Sections">
+                    <SectionLinks sections={SECTIONS} />
+                  </FooterGroup>
+                ) : null}
+                <FooterGroup label="Project">
                   <li>
                     <Link href={REPOSITORY_URL} target="_blank" className="inline-block py-2">
                       GitHub
                     </Link>
                   </li>
                 </FooterGroup>
-                {/* Legal sections live on the landing too, so they follow the same signed-out rule. */}
-                {showSections ? (
-                  <FooterGroup label="Legal">
-                    <SectionLinks sections={FOOTER_ONLY_SECTIONS} />
-                  </FooterGroup>
-                ) : null}
+                {/* Legal pages are routes, not landing anchors, so the group shows in every auth state. */}
+                <FooterGroup label="Legal">
+                  {LEGAL_PAGES.map((page) => (
+                    <li key={page.path}>
+                      <Link to={page.path} className="inline-block py-2">
+                        {page.label}
+                      </Link>
+                    </li>
+                  ))}
+                </FooterGroup>
               </Cluster>
             </nav>
             <Cluster justify="between" gap="4">

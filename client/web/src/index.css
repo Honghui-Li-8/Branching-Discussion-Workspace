@@ -247,7 +247,10 @@
      var(--text-x--line-height))`, so aliasing font-size alone would
      silently drop the paired line-height. Verified against the compiled
      output, same discipline A05a used for the tree-shaking check. */
-  --text-display: var(--text-3xl); /* 30px — landing hero, once per page */
+  --text-hero: var(--text-4xl); /* 36px — the landing hero title, once per product */
+  --text-hero--line-height: var(--text-4xl--line-height);
+
+  --text-display: var(--text-3xl); /* 30px — section titles on public pages */
   --text-display--line-height: var(--text-3xl--line-height);
 
   --text-title: var(--text-xl); /* 20px — page and panel titles */

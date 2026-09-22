@@ -2,8 +2,10 @@ import type { ReactElement } from 'react'
 import { AuthCallback } from './components/AuthCallback'
 import { LoginRoute } from './components/public/LoginRoute'
 import { NotFoundRoute } from './components/public/NotFoundRoute'
+import { PrivacyRoute } from './components/public/PrivacyRoute'
 import { PublicShell } from './components/public/PublicShell'
 import { RootRoute } from './components/public/RootRoute'
+import { TermsRoute } from './components/public/TermsRoute'
 import { PATHS } from './routePaths'
 import { isDev } from './lib/env'
 import { DevGalleryRoute } from './components/dev/DevGalleryRoute'
@@ -43,6 +45,24 @@ export const ROUTES: readonly AppRoute[] = [
     element: (
       <PublicShell>
         <LoginRoute />
+      </PublicShell>
+    ),
+  },
+  // A08b — the legal pages are their own routes rather than landing sections,
+  // so a signed-in visitor (for whom `/` is the workspace) can still read them.
+  {
+    path: PATHS.privacy,
+    element: (
+      <PublicShell>
+        <PrivacyRoute />
+      </PublicShell>
+    ),
+  },
+  {
+    path: PATHS.terms,
+    element: (
+      <PublicShell>
+        <TermsRoute />
       </PublicShell>
     ),
   },

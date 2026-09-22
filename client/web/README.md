@@ -22,11 +22,12 @@ change lands everywhere at once. Tailwind v4 is configured CSS-first — there i
 
 ### Typography
 
-Six semantic roles, applied as ordinary Tailwind classes (`text-body`, `text-caption`):
+Seven semantic roles, applied as ordinary Tailwind classes (`text-body`, `text-caption`):
 
 | Role | Size | Use |
 |---|---|---|
-| `display` | 30px | Landing hero — once per page |
+| `hero` | 36px | Landing hero title — once per product |
+| `display` | 30px | Section titles on public pages |
 | `title` | 20px | Page and panel titles |
 | `heading` | 18px | Section headings within a surface |
 | `body` | 16px | Prose and message content |

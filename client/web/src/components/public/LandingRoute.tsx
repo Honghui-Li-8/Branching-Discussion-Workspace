@@ -2,22 +2,25 @@ import { useAppSelector } from '../../store/hooks'
 import { selectAuthStatus } from '../../store/slices/authSlice'
 import { cn } from '../../lib/utils'
 import type { ReactNode } from 'react'
-import { PATHS, SECTIONS, sectionHref, type SectionId } from '../../routePaths'
+import { PATHS, sectionHref } from '../../routePaths'
 import { buttonVariants } from '../ui/button'
 import { Link, useHashFocus } from '../ui/link'
 import { useDocumentTitle } from '../../lib/useDocumentTitle'
-import { Container, Cluster, Stack } from '../ui/layout'
-import { HowItWorks } from './landing/HowItWorks'
+import { Cluster, Stack } from '../ui/layout'
+import { Band } from './landing/Band'
+import { Eyebrow, SectionHead } from './landing/SectionHead'
+import { LANDING_BLOCKS, type LandingBlockKey } from './landing/sections'
+import { ProofSteps, UseCases } from './landing/HowItWorks'
 import { WhereThingsStand } from './landing/WhereThingsStand'
+import { Changelog } from './landing/Changelog'
 import { About } from './landing/About'
-import { Privacy } from './landing/Privacy'
-import { Terms } from './landing/Terms'
 
 // A07 — the public landing page, rendered inside PublicShell.
 //
 // Voice and vocabulary come from A02's approved narrative package: the
-// descriptor is verbatim, every noun is in its glossary, and nothing here is a
-// pitch. The hero shows the real product — a screenshot of the seeded intro
+// descriptor is A02's, corrected 2026-09-18 (A08b) to say "an assistant reply"
+// because that is the only thing the product branches from; every noun is in
+// its glossary, and nothing here is a pitch. The hero shows the real product — a screenshot of the seeded intro
 // workspace produced by scripts/capture-landing-visual.mjs — never an
 // illustration. The primary action is a link: /login owns sign-in and its
 // pending and failure states (A06).
@@ -25,16 +28,26 @@ import { Terms } from './landing/Terms'
 // Section ids are stable anchors shared with the shell's navigation
 // (routePaths.ts); each section keeps tabIndex={-1} and aria-labelledby so
 // deep links can scroll and focus it (useHashFocus).
+//
+// A08b composition: the page is a sequence of full-bleed Bands, not one
+// container-wrapped Stack. landing/sections.ts lists the five blocks in order
+// with their head copy and band tone; three of them carry an anchor, and the
+// two that do not (use cases, the changelog) are still labelled regions — they
+// are simply not navigation targets, so they take no tabIndex.
 
-/** Produced by `yarn workspace web capture:landing-visual`; see the client README. */
+/** Produced by `yarn workspace web capture:landing-visual`; see the client README.
+ *  A08b — the capture is cropped to five named topics, so the card text is
+ *  readable at hero width; the alt text tracks that crop, not the whole tree. */
 const HERO_VISUAL = {
   src: '/landing/intro-workspace-tree.png',
-  width: 2540,
+  width: 1260,
   height: 760,
   alt:
-    'The Trellis workspace for the seed example "Project Decision": a tree of topics branching from ' +
-    'the question "Should I build this project now?". Three branches are marked Exploring, two are ' +
-    'Approved, and folded counts show further topics beneath each.',
+    'A detail of the Trellis tree for the seed workspace "Project Decision": three topics marked ' +
+    'Exploring — "Personal value vs team value", "Will this create strong interview signal?" and ' +
+    '"Execution and sustainability risks" — two of them leading to an Approved topic, "Personal ' +
+    'productivity gain" and "Visibility of decision process artifact". A count beside each card ' +
+    'shows the topics folded beneath it.',
 }
 
 const Hero = () => {
@@ -44,14 +57,14 @@ const Hero = () => {
     <div className="grid gap-8 lg:grid-cols-2 lg:items-center lg:gap-12">
       <Stack gap="5">
         <Stack gap="3">
-          <h1 className="m-0 text-display font-semibold text-text-default">Trellis</h1>
+          {/* The same eyebrow treatment the section heads use — the beta/solo
+              status is a standing qualifier on the product, not a sentence the
+              reader has to get past to reach the descriptor. */}
+          <Eyebrow>Early beta · solo side project</Eyebrow>
+          <h1 className="m-0 text-hero font-semibold text-text-default">Trellis</h1>
           <p className="m-0 max-w-narrow text-body text-text-secondary">
-            A chat tool where you branch off any message into a side conversation, then bring the
-            conclusion back to the main thread.
-          </p>
-          <p className="m-0 max-w-narrow text-label text-text-muted">
-            An early beta and a solo side project.{' '}
-            <Link to={sectionHref('roadmap')}>See where things stand.</Link>
+            A chat tool where you branch off an assistant reply into a side conversation, then
+            bring the conclusion back to the main thread.
           </p>
         </Stack>
 
@@ -94,41 +107,56 @@ const Hero = () => {
   )
 }
 
-/** Section bodies by anchor id (A07: features, roadmap; A08: about, privacy, terms). */
-const SECTION_BODIES: Partial<Record<SectionId, ReactNode>> = {
-  features: <HowItWorks />,
-  roadmap: <WhereThingsStand />,
+/** Block bodies by block key. Privacy and Terms left the landing with A08b —
+ *  they are routes now, not sections. */
+const SECTION_BODIES: Record<LandingBlockKey, ReactNode> = {
+  'how-it-works': <ProofSteps />,
+  'use-cases': <UseCases />,
+  'where-things-stand': <WhereThingsStand />,
+  changelog: <Changelog />,
   about: <About />,
-  privacy: <Privacy />,
-  terms: <Terms />,
 }
+
+/** Only an anchored section is a focus target, so only it carries a ring. */
+const ANCHOR_CLASSES =
+  'scroll-mt-6 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-accent-default focus-visible:ring-offset-2'
 
 export const LandingRoute = () => {
   useHashFocus()
   useDocumentTitle()
 
   return (
-    <Container>
-      <Stack gap="16" className="py-12">
+    <>
+      <Band tone="subtle">
         <Hero />
+      </Band>
 
-        {SECTIONS.map((section) => (
-          <section
-            key={section.id}
-            id={section.id}
-            tabIndex={-1}
-            aria-labelledby={`${section.id}-heading`}
-            className="scroll-mt-6 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-accent-default focus-visible:ring-offset-2"
-          >
-            <Stack gap="6">
-              <h2 id={`${section.id}-heading`} className="m-0 text-heading font-medium text-text-default">
-                {section.label}
-              </h2>
-              {SECTION_BODIES[section.id]}
-            </Stack>
-          </section>
-        ))}
-      </Stack>
-    </Container>
+      {LANDING_BLOCKS.map((block) => {
+        // The three anchored blocks keep the heading ids their deep links and
+        // the shell's navigation have always pointed at.
+        const headingId = `${block.anchorId ?? block.key}-heading`
+
+        return (
+          <Band key={block.key} tone={block.tone}>
+            <section
+              id={block.anchorId}
+              tabIndex={block.anchorId ? -1 : undefined}
+              aria-labelledby={headingId}
+              className={cn(block.anchorId && ANCHOR_CLASSES)}
+            >
+              <Stack gap="12">
+                <SectionHead
+                  id={headingId}
+                  eyebrow={block.eyebrow}
+                  title={block.title}
+                  subtitle={block.subtitle}
+                />
+                {SECTION_BODIES[block.key]}
+              </Stack>
+            </section>
+          </Band>
+        )
+      })}
+    </>
   )
 }
