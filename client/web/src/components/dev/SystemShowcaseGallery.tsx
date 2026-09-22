@@ -83,6 +83,7 @@ import { Combobox } from '../ui/combobox'
 import { DataTable } from '../ui/data-table'
 import { ICONS } from '../../lib/icons'
 import { PATHS } from '../../routePaths'
+import { useDocumentTitle } from '../../lib/useDocumentTitle'
 
 /* ────────────────────────────────────────────────────────────────────────
    A-T3d — System showcase gallery: the owner's review-and-approval surface
@@ -736,6 +737,7 @@ function Components() {
 }
 
 export function SystemShowcaseGallery() {
+  useDocumentTitle('System showcase')
   return (
     <AppTooltipProvider>
       <AlertPopupProvider>

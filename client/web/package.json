@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "capture:landing-visual": "node scripts/capture-landing-visual.mjs"
+    "capture:landing-visual": "node scripts/capture-landing-visual.mjs",
+    "render:brand-assets": "node scripts/render-brand-assets.mjs"
   },
   "dependencies": {
     "@branching/shared": "workspace:*",

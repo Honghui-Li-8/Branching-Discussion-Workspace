@@ -21,6 +21,9 @@ export const SECTIONS = [
   { id: 'features', label: 'How it works', inHeaderNav: true },
   { id: 'roadmap', label: 'Where things stand', inHeaderNav: true },
   { id: 'about', label: 'About', inHeaderNav: true },
+  // A08 — legal sections, reachable from the footer only.
+  { id: 'privacy', label: 'Privacy', inHeaderNav: false },
+  { id: 'terms', label: 'Terms', inHeaderNav: false },
 ] as const
 
 export type Section = (typeof SECTIONS)[number]
@@ -28,6 +31,15 @@ export type SectionId = Section['id']
 
 /** The sections the header and sheet navigation show. */
 export const HEADER_SECTIONS: readonly Section[] = SECTIONS.filter((s) => s.inHeaderNav)
+
+/** Footer-only sections (the Legal group). */
+export const FOOTER_ONLY_SECTIONS: readonly Section[] = SECTIONS.filter((s) => !s.inHeaderNav)
+
+/**
+ * The one contact channel (owner decision 2026-09-15): the repository's issues.
+ * Used by the footer and by the Privacy and Terms sections.
+ */
+export const CONTACT_URL = 'https://github.com/Honghui-Li-8/Branching-Discussion-Workspace/issues'
 
 export const sectionHref = (id: SectionId): string => `${PATHS.root}#${id}`
 

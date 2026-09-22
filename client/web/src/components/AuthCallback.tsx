@@ -7,12 +7,14 @@ import { useAuth } from './useAuth'
 import { runAuthExchange } from './authCallbackLogic'
 import { apiBaseUrl } from '../lib/env'
 import { Container, Stack } from './ui/layout'
+import { useDocumentTitle } from '../lib/useDocumentTitle'
 
 // A06 — the OAuth return. This surface renders the pending state only; every
 // terminal outcome is a navigation (success → authenticated root, cancel or
 // failure → /login with the error beside the retry action), decided in
 // authCallbackLogic. The text is the state: no motion-only indicator (A-T3e §7).
 export const AuthCallback = () => {
+  useDocumentTitle('Signing in')
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
   const { setAuthError } = useAuth()
