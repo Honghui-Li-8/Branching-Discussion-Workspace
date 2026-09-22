@@ -183,6 +183,7 @@ test.describe('section deep-links (A06) — scroll and focus, across routes', ()
     await page.goto(PATHS.login)
     await page.waitForLoadState('networkidle')
 
+    // The header lists every section; the footer's own loop is below.
     const target = SECTIONS[SECTIONS.length - 1]
     await page.getByRole('banner').getByRole('link', { name: target.label }).click()
 
@@ -208,6 +209,19 @@ test.describe('section deep-links (A06) — scroll and focus, across routes', ()
     const target = SECTIONS[0]
     await page.getByRole('contentinfo').getByRole('link', { name: target.label }).click()
     await expect(page.locator(`#${target.id}`)).toBeFocused()
+  })
+})
+
+test.describe('legal routes (A08b) — reachable from the footer of every surface', () => {
+  test('the footer "Privacy" link on / lands on /privacy', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 })
+    await page.goto(PATHS.root)
+    await page.waitForLoadState('networkidle')
+
+    await page.getByRole('contentinfo').getByRole('link', { name: 'Privacy' }).click()
+
+    await expect(page).toHaveURL(new RegExp(`${PATHS.privacy}$`))
+    await expect(page.getByRole('heading', { level: 1, name: 'Privacy' })).toBeVisible()
   })
 })
 
@@ -249,5 +263,52 @@ test.describe('reflow harness self-check (ADR-0004) — these must be able to fa
 
     expect((await overflowingElements(page)).join(' ')).toContain('seeded-offender')
     await page.evaluate(() => document.getElementById('__seeded_named')?.remove())
+  })
+})
+
+test.describe('landing content (A07) — the visual loads and every anchor focuses its section', () => {
+  test('the hero image decodes and carries its alt text', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 })
+    await page.goto(PATHS.root)
+    await page.waitForLoadState('networkidle')
+
+    const img = page.getByRole('img', { name: /project decision/i })
+    await expect(img).toBeVisible()
+    // A broken path renders an alt-text box with naturalWidth 0; this is the assertion that catches it.
+    expect(await img.evaluate((el) => (el as HTMLImageElement).naturalWidth)).toBeGreaterThan(0)
+  })
+
+  for (const section of SECTIONS) {
+    test(`footer link "${section.label}" scrolls to and focuses #${section.id}`, async ({ page }) => {
+      await page.setViewportSize({ width: 1280, height: 500 })
+      await page.goto(PATHS.root)
+      await page.waitForLoadState('networkidle')
+
+      await page.getByRole('contentinfo').getByRole('link', { name: section.label }).click()
+      await expect(page.locator(`#${section.id}`)).toBeFocused()
+      const { top, viewportHeight } = await page
+        .locator(`#${section.id}`)
+        .evaluate((el) => ({ top: el.getBoundingClientRect().top, viewportHeight: window.innerHeight }))
+      expect(top).toBeGreaterThanOrEqual(0)
+      expect(top).toBeLessThan(viewportHeight)
+    })
+  }
+})
+
+test.describe('identity assets (A08) — the favicon and social image resolve', () => {
+  for (const asset of ['/favicon.svg', '/og-image.png', '/icons/apple-touch-icon.png', '/site.webmanifest']) {
+    test(`${asset} is served`, async ({ request }) => {
+      const response = await request.get(asset)
+      expect(response.status()).toBe(200)
+    })
+  }
+
+  test('the document head declares the description, icon and Open Graph image', async ({ page }) => {
+    await page.goto(PATHS.root)
+    await expect(page.locator('meta[name="description"]')).toHaveAttribute('content', /branch off an assistant reply/)
+    await expect(page.locator('link[rel="icon"]')).toHaveAttribute('href', '/favicon.svg')
+    // Absolute, whatever the origin: scrapers discard relative image URLs.
+    await expect(page.locator('meta[property="og:image"]')).toHaveAttribute('content', /^https?:\/\/[^/]+\/og-image\.png$/)
+    await expect(page.locator('meta[property="og:url"]')).toHaveAttribute('content', /^https?:\/\/[^/]+\/$/)
   })
 })

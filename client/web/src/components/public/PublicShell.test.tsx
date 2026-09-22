@@ -61,7 +61,7 @@ describe('PublicShell (A06)', () => {
     ])
   })
 
-  it('footer carries the section links, the repository link and the contact placeholder', () => {
+  it('footer carries the section links, the legal links, the repository link and the contact link', () => {
     renderWithProviders(<Page />)
 
     const footer = screen.getByRole('contentinfo')
@@ -69,8 +69,18 @@ describe('PublicShell (A06)', () => {
     const github = within(footerNav).getByRole('link', { name: 'GitHub' })
     expect(github.getAttribute('rel')).toBe('noopener noreferrer')
     expect(github.getAttribute('target')).toBe('_blank')
-    expect(within(footerNav).getAllByRole('link')).toHaveLength(4)
-    expect(footer.textContent).toContain('Contact: coming soon')
+    // Three sections + GitHub, then the two legal pages (A08b: routes, not anchors).
+    expect(within(footerNav).getAllByRole('link')).toHaveLength(6)
+    // Each group's name describes what it holds: the repository link is its own
+    // group, so "Sections" never names a list without section links.
+    expect(within(footerNav).getAllByRole('list')).toHaveLength(3)
+    expect(within(within(footerNav).getByRole('list', { name: 'Sections' })).getAllByRole('link')).toHaveLength(3)
+    expect(
+      within(within(footerNav).getByRole('list', { name: 'Project' })).getAllByRole('link').map((a) => a.textContent),
+    ).toEqual(['GitHub'])
+    expect(within(footerNav).getByRole('link', { name: 'Privacy' }).getAttribute('href')).toBe('/privacy')
+    expect(within(footerNav).getByRole('link', { name: 'Terms' }).getAttribute('href')).toBe('/terms')
+    expect(within(footer).getByRole('link', { name: 'Contact via GitHub' }).getAttribute('href')).toMatch(/\/issues$/)
   })
 
   describe('auth-aware CTA', () => {
@@ -96,8 +106,16 @@ describe('PublicShell (A06)', () => {
       // `/` is the workspace for this user, so section anchors would be dead links.
       expect(screen.queryByRole('navigation', { name: 'Sections' })).toBeNull()
       expect(screen.queryByRole('button', { name: 'Open navigation menu' })).toBeNull()
-      expect(within(screen.getByRole('contentinfo')).queryByRole('link', { name: 'Features' })).toBeNull()
+      expect(within(screen.getByRole('contentinfo')).queryByRole('link', { name: 'How it works' })).toBeNull()
       expect(within(screen.getByRole('contentinfo')).getByRole('link', { name: 'GitHub' })).toBeTruthy()
+      // The section group goes with its links rather than staying as an empty
+      // list still named "Sections"; GitHub keeps its own accurate group.
+      expect(within(screen.getByRole('contentinfo')).queryByRole('list', { name: 'Sections' })).toBeNull()
+      expect(within(screen.getByRole('contentinfo')).getByRole('list', { name: 'Project' })).toBeTruthy()
+      // The legal pages are routes, so they stay reachable while the dead anchors go.
+      const footer = within(screen.getByRole('contentinfo'))
+      expect(footer.getByRole('link', { name: 'Privacy' }).getAttribute('href')).toBe('/privacy')
+      expect(footer.getByRole('link', { name: 'Terms' }).getAttribute('href')).toBe('/terms')
     })
   })
 
@@ -110,8 +128,8 @@ describe('PublicShell (A06)', () => {
 
       const dialog = screen.getByRole('dialog', { name: 'Navigation' })
       expect(within(dialog).getAllByRole('link').map((a) => a.textContent)).toEqual([
-        'Features',
-        'Roadmap',
+        'How it works',
+        'Where things stand',
         'About',
       ])
       expect(within(dialog).getByRole('button', { name: 'Close navigation menu' })).toBeTruthy()
@@ -123,7 +141,7 @@ describe('PublicShell (A06)', () => {
     it('closes after a section link is chosen', () => {
       renderWithProviders(<Page />)
       fireEvent.click(screen.getByRole('button', { name: 'Open navigation menu' }))
-      fireEvent.click(within(screen.getByRole('dialog')).getByRole('link', { name: 'Roadmap' }))
+      fireEvent.click(within(screen.getByRole('dialog')).getByRole('link', { name: 'Where things stand' }))
       expect(screen.queryByRole('dialog')).toBeNull()
       expect(screen.getByTestId('location').textContent).toBe('/#roadmap')
     })

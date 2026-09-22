@@ -16,7 +16,14 @@ describe('route table (A06 / A-T3d)', () => {
         isDev: false,
       }))
       const { ROUTES } = jest.requireActual<typeof import('./routes')>('./routes')
-      expect(ROUTES.map((r) => r.path)).toEqual(['/', '/login', '/auth/callback', '*'])
+      expect(ROUTES.map((r) => r.path)).toEqual([
+        '/',
+        '/login',
+        '/privacy',
+        '/terms',
+        '/auth/callback',
+        '*',
+      ])
     })
 
     jest.isolateModules(() => {
@@ -29,6 +36,8 @@ describe('route table (A06 / A-T3d)', () => {
         '/dev/system-showcase',
         '/',
         '/login',
+        '/privacy',
+        '/terms',
         '/auth/callback',
         '*',
       ])

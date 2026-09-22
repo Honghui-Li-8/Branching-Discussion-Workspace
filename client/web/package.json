@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "capture:landing-visual": "node scripts/capture-landing-visual.mjs",
+    "render:brand-assets": "node scripts/render-brand-assets.mjs"
   },
   "dependencies": {
     "@branching/shared": "workspace:*",
@@ -80,6 +82,7 @@
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.4.0",
     "jest-axe": "^11.0.0",
+    "playwright": "1.59.1",
     "postcss": "^8.5.8",
     "tailwindcss": "^4.2.1",
     "typescript": "^5.9.3",

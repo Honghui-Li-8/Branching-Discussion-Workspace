@@ -22,11 +22,12 @@ change lands everywhere at once. Tailwind v4 is configured CSS-first — there i
 
 ### Typography
 
-Six semantic roles, applied as ordinary Tailwind classes (`text-body`, `text-caption`):
+Seven semantic roles, applied as ordinary Tailwind classes (`text-body`, `text-caption`):
 
 | Role | Size | Use |
 |---|---|---|
-| `display` | 30px | Landing hero — once per page |
+| `hero` | 36px | Landing hero title — once per product |
+| `display` | 30px | Section titles on public pages |
 | `title` | 20px | Page and panel titles |
 | `heading` | 18px | Section headings within a surface |
 | `body` | 16px | Prose and message content |
@@ -53,6 +54,21 @@ shadows, blurs, and hairline borders.
 
 ESLint enforces this at `warn` — a ratchet on new code, not a gate, since the existing
 violations are tracked against their own tickets.
+
+### Landing visual
+
+The landing hero shows a screenshot of the seeded intro workspace, not an illustration.
+`public/landing/intro-workspace-tree.png` is produced by `yarn workspace web capture:landing-visual`
+(Playwright against the local dev servers with the auth bypass configured; set
+`LANDING_CAPTURE_URL` if Vite is not on :5173). Re-run it whenever the tree or its cards are
+restyled and review the new image like code. CI never runs it — there is no API there.
+
+### Brand assets
+
+`public/favicon.svg` is the Trellis mark (the Figma "Brand Mark": teal-tint disc, teal branch
+glyph). `yarn workspace web render:brand-assets` renders the PNG derivatives — the apple-touch and
+manifest icons and the 1200×630 Open Graph card — from that SVG and the palette, via Playwright.
+Re-run it after changing the mark, the palette or the descriptor, and review the PNGs like code.
 
 ### Accessibility
 

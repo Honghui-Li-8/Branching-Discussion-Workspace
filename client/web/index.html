@@ -2,9 +2,34 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Trellis</title>
+    <meta
+      name="description"
+      content="A chat tool where you branch off an assistant reply into a side conversation, then bring the conclusion back to the main thread."
+    />
+    <!-- A08: identity assets rendered from public/favicon.svg by `yarn workspace web render:brand-assets`. -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <meta name="theme-color" content="#0d1217" />
+    <!-- Open Graph / Twitter. Scrapers need absolute URLs; __PUBLIC_ORIGIN__ is replaced at
+         build time (vite.config.ts: VITE_PUBLIC_ORIGIN, else the Vercel URL, else localhost). -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="__PUBLIC_ORIGIN__/" />
+    <meta property="og:site_name" content="Trellis" />
+    <meta property="og:title" content="Trellis" />
+    <meta
+      property="og:description"
+      content="A chat tool where you branch off an assistant reply into a side conversation, then bring the conclusion back to the main thread."
+    />
+    <meta property="og:image" content="__PUBLIC_ORIGIN__/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="The Trellis mark and name, the one-line description, and the words Branch, Explore, Approve, Resume." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Trellis" />
+    <meta name="twitter:image" content="__PUBLIC_ORIGIN__/og-image.png" />
   </head>
   <body>
     <div id="root"></div>

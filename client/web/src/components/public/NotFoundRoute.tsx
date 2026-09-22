@@ -3,12 +3,14 @@ import { selectAuthStatus } from '../../store/slices/authSlice'
 import { Link } from '../ui/link'
 import { Cluster, Container, Stack } from '../ui/layout'
 import { PATHS } from '../../routePaths'
+import { useDocumentTitle } from '../../lib/useDocumentTitle'
 
 // A06 — friendly not-found with auth-aware recovery. Replaces the silent
 // `<Navigate to="/">` so an unknown URL is never a dead end and never a
 // surprise redirect. Copy follows the Figma "404 — Not Found" final.
 export const NotFoundRoute = () => {
   const authStatus = useAppSelector(selectAuthStatus)
+  useDocumentTitle('Page not found')
 
   return (
     <Container width="narrow">

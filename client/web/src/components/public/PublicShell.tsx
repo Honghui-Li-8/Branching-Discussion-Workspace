@@ -1,9 +1,16 @@
-import { useState, type ReactNode } from 'react'
+import { useId, useState, type ReactNode } from 'react'
 import { useAppSelector } from '../../store/hooks'
 import { selectAuthStatus } from '../../store/slices/authSlice'
 import { ICONS } from '../../lib/icons'
 import { cn } from '../../lib/utils'
-import { PATHS, SECTIONS, sectionHref } from '../../routePaths'
+import {
+  CONTACT_URL,
+  LEGAL_PAGES,
+  PATHS,
+  SECTIONS,
+  sectionHref,
+  type Section,
+} from '../../routePaths'
 import { buttonVariants } from '../ui/button'
 import { Cluster, Container, Stack } from '../ui/layout'
 import { Link } from '../ui/link'
@@ -18,8 +25,9 @@ import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle, SheetTri
 //                (near-black, owner decision 2026-08-10; `data-surface="dark"`
 //                repoints the focus-ring offset so rings compose on it)
 //   main       → single landmark, focusable so the skip link lands on it
-//   footer     → section links, contact placeholder (allowed until phase
-//                exit; A08 supplies the fact), repository link, copyright
+//   footer     → section links, legal-page links (A08b), contact placeholder
+//                (allowed until phase exit; A08 supplies the fact),
+//                repository link, copyright
 //
 // Narrow widths (below `lg`, ADR-0004's canonical boundary) collapse the
 // section navigation into the Sheet primitive, inheriting its focus trap,
@@ -29,6 +37,21 @@ import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle, SheetTri
 // the section labels routePaths.ts already owns.
 
 const REPOSITORY_URL = 'https://github.com/Honghui-Li-8/Branching-Discussion-Workspace'
+
+/** Footer link group: a list named by a visually hidden label (aria-labelledby). */
+const FooterGroup = ({ label, children }: { label: string; children: ReactNode }) => {
+  const id = useId()
+  return (
+    <div>
+      <span id={id} className="sr-only">
+        {label}
+      </span>
+      <Cluster as="ul" role="list" aria-labelledby={id} gap="6" className="list-none p-0">
+        {children}
+      </Cluster>
+    </div>
+  )
+}
 
 const headerLinkClasses = 'text-gray-200 hover:text-text-inverse focus-visible:ring-accent-wash'
 
@@ -59,9 +82,17 @@ const AuthCta = ({ className }: { className?: string }) => {
   )
 }
 
-const SectionLinks = ({ onNavigate, className }: { onNavigate?: () => void; className?: string }) => (
+const SectionLinks = ({
+  sections,
+  onNavigate,
+  className,
+}: {
+  sections: readonly Section[]
+  onNavigate?: () => void
+  className?: string
+}) => (
   <>
-    {SECTIONS.map((section) => (
+    {sections.map((section) => (
       <li key={section.id}>
         <Link to={sectionHref(section.id)} onClick={onNavigate} className={cn('inline-block py-2', className)}>
           {section.label}
@@ -101,15 +132,17 @@ export const PublicShell = ({ children }: { children: ReactNode }) => {
             <Link
               to={PATHS.root}
               underline="hover"
-              className="text-label font-semibold text-text-inverse no-underline hover:text-text-inverse focus-visible:ring-accent-wash"
+              className="inline-flex items-center gap-2 text-label font-semibold text-text-inverse no-underline hover:text-text-inverse focus-visible:ring-accent-wash"
             >
+              {/* The mark is decorative beside the wordmark; the link's name is "Trellis". */}
+              <img src="/favicon.svg" alt="" aria-hidden="true" width={28} height={28} className="size-7" />
               Trellis
             </Link>
 
             {showSections ? (
               <nav aria-label="Sections" className="hidden lg:block">
-                <Cluster as="ul" gap="6" className="list-none p-0">
-                  <SectionLinks className={headerLinkClasses} />
+                <Cluster as="ul" role="list" gap="6" className="list-none p-0">
+                  <SectionLinks sections={SECTIONS} className={headerLinkClasses} />
                 </Cluster>
               </nav>
             ) : null}
@@ -141,8 +174,8 @@ export const PublicShell = ({ children }: { children: ReactNode }) => {
                     </Cluster>
                     <SheetDescription className="sr-only">Sections of this page</SheetDescription>
                     <nav aria-label="Sections menu">
-                      <Stack as="ul" gap="1" className="list-none p-0">
-                        <SectionLinks onNavigate={() => setIsMenuOpen(false)} />
+                      <Stack as="ul" role="list" gap="1" className="list-none p-0">
+                        <SectionLinks sections={SECTIONS} onNavigate={() => setIsMenuOpen(false)} />
                       </Stack>
                     </nav>
                   </Stack>
@@ -162,19 +195,44 @@ export const PublicShell = ({ children }: { children: ReactNode }) => {
         <Container>
           <Stack gap="4" className="py-8">
             <nav aria-label="Footer">
-              <Cluster as="ul" gap="6" className="list-none p-0">
-                {showSections ? <SectionLinks /> : null}
-                <li>
-                  <Link href={REPOSITORY_URL} target="_blank" className="inline-block py-2">
-                    GitHub
-                  </Link>
-                </li>
+              <Cluster gap="8" align="start">
+                {/* The section links are the only members of this group, so it
+                    goes when they do — a list named "Sections" that holds no
+                    section link would misname what it contains (A-T3e). */}
+                {showSections ? (
+                  <FooterGroup label="Sections">
+                    <SectionLinks sections={SECTIONS} />
+                  </FooterGroup>
+                ) : null}
+                <FooterGroup label="Project">
+                  <li>
+                    <Link href={REPOSITORY_URL} target="_blank" className="inline-block py-2">
+                      GitHub
+                    </Link>
+                  </li>
+                </FooterGroup>
+                {/* Legal pages are routes, not landing anchors, so the group shows in every auth state. */}
+                <FooterGroup label="Legal">
+                  {LEGAL_PAGES.map((page) => (
+                    <li key={page.path}>
+                      <Link to={page.path} className="inline-block py-2">
+                        {page.label}
+                      </Link>
+                    </li>
+                  ))}
+                </FooterGroup>
               </Cluster>
             </nav>
             <Cluster justify="between" gap="4">
-              <p className="m-0">Trellis — a branching discussion workspace</p>
-              {/* Verified contact is A08's fact; a placeholder is allowed until phase exit. */}
-              <p className="m-0 text-text-muted">Contact: coming soon</p>
+              <p className="m-0 inline-flex items-center gap-2">
+                <img src="/favicon.svg" alt="" aria-hidden="true" width={20} height={20} className="size-5" />
+                Trellis — a branching discussion workspace
+              </p>
+              <p className="m-0 text-text-muted">
+                <Link href={CONTACT_URL} target="_blank">
+                  Contact via GitHub
+                </Link>
+              </p>
               <p className="m-0 text-text-muted">© {new Date().getFullYear()} Trellis</p>
             </Cluster>
           </Stack>

@@ -23,6 +23,8 @@ import {
   Shrink,
   Maximize2,
   Minimize2,
+  Telescope,
+  CornerDownLeft,
   AlertTriangle,
   User,
   MoreHorizontal,
@@ -44,6 +46,14 @@ export const ICONS = {
   navigate: Compass,
   create: PlusCircle,
   branch: GitBranch,
+  // A08b — the two halves of the loop A05b's list never named, because no
+  // control carried them yet. `explore` is working inside a branch: Telescope,
+  // not Search, because searching is finding a thing you can already name and
+  // will want its own glyph. `resume` is the parent thread picking back up
+  // where the merged conclusion lands: CornerDownLeft, not Play, which reads
+  // as playback in a product that has no media.
+  explore: Telescope,
+  resume: CornerDownLeft,
   return: ArrowLeftCircle,
   merge: GitPullRequestArrow,
   approve: CheckCircle2,
