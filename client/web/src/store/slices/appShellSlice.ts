@@ -10,6 +10,8 @@ type WorkspaceNavItem = {
 type AppShellState = {
   workspaces: WorkspaceNavItem[]
   activeWorkspaceId: string | null
+  /** The node whose conversation is open (A10b): shared by the canvas and the sidebar outline. */
+  openNodeId: string | null
   isWorkspacesLoading: boolean
   isSidebarCollapsed: boolean
 }
@@ -17,6 +19,7 @@ type AppShellState = {
 const initialState: AppShellState = {
   workspaces: [],
   activeWorkspaceId: null,
+  openNodeId: null,
   isWorkspacesLoading: false,
   isSidebarCollapsed: false,
 }
@@ -32,7 +35,14 @@ const appShellSlice = createSlice({
       state.isWorkspacesLoading = action.payload
     },
     setActiveWorkspaceId: (state, action: PayloadAction<string | null>) => {
+      if (state.activeWorkspaceId !== action.payload) {
+        // A node id belongs to one workspace; switching workspaces closes it.
+        state.openNodeId = null
+      }
       state.activeWorkspaceId = action.payload
+    },
+    setOpenNodeId: (state, action: PayloadAction<string | null>) => {
+      state.openNodeId = action.payload
     },
     setSidebarCollapsed: (state, action: PayloadAction<boolean>) => {
       state.isSidebarCollapsed = action.payload
@@ -40,10 +50,12 @@ const appShellSlice = createSlice({
   },
 })
 
-export const { setWorkspaces, setWorkspacesLoading, setActiveWorkspaceId, setSidebarCollapsed } = appShellSlice.actions
+export const { setWorkspaces, setWorkspacesLoading, setActiveWorkspaceId, setOpenNodeId, setSidebarCollapsed } =
+  appShellSlice.actions
 
 export const selectWorkspaces = (state: RootState) => state.appShell.workspaces
 export const selectActiveWorkspaceId = (state: RootState) => state.appShell.activeWorkspaceId
+export const selectOpenNodeId = (state: RootState) => state.appShell.openNodeId
 export const selectWorkspacesLoading = (state: RootState) => state.appShell.isWorkspacesLoading
 export const selectSidebarCollapsed = (state: RootState) => state.appShell.isSidebarCollapsed
 export const selectActiveWorkspace = (state: RootState) =>

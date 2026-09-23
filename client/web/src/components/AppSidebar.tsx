@@ -19,6 +19,8 @@ import { Button } from './ui/button'
 import { Input } from './ui/form-field'
 import { Skeleton } from './ui/skeleton'
 import { AppTooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/disclosure'
+import { WorkspaceOutline } from './WorkspaceOutline'
 import { PANEL_TOGGLE_ICONS } from '../lib/icons'
 import { cn } from '../lib/utils'
 
@@ -54,6 +56,7 @@ export const AppSidebar = () => {
   const isCollapsed = useAppSelector(selectSidebarCollapsed)
   const setIsCollapsed = (val: boolean) => dispatch(setSidebarCollapsed(val))
 
+  const [sidebarTab, setSidebarTab] = useState<'workspaces' | 'outline'>('workspaces')
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
 
@@ -130,10 +133,33 @@ export const AppSidebar = () => {
             <div className="px-3 pt-3">
               <CreateWorkspacePopover />
             </div>
-            <h2 className="m-0 px-4 pt-4 pb-1 text-caption font-medium uppercase tracking-wide text-text-muted">
-              Workspaces
-            </h2>
 
+            {/* A10b: Workspaces | Outline segmented control (A03 frame 302:682). */}
+            <Tabs
+              value={sidebarTab}
+              onValueChange={(value) => setSidebarTab(value === 'outline' ? 'outline' : 'workspaces')}
+              className="flex min-h-0 flex-1 flex-col"
+            >
+              <TabsList
+                aria-label="Sidebar view"
+                className="mx-3 mt-3 grid grid-cols-2 gap-0 rounded-md border border-border-default bg-bg-subtle p-0.5"
+              >
+                <TabsTrigger
+                  value="workspaces"
+                  className="rounded-sm border-b-0 py-1.5 text-center data-[state=active]:bg-accent-tint data-[state=active]:text-accent-strong"
+                >
+                  Workspaces
+                </TabsTrigger>
+                <TabsTrigger
+                  value="outline"
+                  disabled={!activeWorkspaceId}
+                  className="rounded-sm border-b-0 py-1.5 text-center data-[state=active]:bg-accent-tint data-[state=active]:text-accent-strong"
+                >
+                  Outline
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="workspaces" className="flex min-h-0 flex-1 flex-col pt-2 text-text-default">
             <AppTooltipProvider>
             <ul className="m-0 flex max-h-56 list-none flex-col gap-0.5 overflow-y-auto px-2 pb-2 lg:max-h-none">
               {isWorkspacesLoading && workspaces.length === 0 ? (
@@ -204,6 +230,11 @@ export const AppSidebar = () => {
               )}
             </ul>
             </AppTooltipProvider>
+              </TabsContent>
+              <TabsContent value="outline" className="min-h-0 flex-1 overflow-y-auto pt-2 text-text-default">
+                <WorkspaceOutline />
+              </TabsContent>
+            </Tabs>
           </nav>
 
           <div className="border-t border-border-default px-3 py-3">
