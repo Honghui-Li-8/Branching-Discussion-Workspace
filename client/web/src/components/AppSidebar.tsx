@@ -14,12 +14,11 @@ import {
 import { useAuth } from './useAuth'
 import { trpc } from '../trpc'
 import { CreditBalanceIndicator } from './CreditBalanceIndicator'
+import { AccountMenu } from './AccountMenu'
 import { Button } from './ui/button'
 import { Input } from './ui/form-field'
-import { Link } from './ui/link'
 import { Skeleton } from './ui/skeleton'
 import { ICONS, PANEL_TOGGLE_ICONS } from '../lib/icons'
-import { PATHS } from '../routePaths'
 import { cn } from '../lib/utils'
 
 /**
@@ -33,15 +32,7 @@ export const AppSidebar = () => {
   const activeWorkspaceId = useAppSelector(selectActiveWorkspaceId)
   const isWorkspacesLoading = useAppSelector(selectWorkspacesLoading)
   const utils = trpc.useUtils()
-  const {
-    authUser,
-    isAuthenticated,
-    isAuthBootstrapPending,
-    isAuthActionPending,
-    authError,
-    login,
-    logout,
-  } = useAuth()
+  const { isAuthenticated, isAuthBootstrapPending, authError } = useAuth()
 
   const invalidateWorkspaceList = async () => {
     await utils.workspacesList.invalidate()
@@ -113,8 +104,6 @@ export const AppSidebar = () => {
     setIsPopoverOpen((current) => !current)
   }
 
-  const currentUserName = isAuthBootstrapPending ? '…' : (authUser?.displayName ?? 'Guest')
-  const avatarInitial = currentUserName.trim().slice(0, 1).toUpperCase() || '?'
   const workspaceActionError =
     createWorkspaceMutation.error?.message ??
     updateWorkspaceMutation.error?.message ??
@@ -122,15 +111,6 @@ export const AppSidebar = () => {
     null
   const ExpandIcon = PANEL_TOGGLE_ICONS.left.open
   const CollapseIcon = PANEL_TOGGLE_ICONS.left.close
-
-  const avatar = (
-    <span
-      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-bg-emphasis text-caption font-semibold text-text-inverse"
-      aria-hidden="true"
-    >
-      {avatarInitial}
-    </span>
-  )
 
   return (
     <>
@@ -155,7 +135,7 @@ export const AppSidebar = () => {
             >
               <ExpandIcon className="h-4 w-4" aria-hidden="true" />
             </Button>
-            <span title={currentUserName}>{avatar}</span>
+            <AccountMenu variant="avatar" />
           </div>
         ) : null}
 
@@ -260,41 +240,20 @@ export const AppSidebar = () => {
             </ul>
           </nav>
 
-          <div className="border-t border-border-default px-4 py-3">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex min-w-0 items-center gap-2">
-                {avatar}
-                <p className="m-0 truncate text-label font-medium text-text-default">{currentUserName}</p>
-              </div>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={isAuthenticated ? () => void logout() : () => void login()}
-                disabled={isAuthActionPending || isAuthBootstrapPending}
-              >
-                {isAuthBootstrapPending
-                  ? 'Checking…'
-                  : isAuthActionPending
-                    ? 'Working…'
-                    : isAuthenticated
-                      ? 'Logout'
-                      : 'Login'}
-              </Button>
+          <div className="border-t border-border-default px-3 py-3">
+            <AccountMenu variant="row" />
+            <div className="px-1.5">
+              <CreditBalanceIndicator />
             </div>
-            <CreditBalanceIndicator />
             {authError && !isAuthBootstrapPending ? (
-              <p role="alert" className="mt-2 mb-0 text-caption text-error-default">
+              <p role="alert" className="mt-2 mb-0 px-1.5 text-caption text-error-default">
                 {authError}
               </p>
             ) : workspaceActionError ? (
-              <p role="alert" className="mt-2 mb-0 text-caption text-error-default">
+              <p role="alert" className="mt-2 mb-0 px-1.5 text-caption text-error-default">
                 {workspaceActionError}
               </p>
             ) : null}
-            <nav aria-label="Legal" className="mt-3 flex gap-3 text-caption">
-              <Link to={PATHS.privacy}>Privacy</Link>
-              <Link to={PATHS.terms}>Terms</Link>
-            </nav>
           </div>
         </div>
       </aside>

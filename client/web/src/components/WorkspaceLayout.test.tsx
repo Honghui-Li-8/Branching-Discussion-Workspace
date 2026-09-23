@@ -108,7 +108,8 @@ describe('signed-in shell layout (A10)', () => {
     })
 
     expect(within(sidebar()).getByRole('button', { name: 'Create workspace' })).toHaveProperty('disabled', true)
-    expect(within(sidebar()).getByRole('button', { name: /checking/i })).toHaveProperty('disabled', true)
+    expect(within(sidebar()).getByRole('button', { name: 'Account menu' })).toHaveProperty('disabled', true)
+    expect(within(sidebar()).getByText(/checking/i)).toBeTruthy()
     expect(await seriousViolations(container)).toHaveLength(0)
   })
 
@@ -205,7 +206,7 @@ describe('signed-in shell layout (A10)', () => {
     expect(await seriousViolations(container)).toHaveLength(0)
   }, 15000)
 
-  it('account row: legal links, credit line and logout are present', async () => {
+  it('account menu: identity, Privacy, Terms and Logout live behind the avatar; no standalone legal links', async () => {
     renderWithProviders(<WorkspaceLayout />, {
       authStatus: 'authenticated',
       // TEST_USER's 100 credits round down to zero turns; give this one a few.
@@ -214,12 +215,20 @@ describe('signed-in shell layout (A10)', () => {
     })
     await within(sidebar()).findByRole('button', { name: rowName(WORKSPACES[0]) })
 
-    const legal = within(sidebar()).getByRole('navigation', { name: 'Legal' })
-    expect(within(legal).getByRole('link', { name: 'Privacy' }).getAttribute('href')).toBe('/privacy')
-    expect(within(legal).getByRole('link', { name: 'Terms' }).getAttribute('href')).toBe('/terms')
+    // Owner decision 2026-09-22: no Privacy/Terms links under the account row.
+    expect(within(sidebar()).queryByRole('link', { name: 'Privacy' })).toBeNull()
+    expect(within(sidebar()).queryByRole('button', { name: 'Logout' })).toBeNull()
     expect(within(sidebar()).getByRole('link', { name: 'Trellis' }).getAttribute('href')).toBe('/')
     expect(within(sidebar()).getByText(/turns remaining/)).toBeTruthy()
-    expect(within(sidebar()).getByRole('button', { name: 'Logout' })).toBeTruthy()
+
+    const trigger = within(sidebar()).getByRole('button', { name: 'Account menu' })
+    fireEvent.keyDown(trigger, { key: 'Enter' })
+    const menu = await screen.findByRole('menu')
+    expect(within(menu).getByText(TEST_USER.displayName as string)).toBeTruthy()
+    expect(within(menu).getByText(TEST_USER.email as string)).toBeTruthy()
+    expect(within(menu).getByRole('menuitem', { name: 'Privacy' }).getAttribute('href')).toBe('/privacy')
+    expect(within(menu).getByRole('menuitem', { name: 'Terms' }).getAttribute('href')).toBe('/terms')
+    expect(within(menu).getByRole('menuitem', { name: 'Logout' })).toBeTruthy()
   })
 
   it('zero credit: the credit line says sending will fail', async () => {

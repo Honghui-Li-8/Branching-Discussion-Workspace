@@ -1,0 +1,93 @@
+import { useAuth } from './useAuth'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from './ui/dropdown-menu'
+import { Button } from './ui/button'
+import { Link } from './ui/link'
+import { ICONS } from '../lib/icons'
+import { LEGAL_PAGES } from '../routePaths'
+import { cn } from '../lib/utils'
+
+type AccountMenuProps = {
+  /** `row` is the expanded footer (avatar + name); `avatar` is the collapsed strip. */
+  variant: 'row' | 'avatar'
+}
+
+/**
+ * The account menu (A10): who is signed in, the legal pages, and logout, behind
+ * the avatar. Owner decision 2026-09-22: Privacy and Terms live here, not as
+ * standalone links under the account row. Both sidebar states render it, so
+ * logout and the legal pages stay reachable while collapsed.
+ */
+export const AccountMenu = ({ variant }: AccountMenuProps) => {
+  const { authUser, isAuthenticated, isAuthBootstrapPending, isAuthActionPending, login, logout } =
+    useAuth()
+
+  const currentUserName = isAuthBootstrapPending ? '…' : (authUser?.displayName ?? 'Guest')
+  const avatarInitial = currentUserName.trim().slice(0, 1).toUpperCase() || '?'
+  const isBusy = isAuthActionPending || isAuthBootstrapPending
+
+  const avatar = (
+    <span
+      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-bg-emphasis text-caption font-semibold text-text-inverse"
+      aria-hidden="true"
+    >
+      {avatarInitial}
+    </span>
+  )
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          aria-label="Account menu"
+          title={currentUserName}
+          disabled={isAuthBootstrapPending}
+          className={cn(
+            'px-1.5',
+            variant === 'row' && 'h-auto w-full justify-start gap-2 py-1.5 text-left',
+          )}
+        >
+          {avatar}
+          {variant === 'row' ? (
+            <>
+              <span className="min-w-0 flex-1 truncate text-label font-medium text-text-default">
+                {isAuthBootstrapPending ? 'Checking…' : currentUserName}
+              </span>
+              <ICONS.menu className="h-4 w-4 shrink-0 text-text-muted" aria-hidden="true" />
+            </>
+          ) : null}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align={variant === 'row' ? 'start' : 'end'} side="top" className="w-56">
+        <div className="px-2 py-1.5">
+          <p className="m-0 truncate text-label font-medium text-text-default">{currentUserName}</p>
+          {authUser?.email ? (
+            <p className="m-0 truncate text-caption text-text-muted">{authUser.email}</p>
+          ) : null}
+        </div>
+        <DropdownMenuSeparator />
+        {LEGAL_PAGES.map((page) => (
+          <DropdownMenuItem key={page.path} asChild>
+            <Link to={page.path} className="text-text-default no-underline hover:text-text-default">
+              {page.label}
+            </Link>
+          </DropdownMenuItem>
+        ))}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          disabled={isBusy}
+          onSelect={isAuthenticated ? () => void logout() : () => void login()}
+        >
+          {isAuthActionPending ? 'Working…' : isAuthenticated ? 'Logout' : 'Login'}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
