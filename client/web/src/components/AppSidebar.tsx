@@ -18,6 +18,7 @@ import { AccountMenu } from './AccountMenu'
 import { Button } from './ui/button'
 import { Input } from './ui/form-field'
 import { Skeleton } from './ui/skeleton'
+import { AppTooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip'
 import { PANEL_TOGGLE_ICONS } from '../lib/icons'
 import { cn } from '../lib/utils'
 
@@ -121,22 +122,27 @@ export const AppSidebar = () => {
             </Button>
           </div>
 
+          {/* A03 sidebar anatomy (Figma 302:447, owner review 2026-09-22): the
+              create action is a full-width primary button above a small-caps
+              label; rows are single-line titles, the current one on a light
+              accent tint with no bar. The summary is a tooltip, not a second line. */}
           <nav aria-label="Workspaces" className="flex min-h-0 flex-1 flex-col">
-            <div className="flex items-center justify-between gap-2 px-4 pt-3 pb-2">
-              <h2 className="m-0 text-caption font-medium uppercase tracking-wide text-text-muted">
-                Workspaces
-              </h2>
+            <div className="px-3 pt-3">
               <CreateWorkspacePopover />
             </div>
+            <h2 className="m-0 px-4 pt-4 pb-1 text-caption font-medium uppercase tracking-wide text-text-muted">
+              Workspaces
+            </h2>
 
-            <ul className="m-0 flex max-h-56 list-none flex-col gap-1 overflow-y-auto px-2 pb-2 lg:max-h-none">
+            <AppTooltipProvider>
+            <ul className="m-0 flex max-h-56 list-none flex-col gap-0.5 overflow-y-auto px-2 pb-2 lg:max-h-none">
               {isWorkspacesLoading && workspaces.length === 0 ? (
                 <li className="flex flex-col gap-1 px-1 py-1">
                   <span role="status" className="sr-only">
                     Loading workspaces
                   </span>
-                  <Skeleton className="h-11 w-full" />
-                  <Skeleton className="h-11 w-full" />
+                  <Skeleton className="h-9 w-full" />
+                  <Skeleton className="h-9 w-full" />
                 </li>
               ) : workspaces.length === 0 ? (
                 <li className="rounded-md border border-dashed border-border-default px-3 py-2.5 text-caption text-text-muted">
@@ -170,24 +176,26 @@ export const AppSidebar = () => {
                           onDelete={() => handleDelete(workspace.id)}
                           isDeletePending={deleteWorkspaceMutation.isPending}
                         >
-                          <button
-                            type="button"
-                            aria-current={isActive ? 'true' : undefined}
-                            className={cn(
-                              'flex min-w-0 flex-1 cursor-pointer flex-col gap-0.5 rounded-md border-l-2 px-3 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default focus-visible:ring-offset-2',
-                              isActive
-                                ? 'border-accent-default bg-accent-tint'
-                                : 'border-transparent hover:bg-bg-subtle',
-                            )}
-                            onClick={() => dispatch(setActiveWorkspaceId(workspace.id))}
-                          >
-                            <span className="truncate text-label font-medium text-text-default">
-                              {workspace.title}
-                            </span>
-                            <span className="line-clamp-2 text-caption text-text-muted">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                type="button"
+                                aria-current={isActive ? 'true' : undefined}
+                                className={cn(
+                                  'flex h-9 min-w-0 flex-1 cursor-pointer items-center rounded-md px-3 text-left text-label transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default focus-visible:ring-offset-2',
+                                  isActive
+                                    ? 'bg-accent-tint font-medium text-accent-strong'
+                                    : 'text-text-default hover:bg-bg-subtle',
+                                )}
+                                onClick={() => dispatch(setActiveWorkspaceId(workspace.id))}
+                              >
+                                <span className="truncate">{workspace.title}</span>
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="right" className="max-w-narrow">
                               {workspaceSummary}
-                            </span>
-                          </button>
+                            </TooltipContent>
+                          </Tooltip>
                         </WorkspaceItemActions>
                       )}
                     </li>
@@ -195,6 +203,7 @@ export const AppSidebar = () => {
                 })
               )}
             </ul>
+            </AppTooltipProvider>
           </nav>
 
           <div className="border-t border-border-default px-3 py-3">

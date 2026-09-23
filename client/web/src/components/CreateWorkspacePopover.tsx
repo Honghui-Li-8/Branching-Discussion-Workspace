@@ -27,12 +27,12 @@ export const CreateWorkspacePopover = () => {
       }}
     >
       <PopoverTrigger asChild>
-        <Button size="sm" aria-label="Create workspace" disabled={!isAvailable}>
+        <Button className="w-full" aria-label="Create workspace" disabled={!isAvailable}>
           <ICONS.create className="h-4 w-4" aria-hidden="true" />
-          New
+          New workspace
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" aria-label="Create workspace" className="w-64 p-1">
+      <PopoverContent align="start" aria-label="Create workspace" className="w-64 p-1">
         <Button
           variant="ghost"
           size="sm"
