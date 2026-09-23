@@ -65,7 +65,14 @@ const trpcFetch = (handlers: Handlers, calls: string[] = []): typeof fetch =>
       const entry = batchInput[String(index)] as { json?: unknown } | undefined
       const inputValue = entry && typeof entry === 'object' && 'json' in entry ? entry.json : entry
       const handler = handlers[procedure]
-      return { result: { data: handler ? handler(inputValue) : [] } }
+      try {
+        return { result: { data: handler ? handler(inputValue) : [] } }
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e)
+        return {
+          error: { message, code: -32603, data: { code: 'INTERNAL_SERVER_ERROR', httpStatus: 500, path: procedure } },
+        }
+      }
     })
     // jsdom has no `Response`; a plain object with what the tRPC link reads.
     const text = JSON.stringify(body)
@@ -241,6 +248,100 @@ describe('signed-in shell layout (A10)', () => {
 
     expect(within(sidebar()).getByRole('status').textContent).toMatch(/no credit left/i)
   })
+
+  it('create: the popover opens from New, Escape closes it and focus returns to the trigger', async () => {
+    const { container } = renderWithProviders(<WorkspaceLayout />, {
+      authStatus: 'authenticated',
+      fetchImpl: trpcFetch({ workspacesList: () => WORKSPACES }),
+    })
+    await within(sidebar()).findByRole('button', { name: rowName(WORKSPACES[0]) })
+    const trigger = within(sidebar()).getByRole('button', { name: 'Create workspace' })
+
+    fireEvent.click(trigger)
+    const dialog = await screen.findByRole('dialog', { name: 'Create workspace' })
+    expect(within(dialog).getByRole('button', { name: /new blank workspace/i })).toBeTruthy()
+    expect(within(dialog).getByRole('button', { name: /choose a database/i })).toBeTruthy()
+    expect(await seriousViolations(container)).toHaveLength(0)
+
+    fireEvent.keyDown(dialog, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Create workspace' })).toBeNull())
+    expect(document.activeElement).toBe(trigger)
+  }, 15000)
+
+  it('create: a blank workspace is created through the hook, listed and selected', async () => {
+    const list = [...WORKSPACES]
+    const calls: string[] = []
+    renderWithProviders(<WorkspaceLayout />, {
+      authStatus: 'authenticated',
+      fetchImpl: trpcFetch(
+        {
+          workspacesList: () => list,
+          workspaceCreate: (input) => {
+            const created = { id: 'w3', title: (input as { title: string }).title, summary: null }
+            list.push(created)
+            return created
+          },
+        },
+        calls,
+      ),
+    })
+    await within(sidebar()).findByRole('button', { name: rowName(WORKSPACES[0]) })
+
+    fireEvent.click(within(sidebar()).getByRole('button', { name: 'Create workspace' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Create workspace' })
+    fireEvent.click(within(dialog).getByRole('button', { name: /new blank workspace/i }))
+
+    const created = await within(sidebar()).findByRole('button', { name: /^New Workspace 3/ }, { timeout: 4000 })
+    await waitFor(() => expect(created.getAttribute('aria-current')).toBe('true'))
+    expect(calls).toContain('workspaceCreate')
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Create workspace' })).toBeNull())
+  }, 15000)
+
+  it('create: a failing example create reports the error and leaves the list and selection intact', async () => {
+    renderWithProviders(<WorkspaceLayout />, {
+      authStatus: 'authenticated',
+      fetchImpl: trpcFetch({
+        workspacesList: () => WORKSPACES,
+        workspaceCreateFromExample: () => {
+          throw new Error('example import failed')
+        },
+      }),
+    })
+    const first = await within(sidebar()).findByRole('button', { name: rowName(WORKSPACES[0]) })
+
+    fireEvent.click(within(sidebar()).getByRole('button', { name: 'Create workspace' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Create workspace' })
+    fireEvent.click(within(dialog).getByRole('button', { name: /choose a database/i }))
+
+    expect((await within(dialog).findByRole('alert', {}, { timeout: 4000 })).textContent).toMatch(/went wrong/i)
+    expect(within(sidebar()).getAllByRole('button', { name: /^(MVP|Choose)/ })).toHaveLength(2)
+    expect(first.getAttribute('aria-current')).toBe('true')
+  }, 15000)
+
+  it('no workspaces: the empty state offers the create actions and blank creates', async () => {
+    const list: typeof WORKSPACES = []
+    const { container } = renderWithProviders(<WorkspaceLayout />, {
+      authStatus: 'authenticated',
+      fetchImpl: trpcFetch({
+        workspacesList: () => list,
+        workspaceCreate: (input) => {
+          const created = { id: 'w9', title: (input as { title: string }).title, summary: null }
+          list.push(created)
+          return created
+        },
+      }),
+    })
+    await waitFor(() => expect(within(sidebar()).getByText(/no workspaces yet/i)).toBeTruthy())
+    const main = screen.getByRole('main', { name: 'Workspace' })
+    expect(within(main).getByRole('button', { name: /project decision/i })).toBeTruthy()
+    expect(await seriousViolations(container)).toHaveLength(0)
+
+    fireEvent.click(within(main).getByRole('button', { name: /new blank workspace/i }))
+
+    const created = await within(sidebar()).findByRole('button', { name: /^New Workspace 1/ }, { timeout: 4000 })
+    await waitFor(() => expect(created.getAttribute('aria-current')).toBe('true'))
+    expect(mockedTree()).toBeTruthy()
+  }, 15000)
 
   it('seeded: an unnamed icon button inside the shell turns the scan red', async () => {
     const { container } = renderWithProviders(<WorkspaceLayout />, {

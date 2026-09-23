@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { useAppDispatch, useAppSelector } from '../store/hooks'
 import { WorkspaceItemActions } from './WorkspaceItemActions'
 import { CreateWorkspacePopover } from './CreateWorkspacePopover'
@@ -18,7 +18,7 @@ import { AccountMenu } from './AccountMenu'
 import { Button } from './ui/button'
 import { Input } from './ui/form-field'
 import { Skeleton } from './ui/skeleton'
-import { ICONS, PANEL_TOGGLE_ICONS } from '../lib/icons'
+import { PANEL_TOGGLE_ICONS } from '../lib/icons'
 import { cn } from '../lib/utils'
 
 /**
@@ -32,18 +32,11 @@ export const AppSidebar = () => {
   const activeWorkspaceId = useAppSelector(selectActiveWorkspaceId)
   const isWorkspacesLoading = useAppSelector(selectWorkspacesLoading)
   const utils = trpc.useUtils()
-  const { isAuthenticated, isAuthBootstrapPending, authError } = useAuth()
+  const { isAuthBootstrapPending, authError } = useAuth()
 
   const invalidateWorkspaceList = async () => {
     await utils.workspacesList.invalidate()
   }
-
-  const createWorkspaceMutation = trpc.workspaceCreate.useMutation({
-    onSuccess: async (workspace) => {
-      await invalidateWorkspaceList()
-      dispatch(setActiveWorkspaceId(workspace.id))
-    },
-  })
 
   const updateWorkspaceMutation = trpc.workspaceUpdate.useMutation({
     onSuccess: async () => {
@@ -57,25 +50,8 @@ export const AppSidebar = () => {
     },
   })
 
-  const createWorkspace = () => {
-    if (!isAuthenticated || createWorkspaceMutation.isPending) {
-      return
-    }
-
-    const nextNumber = workspaces.length + 1
-    createWorkspaceMutation.mutate({
-      title: `New Workspace ${nextNumber}`,
-      rootNodeTitle: 'Root decision',
-      rootNodeSummary: '',
-    })
-  }
-
   const isCollapsed = useAppSelector(selectSidebarCollapsed)
   const setIsCollapsed = (val: boolean) => dispatch(setSidebarCollapsed(val))
-
-  const [isPopoverOpen, setIsPopoverOpen] = useState(false)
-  const [popoverPosition, setPopoverPosition] = useState({ top: 0, left: 0 })
-  const createButtonRef = useRef<HTMLButtonElement>(null)
 
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
@@ -96,16 +72,7 @@ export const AppSidebar = () => {
     deleteWorkspaceMutation.mutate({ id: workspaceId })
   }
 
-  const toggleCreatePopover = () => {
-    const anchorRect = createButtonRef.current?.getBoundingClientRect()
-    if (anchorRect) {
-      setPopoverPosition({ top: anchorRect.bottom + 6, left: anchorRect.left })
-    }
-    setIsPopoverOpen((current) => !current)
-  }
-
   const workspaceActionError =
-    createWorkspaceMutation.error?.message ??
     updateWorkspaceMutation.error?.message ??
     deleteWorkspaceMutation.error?.message ??
     null
@@ -159,17 +126,7 @@ export const AppSidebar = () => {
               <h2 className="m-0 text-caption font-medium uppercase tracking-wide text-text-muted">
                 Workspaces
               </h2>
-              <Button
-                ref={createButtonRef}
-                size="sm"
-                onClick={toggleCreatePopover}
-                aria-label="Create workspace"
-                aria-expanded={isPopoverOpen}
-                disabled={!isAuthenticated || isAuthBootstrapPending}
-              >
-                <ICONS.create className="h-4 w-4" aria-hidden="true" />
-                New
-              </Button>
+              <CreateWorkspacePopover />
             </div>
 
             <ul className="m-0 flex max-h-56 list-none flex-col gap-1 overflow-y-auto px-2 pb-2 lg:max-h-none">
@@ -257,15 +214,6 @@ export const AppSidebar = () => {
           </div>
         </div>
       </aside>
-
-      {isPopoverOpen && (
-        <CreateWorkspacePopover
-          anchorRef={createButtonRef}
-          position={popoverPosition}
-          onCreateBlank={createWorkspace}
-          onClose={() => setIsPopoverOpen(false)}
-        />
-      )}
     </>
   )
 }
