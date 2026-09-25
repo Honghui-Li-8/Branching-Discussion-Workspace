@@ -22,7 +22,7 @@ export const SessionExpiredNotice = () => {
       <Container>
         <div className="flex items-start gap-3 py-3">
           <p role="status" className="m-0 flex-1 text-label">
-            Your session expired, so you&rsquo;ve been signed out.{' '}
+            Your session expired, so you’ve been signed out.{' '}
             <SignInLink underline="always">Sign in</SignInLink> to pick up where you left off.
           </p>
           <button

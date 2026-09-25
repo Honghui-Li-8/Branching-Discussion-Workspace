@@ -597,9 +597,9 @@ describe('signed-in shell layout (A10)', () => {
     })
 
     const main = screen.getByRole('main', { name: 'Workspace' })
-    expect((await within(main).findByRole('alert')).textContent).toMatch(/couldn.t reach the server/i)
-    expect(within(main).getByRole('heading', { level: 1 }).textContent).toMatch(/didn.t load/i)
-    expect(within(sidebar()).getByText(/couldn.t load your workspaces/i)).toBeTruthy()
+    expect((await within(main).findByRole('alert')).textContent).toMatch(/couldn’t reach the server/i)
+    expect(within(main).getByRole('heading', { level: 1 }).textContent).toMatch(/didn’t load/i)
+    expect(within(sidebar()).getByText(/couldn’t load your workspaces/i)).toBeTruthy()
     // Never the empty state: that would invite creating a workspace the user may already have.
     expect(within(sidebar()).queryByText(/no workspaces yet/i)).toBeNull()
     expect(within(main).queryByRole('button', { name: /new blank workspace/i })).toBeNull()

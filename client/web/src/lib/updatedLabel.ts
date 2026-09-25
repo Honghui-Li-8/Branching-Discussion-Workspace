@@ -6,7 +6,7 @@ const startOfDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(),
  * "Updated today / yesterday / N days ago / Mar 18 / Mar 18, 2025" for a
  * workspace row's meta line (A10, owner pick W3, 2026-09-25). Days are
  * counted in the viewer's calendar, not in 24-hour blocks. Returns null for an
- * unparseable timestamp so the row can omit the line.
+ * invalid timestamp so the row can omit the line.
  */
 export const updatedLabel = (iso: string, now: Date = new Date()): string | null => {
   const updated = new Date(iso)
