@@ -12,7 +12,6 @@ import {
   setActiveWorkspaceId,
   setSidebarCollapsed,
 } from '../store/slices/appShellSlice'
-import { useAuth } from './useAuth'
 import { trpc } from '../trpc'
 import { CreditBalanceIndicator } from './CreditBalanceIndicator'
 import { AccountMenu } from './AccountMenu'
@@ -38,7 +37,6 @@ export const AppSidebar = () => {
   const isWorkspacesLoading = useAppSelector(selectWorkspacesLoading)
   const isWorkspacesLoadFailed = useAppSelector(selectWorkspacesLoadFailed)
   const utils = trpc.useUtils()
-  const { isAuthBootstrapPending, authError } = useAuth()
 
   const invalidateWorkspaceList = async () => {
     await utils.workspacesList.invalidate()
@@ -244,11 +242,9 @@ export const AppSidebar = () => {
 
           <div className="border-t border-border-default px-3 py-3">
             <AccountMenu variant="row" detail={<CreditBalanceIndicator />} />
-            {authError && !isAuthBootstrapPending ? (
-              <p role="alert" className="mt-2 mb-0 px-1.5 text-caption text-error-default">
-                {authError}
-              </p>
-            ) : workspaceActionError ? (
+            {/* Sign-out failures are reported inside the account menu, which
+                stays open on failure and would hide an alert placed here. */}
+            {workspaceActionError ? (
               <p role="alert" className="mt-2 mb-0 px-1.5 text-caption text-error-default">
                 {workspaceActionError}
               </p>

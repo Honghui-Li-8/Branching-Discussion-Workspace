@@ -75,9 +75,10 @@ export const AccountMenu = ({ variant, detail }: AccountMenuProps) => {
       >
         {isAuthActionPending ? 'Working…' : isAuthenticated ? 'Logout' : 'Login'}
       </DropdownMenuItem>
-      {/* Collapsed, the footer that renders auth errors is hidden, so the
-          menu carries it. Expanded, the footer does — one alert, not two. */}
-      {variant === 'avatar' && authError && !isAuthBootstrapPending ? (
+      {/* A failed sign-out keeps the menu open, and an open menu hides the rest
+          of the page from assistive tech, so the error is reported here, beside
+          the action that retries it, in both sidebar states. */}
+      {authError && !isAuthBootstrapPending ? (
         <p role="alert" className="m-0 px-2 pt-1 pb-1.5 text-caption text-error-default">
           {authError}
         </p>

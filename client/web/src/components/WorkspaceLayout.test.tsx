@@ -345,6 +345,28 @@ describe('signed-in shell layout (A10)', () => {
     expect(screen.getByRole('menu')).toBe(menu)
   })
 
+  it('expanded: a failed logout keeps the signed-in shell and reports it in the menu', async () => {
+    const base = trpcFetch({ workspacesList: () => WORKSPACES })
+    const fetchImpl: typeof fetch = (input, init) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+      if (!url.includes('/auth/logout')) return base(input, init)
+      return Promise.resolve({ ok: false, status: 500, json: async () => ({}) } as unknown as Response)
+    }
+    const { store } = renderWithProviders(<WorkspaceLayout />, { authStatus: 'authenticated', fetchImpl })
+    await within(sidebar()).findByRole('button', { name: rowName(WORKSPACES[0]) })
+
+    fireEvent.keyDown(within(sidebar()).getByRole('button', { name: 'Account menu' }), { key: 'Enter' })
+    const menu = await screen.findByRole('menu')
+    fireEvent.click(within(menu).getByRole('menuitem', { name: 'Logout' }))
+
+    // The open menu hides the page from assistive tech, so the alert lives in the menu.
+    expect((await within(menu).findByRole('alert')).textContent).toMatch(/unable to sign out/i)
+    expect(store.getState().auth.status).toBe('authenticated')
+    fireEvent.keyDown(menu, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('menu')).toBeNull())
+    expect(within(sidebar()).getByRole('button', { name: rowName(WORKSPACES[0]) })).toBeTruthy()
+  })
+
   it('zero credit: the credit line says sending will fail', async () => {
     renderWithProviders(<WorkspaceLayout />, {
       authStatus: 'authenticated',
