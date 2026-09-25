@@ -63,9 +63,21 @@ export const useCreateWorkspaceActions = ({ onCreated }: { onCreated?: () => voi
   // workspace: the sync component mirrors the query into the store on its own
   // render cycle, and a selection that lands ahead of the list is reset to the
   // first row as "unknown". Ordering both writes here makes it deterministic.
-  const settle = async (workspace: { id: string }) => {
-    const fresh = await utils.workspacesList.fetch()
-    dispatch(setWorkspaces(toWorkspaceNavItems(fresh)))
+  const settle = async (workspace: { id: string; title: string; summary?: string | null }) => {
+    let fresh: ReturnType<typeof toWorkspaceNavItems>
+    try {
+      fresh = toWorkspaceNavItems(await utils.workspacesList.fetch())
+    } catch {
+      // The create has committed: a failed refresh must not report it as a
+      // failed create, or a retry duplicates it. List the returned workspace
+      // beside the ones already shown, and let the query reconcile later.
+      fresh = [
+        ...workspaces.filter((item) => item.id !== workspace.id),
+        ...toWorkspaceNavItems([workspace]),
+      ]
+      void utils.workspacesList.invalidate()
+    }
+    dispatch(setWorkspaces(fresh))
     dispatch(setActiveWorkspaceId(workspace.id))
     setPendingKey(null)
     setError(null)

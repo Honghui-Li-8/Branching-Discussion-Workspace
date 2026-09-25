@@ -392,6 +392,34 @@ describe('signed-in shell layout (A10)', () => {
     expect(mockedTree()).toBeTruthy()
   })
 
+  it('create: a committed create is listed and selected even when the list refresh fails', async () => {
+    let createdAlready = false
+    renderWithProviders(<WorkspaceLayout />, {
+      authStatus: 'authenticated',
+      fetchImpl: trpcFetch({
+        workspacesList: () => {
+          if (createdAlready) throw new Error('list refresh failed')
+          return WORKSPACES
+        },
+        workspaceCreate: (input) => {
+          createdAlready = true
+          return { id: 'w3', title: (input as { title: string }).title, summary: null }
+        },
+      }),
+    })
+    await within(sidebar()).findByRole('button', { name: rowName(WORKSPACES[0]) })
+
+    fireEvent.click(within(sidebar()).getByRole('button', { name: 'Create workspace' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Create workspace' })
+    fireEvent.click(within(dialog).getByRole('button', { name: /new blank workspace/i }))
+
+    const created = await within(sidebar()).findByRole('button', { name: /^New Workspace 3/ }, { timeout: 4000 })
+    await waitFor(() => expect(created.getAttribute('aria-current')).toBe('true'))
+    expect(within(sidebar()).getAllByRole('button', { name: /^(MVP|Choose|New Workspace)/ })).toHaveLength(3)
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Create workspace' })).toBeNull())
+    expect(screen.queryByText(/went wrong/i)).toBeNull()
+  })
+
   it('create: a pending create from the empty state holds the sidebar popover to it too', async () => {
     const base = trpcFetch({ workspacesList: () => [] })
     // The create never settles: the assertion is about the in-flight state.
