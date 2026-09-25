@@ -392,6 +392,30 @@ describe('signed-in shell layout (A10)', () => {
     expect(mockedTree()).toBeTruthy()
   })
 
+  it('create: a pending create from the empty state holds the sidebar popover to it too', async () => {
+    const base = trpcFetch({ workspacesList: () => [] })
+    // The create never settles: the assertion is about the in-flight state.
+    const fetchImpl: typeof fetch = (input, init) =>
+      String(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url).includes(
+        'workspaceCreate',
+      )
+        ? new Promise<Response>(() => {})
+        : base(input, init)
+    renderWithProviders(<WorkspaceLayout />, { authStatus: 'authenticated', fetchImpl })
+    await waitFor(() => expect(within(sidebar()).getByText(/no workspaces yet/i)).toBeTruthy())
+    const main = screen.getByRole('main', { name: 'Workspace' })
+
+    fireEvent.click(within(main).getByRole('button', { name: /new blank workspace/i }))
+    await waitFor(() =>
+      expect(within(main).getByRole('button', { name: /new blank workspace/i }).getAttribute('aria-busy')).toBe('true'),
+    )
+
+    fireEvent.click(within(sidebar()).getByRole('button', { name: 'Create workspace' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Create workspace' })
+    expect(within(dialog).getByRole('button', { name: /new blank workspace/i })).toHaveProperty('disabled', true)
+    expect(within(dialog).getByRole('button', { name: /choose a database/i })).toHaveProperty('disabled', true)
+  })
+
   it('outline: the Outline tab lists the open workspace nodes and opens one', async () => {
     const { container, store } = renderWithProviders(<WorkspaceLayout />, {
       authStatus: 'authenticated',

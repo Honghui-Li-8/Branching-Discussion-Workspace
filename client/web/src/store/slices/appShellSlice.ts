@@ -1,5 +1,9 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit'
+import type { ExampleWorkspaceKey } from '@branching/shared/router/schemas/core'
 import type { RootState } from '..'
+
+/** Which create action is in flight: a blank workspace or one of the examples. */
+export type CreatePendingKey = 'blank' | ExampleWorkspaceKey
 
 type WorkspaceNavItem = {
   id: string
@@ -14,6 +18,12 @@ type AppShellState = {
   openNodeId: string | null
   isWorkspacesLoading: boolean
   isSidebarCollapsed: boolean
+  /**
+   * The in-flight create (A10). Shared, not per-component: the sidebar popover
+   * and the empty state are two entry points to one create model, so either
+   * one's request must hold both to one action at a time.
+   */
+  createPendingKey: CreatePendingKey | null
 }
 
 const initialState: AppShellState = {
@@ -22,6 +32,7 @@ const initialState: AppShellState = {
   openNodeId: null,
   isWorkspacesLoading: false,
   isSidebarCollapsed: false,
+  createPendingKey: null,
 }
 
 const appShellSlice = createSlice({
@@ -47,17 +58,27 @@ const appShellSlice = createSlice({
     setSidebarCollapsed: (state, action: PayloadAction<boolean>) => {
       state.isSidebarCollapsed = action.payload
     },
+    setCreatePendingKey: (state, action: PayloadAction<CreatePendingKey | null>) => {
+      state.createPendingKey = action.payload
+    },
   },
 })
 
-export const { setWorkspaces, setWorkspacesLoading, setActiveWorkspaceId, setOpenNodeId, setSidebarCollapsed } =
-  appShellSlice.actions
+export const {
+  setWorkspaces,
+  setWorkspacesLoading,
+  setActiveWorkspaceId,
+  setOpenNodeId,
+  setSidebarCollapsed,
+  setCreatePendingKey,
+} = appShellSlice.actions
 
 export const selectWorkspaces = (state: RootState) => state.appShell.workspaces
 export const selectActiveWorkspaceId = (state: RootState) => state.appShell.activeWorkspaceId
 export const selectOpenNodeId = (state: RootState) => state.appShell.openNodeId
 export const selectWorkspacesLoading = (state: RootState) => state.appShell.isWorkspacesLoading
 export const selectSidebarCollapsed = (state: RootState) => state.appShell.isSidebarCollapsed
+export const selectCreatePendingKey = (state: RootState) => state.appShell.createPendingKey
 export const selectActiveWorkspace = (state: RootState) =>
   state.appShell.activeWorkspaceId
     ? state.appShell.workspaces.find((workspace) => workspace.id === state.appShell.activeWorkspaceId) ?? null

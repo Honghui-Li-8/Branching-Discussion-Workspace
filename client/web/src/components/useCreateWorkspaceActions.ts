@@ -1,7 +1,14 @@
 import { useState } from 'react'
 import type { ExampleWorkspaceKey } from '@branching/shared/router/schemas/core'
 import { useAppDispatch, useAppSelector } from '../store/hooks'
-import { selectWorkspaces, setActiveWorkspaceId, setWorkspaces } from '../store/slices/appShellSlice'
+import {
+  selectCreatePendingKey,
+  selectWorkspaces,
+  setActiveWorkspaceId,
+  setCreatePendingKey,
+  setWorkspaces,
+  type CreatePendingKey,
+} from '../store/slices/appShellSlice'
 import { toWorkspaceNavItems } from './workspaceNavItems'
 import { trpc } from '../trpc'
 import { useAuth } from './useAuth'
@@ -33,8 +40,6 @@ export const EXAMPLE_WORKSPACES: ReadonlyArray<{
   },
 ]
 
-export type CreatePendingKey = 'blank' | ExampleWorkspaceKey
-
 const CREATE_FAILED = 'Something went wrong. Please try again.'
 
 /**
@@ -48,7 +53,10 @@ export const useCreateWorkspaceActions = ({ onCreated }: { onCreated?: () => voi
   const utils = trpc.useUtils()
   const workspaces = useAppSelector(selectWorkspaces)
   const { isAuthenticated, isAuthBootstrapPending } = useAuth()
-  const [pendingKey, setPendingKey] = useState<CreatePendingKey | null>(null)
+  // Pending is shared through the store so both entry points hold to one
+  // create at a time; the error stays with the surface that asked.
+  const pendingKey = useAppSelector(selectCreatePendingKey)
+  const setPendingKey = (key: CreatePendingKey | null) => dispatch(setCreatePendingKey(key))
   const [error, setError] = useState<string | null>(null)
 
   // Fetch the fresh list and write it to the store *before* selecting the new
