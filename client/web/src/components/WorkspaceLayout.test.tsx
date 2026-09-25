@@ -237,7 +237,7 @@ describe('signed-in shell layout (A10)', () => {
   it('account menu: identity, Privacy, Terms and Logout live behind the avatar; no standalone legal links', async () => {
     renderWithProviders(<WorkspaceLayout />, {
       authStatus: 'authenticated',
-      // TEST_USER's 100 credits round down to zero turns; give this one a few.
+      // TEST_USER's 100 credits are under one turn; give this one a few.
       user: { ...TEST_USER, creditBalance: 4000 },
       fetchImpl: trpcFetch({ workspacesList: () => WORKSPACES }),
     })
@@ -268,6 +268,18 @@ describe('signed-in shell layout (A10)', () => {
     await within(sidebar()).findByRole('button', { name: rowName(WORKSPACES[0]) })
 
     expect(within(sidebar()).getByRole('status').textContent).toMatch(/no credit left/i)
+  })
+
+  it('low credit: a positive balance under one turn does not claim sending will fail', async () => {
+    renderWithProviders(<WorkspaceLayout />, {
+      authStatus: 'authenticated',
+      user: { ...TEST_USER, creditBalance: 100 },
+      fetchImpl: trpcFetch({ workspacesList: () => WORKSPACES }),
+    })
+    await within(sidebar()).findByRole('button', { name: rowName(WORKSPACES[0]) })
+
+    expect(within(sidebar()).getByText(/less than one turn remaining/i)).toBeTruthy()
+    expect(within(sidebar()).queryByText(/no credit left/i)).toBeNull()
   })
 
   it('create: the popover opens from New, Escape closes it and focus returns to the trigger', async () => {
