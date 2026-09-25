@@ -9,6 +9,8 @@ type WorkspaceNavItem = {
   id: string
   title: string
   summary: string | null
+  /** ISO timestamp of the last change; null when the source row lacks one. */
+  updatedAt: string | null
 }
 
 type AppShellState = {

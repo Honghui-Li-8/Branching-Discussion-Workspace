@@ -18,11 +18,11 @@ import { AccountMenu } from './AccountMenu'
 import { Button } from './ui/button'
 import { Input } from './ui/form-field'
 import { Skeleton } from './ui/skeleton'
-import { AppTooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/disclosure'
 import { WorkspaceOutline } from './WorkspaceOutline'
 import { PANEL_TOGGLE_ICONS } from '../lib/icons'
 import { cn } from '../lib/utils'
+import { updatedLabel } from '../lib/updatedLabel'
 
 /**
  * The signed-in navigation frame (A10): identity, the workspace list with a
@@ -125,10 +125,11 @@ export const AppSidebar = () => {
             </Button>
           </div>
 
-          {/* A03 sidebar anatomy (Figma 302:447, owner review 2026-09-22): the
-              create action is a full-width primary button above a small-caps
-              label; rows are single-line titles, the current one on a light
-              accent tint with no bar. The summary is a tooltip, not a second line. */}
+          {/* A03 sidebar anatomy (Figma 302:447, owner review 2026-09-22) with
+              the owner's 2026-09-25 row pick (W3): the create action is a
+              full-width primary button; each row is a one-line title over the
+              summary (up to two lines) and when it was last updated, and the
+              current row — overflow menu included — sits on a light accent tint. */}
           <nav aria-label="Workspaces" className="flex min-h-0 flex-1 flex-col">
             <div className="px-3 pt-3">
               <CreateWorkspacePopover />
@@ -142,99 +143,91 @@ export const AppSidebar = () => {
             >
               <TabsList
                 aria-label="Sidebar view"
-                className="mx-3 mt-3 grid grid-cols-2 gap-0 rounded-md border border-border-default bg-bg-subtle p-0.5"
+                className="mx-3 mt-3 grid grid-cols-2 gap-0 overflow-hidden rounded-md border border-border-default bg-bg-subtle p-0"
               >
                 <TabsTrigger
                   value="workspaces"
-                  className="rounded-sm border-b-0 py-1.5 text-center data-[state=active]:bg-accent-tint data-[state=active]:text-accent-strong"
+                  className="rounded-none border-b-0 py-1.5 text-center data-[state=active]:bg-accent-tint data-[state=active]:text-accent-strong"
                 >
                   Workspaces
                 </TabsTrigger>
                 <TabsTrigger
                   value="outline"
                   disabled={!activeWorkspaceId}
-                  className="rounded-sm border-b-0 py-1.5 text-center data-[state=active]:bg-accent-tint data-[state=active]:text-accent-strong"
+                  className="rounded-none border-b-0 py-1.5 text-center data-[state=active]:bg-accent-tint data-[state=active]:text-accent-strong"
                 >
                   Outline
                 </TabsTrigger>
               </TabsList>
 
               <TabsContent value="workspaces" className="flex min-h-0 flex-1 flex-col pt-2 text-text-default">
-            <AppTooltipProvider>
-            <ul className="m-0 flex max-h-56 list-none flex-col gap-0.5 overflow-y-auto px-2 pb-2 lg:max-h-none">
-              {isWorkspacesLoading && workspaces.length === 0 ? (
-                <li className="flex flex-col gap-1 px-1 py-1">
-                  <span role="status" className="sr-only">
-                    Loading workspaces
-                  </span>
-                  <Skeleton className="h-9 w-full" />
-                  <Skeleton className="h-9 w-full" />
-                </li>
-              ) : workspaces.length === 0 ? (
-                <li className="rounded-md border border-dashed border-border-default px-3 py-2.5 text-caption text-text-muted">
-                  No workspaces yet.
-                </li>
-              ) : (
-                workspaces.map((workspace) => {
-                  const isActive = workspace.id === activeWorkspaceId
-                  const workspaceSummary = workspace.summary?.trim() || 'No summary yet.'
-                  const isRenaming = renamingId === workspace.id
+                <ul className="m-0 flex max-h-56 list-none flex-col gap-0.5 overflow-y-auto px-2 pb-2 lg:max-h-none">
+                  {isWorkspacesLoading && workspaces.length === 0 ? (
+                    <li className="flex flex-col gap-1 px-1 py-1">
+                      <span role="status" className="sr-only">
+                        Loading workspaces
+                      </span>
+                      <Skeleton className="h-9 w-full" />
+                      <Skeleton className="h-9 w-full" />
+                    </li>
+                  ) : workspaces.length === 0 ? (
+                    <li className="rounded-md border border-dashed border-border-default px-3 py-2.5 text-caption text-text-muted">
+                      No workspaces yet.
+                    </li>
+                  ) : (
+                    workspaces.map((workspace) => {
+                      const isActive = workspace.id === activeWorkspaceId
+                      const summary = workspace.summary?.trim() || null
+                      const updated = workspace.updatedAt ? updatedLabel(workspace.updatedAt) : null
+                      const isRenaming = renamingId === workspace.id
 
-                  return (
-                    <li key={workspace.id}>
-                      {isRenaming ? (
-                        <Input
-                          autoFocus
-                          aria-label="Workspace name"
-                          value={renameValue}
-                          onChange={(e) => setRenameValue(e.target.value)}
-                          onBlur={saveRename}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') e.currentTarget.blur()
-                            if (e.key === 'Escape') setRenamingId(null)
-                          }}
-                          className="text-label font-medium"
-                        />
-                      ) : (
-                        // The tooltip root wraps the actions so the context-menu
-                        // trigger (inside WorkspaceItemActions) slots onto the
-                        // tooltip trigger and both land on the row button. Root
-                        // renders no DOM node, so a trigger given it as child
-                        // would drop its right-click handler.
-                        <Tooltip>
-                          <WorkspaceItemActions
-                            workspaceTitle={workspace.title}
-                            onRename={() => startRename(workspace.id, workspace.title)}
-                            onDelete={() => handleDelete(workspace.id)}
-                            isDeletePending={deleteWorkspaceMutation.isPending}
-                          >
-                            <TooltipTrigger asChild>
+                      return (
+                        <li key={workspace.id}>
+                          {isRenaming ? (
+                            <Input
+                              autoFocus
+                              aria-label="Workspace name"
+                              value={renameValue}
+                              onChange={(e) => setRenameValue(e.target.value)}
+                              onBlur={saveRename}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') e.currentTarget.blur()
+                                if (e.key === 'Escape') setRenamingId(null)
+                              }}
+                              className="text-label font-medium"
+                            />
+                          ) : (
+                            <WorkspaceItemActions
+                              workspaceTitle={workspace.title}
+                              isActive={isActive}
+                              onRename={() => startRename(workspace.id, workspace.title)}
+                              onDelete={() => handleDelete(workspace.id)}
+                              isDeletePending={deleteWorkspaceMutation.isPending}
+                            >
                               <button
                                 type="button"
                                 aria-current={isActive ? 'true' : undefined}
                                 className={cn(
-                                  'flex h-9 min-w-0 flex-1 cursor-pointer items-center rounded-md px-3 text-left text-label transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default focus-visible:ring-offset-2',
-                                  isActive
-                                    ? 'bg-accent-tint font-medium text-accent-strong'
-                                    : 'text-text-default hover:bg-bg-subtle',
+                                  'flex min-w-0 flex-1 cursor-pointer flex-col gap-0.5 rounded-md py-2 pr-1 pl-3 text-left text-label transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default focus-visible:ring-offset-2',
+                                  isActive ? 'font-medium text-accent-strong' : 'text-text-default',
                                 )}
                                 onClick={() => dispatch(setActiveWorkspaceId(workspace.id))}
                               >
                                 <span className="truncate">{workspace.title}</span>
+                                {summary ? (
+                                  <span className="line-clamp-2 text-caption font-normal text-text-muted">{summary}</span>
+                                ) : null}
+                                {updated ? (
+                                  <span className="text-caption font-normal text-text-muted">{updated}</span>
+                                ) : null}
                               </button>
-                            </TooltipTrigger>
-                          </WorkspaceItemActions>
-                          <TooltipContent side="right" className="max-w-narrow">
-                            {workspaceSummary}
-                          </TooltipContent>
-                        </Tooltip>
-                      )}
-                    </li>
-                  )
-                })
-              )}
-            </ul>
-            </AppTooltipProvider>
+                            </WorkspaceItemActions>
+                          )}
+                        </li>
+                      )
+                    })
+                  )}
+                </ul>
               </TabsContent>
               <TabsContent value="outline" className="min-h-0 flex-1 overflow-y-auto pt-2 text-text-default">
                 <WorkspaceOutline />
@@ -243,10 +236,7 @@ export const AppSidebar = () => {
           </nav>
 
           <div className="border-t border-border-default px-3 py-3">
-            <AccountMenu variant="row" />
-            <div className="px-1.5">
-              <CreditBalanceIndicator />
-            </div>
+            <AccountMenu variant="row" detail={<CreditBalanceIndicator />} />
             {authError && !isAuthBootstrapPending ? (
               <p role="alert" className="mt-2 mb-0 px-1.5 text-caption text-error-default">
                 {authError}

@@ -24,18 +24,22 @@ import {
 } from './ui/alert-dialog'
 import { Button } from './ui/button'
 import { ICONS, OVERFLOW_ICONS } from '../lib/icons'
+import { cn } from '../lib/utils'
 
 type Props = {
   workspaceTitle: string
   onRename: () => void
   onDelete: () => void
   isDeletePending: boolean
+  /** The row is the open workspace: the whole row, menu included, takes the tint. */
+  isActive: boolean
   children: ReactNode
 }
 
 /**
  * A workspace row's management actions (A10): a visible overflow-menu button
- * beside the row, reachable by mouse, touch and keyboard, plus the original
+ * inside the row's highlight (owner review 2026-09-25: one unit, not a row
+ * with a button beside it), reachable by mouse, touch and keyboard, plus the original
  * right-click context menu as an optional shortcut. Both drive one delete
  * confirmation. Delete is immediate on the server, and the copy says so.
  *
@@ -48,6 +52,7 @@ export const WorkspaceItemActions = ({
   onRename,
   onDelete,
   isDeletePending,
+  isActive,
   children,
 }: Props) => {
   const [confirmOpen, setConfirmOpen] = useState(false)
@@ -62,7 +67,12 @@ export const WorkspaceItemActions = ({
 
   return (
     <>
-      <div className="flex min-w-0 items-stretch gap-1">
+      <div
+        className={cn(
+          'flex min-w-0 items-start rounded-md transition-colors',
+          isActive ? 'bg-accent-tint' : 'hover:bg-bg-subtle',
+        )}
+      >
         <ContextMenu>
           <ContextMenuTrigger ref={rowRef} asChild>
             {children}
@@ -90,7 +100,7 @@ export const WorkspaceItemActions = ({
               ref={overflowRef}
               variant="ghost"
               size="sm"
-              className="shrink-0 self-center px-2"
+              className="mt-1 mr-0.5 shrink-0 px-2 text-text-muted hover:bg-transparent hover:text-text-default"
               aria-label={`Actions for ${workspaceTitle}`}
             >
               <OverflowIcon className="h-4 w-4" aria-hidden="true" />

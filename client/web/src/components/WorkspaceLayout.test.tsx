@@ -244,16 +244,28 @@ describe('signed-in shell layout (A10)', () => {
     expect(await seriousViolations(container)).toHaveLength(0)
   })
 
-  it('row actions: right-clicking a row still opens its context menu; focus shows the summary', async () => {
+  it('rows: a one-line title over the summary and when it was updated; no summary, no line', async () => {
+    const updatedAt = new Date(Date.now() - 2 * 86_400_000).toISOString()
+    renderWithProviders(<WorkspaceLayout />, {
+      authStatus: 'authenticated',
+      fetchImpl: trpcFetch({ workspacesList: () => WORKSPACES.map((w) => ({ ...w, updatedAt })) }),
+    })
+    const first = await within(sidebar()).findByRole('button', { name: rowName(WORKSPACES[0]) })
+    const second = within(sidebar()).getByRole('button', { name: rowName(WORKSPACES[1]) })
+
+    // Owner pick W3 (2026-09-25): the summary is in the row, not a tooltip.
+    expect(first.textContent).toMatch(/should we branch/i)
+    expect(first.textContent).toMatch(/updated 2 days ago/i)
+    expect(second.textContent).not.toMatch(/no summary/i)
+    expect(screen.queryByRole('tooltip')).toBeNull()
+  })
+
+  it('row actions: right-clicking a row still opens its context menu', async () => {
     renderWithProviders(<WorkspaceLayout />, {
       authStatus: 'authenticated',
       fetchImpl: trpcFetch({ workspacesList: () => WORKSPACES }),
     })
     const row = await within(sidebar()).findByRole('button', { name: rowName(WORKSPACES[0]) })
-
-    fireEvent.focus(row)
-    expect((await screen.findByRole('tooltip')).textContent).toMatch(/should we branch/i)
-    fireEvent.blur(row)
 
     fireEvent.contextMenu(row)
     const menu = await screen.findByRole('menu')

@@ -45,6 +45,7 @@ describe('trpc client auth handling', () => {
           id: 'w1',
           title: 'Workspace One',
           summary: 'Summary',
+          updatedAt: null,
         },
       ]),
     )

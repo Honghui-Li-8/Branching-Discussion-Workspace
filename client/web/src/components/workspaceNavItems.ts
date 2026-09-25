@@ -1,4 +1,4 @@
-type WorkspaceLike = { id: string; title: string; summary?: string | null }
+type WorkspaceLike = { id: string; title: string; summary?: string | null; updatedAt?: string }
 
 /**
  * The shape the shell keeps in the store for the sidebar list. Shared by the
@@ -10,4 +10,5 @@ export const toWorkspaceNavItems = (data: ReadonlyArray<WorkspaceLike>) =>
     id: workspace.id,
     title: workspace.title,
     summary: workspace.summary ?? null,
+    updatedAt: workspace.updatedAt ?? null,
   }))
