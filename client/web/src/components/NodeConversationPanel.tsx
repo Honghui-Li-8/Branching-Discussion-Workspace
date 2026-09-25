@@ -35,6 +35,9 @@ type NodeConversationPanelProps = {
     branchFollowupBootstrap: BranchFollowupBootstrap,
   ) => void
   width: number
+  /** The separator's range in pixels, for `aria-valuemin`/`aria-valuemax`. */
+  minWidth: number
+  maxWidth: number
   isFullscreen: boolean
   onClose: () => void
   onWidthChange: (nextWidth: number) => void
@@ -112,6 +115,8 @@ export const NodeConversationPanel = ({
   branchFollowupBootstrap,
   onOpenBranchConversation,
   width,
+  minWidth,
+  maxWidth,
   isFullscreen,
   onClose,
   onWidthChange,
@@ -610,6 +615,8 @@ export const NodeConversationPanel = ({
         aria-orientation="vertical"
         aria-label="Resize conversation panel"
         aria-valuenow={Math.round(width)}
+        aria-valuemin={Math.round(minWidth)}
+        aria-valuemax={Math.round(maxWidth)}
         tabIndex={0}
         className="absolute inset-y-0 left-0 w-2 -translate-x-1 cursor-ew-resize touch-none hover:bg-accent-wash/60 focus-visible:bg-accent-wash focus-visible:outline-none"
         onPointerDown={handleResizeStart}

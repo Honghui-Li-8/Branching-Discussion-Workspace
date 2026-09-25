@@ -61,6 +61,8 @@ const WorkspaceTreeCanvas = ({ activeWorkspace }: WorkspaceTreeCanvasProps) => {
             branchFollowupBootstrap={ui.conversationTarget?.branchFollowupBootstrap ?? null}
             onOpenBranchConversation={ui.openConversationWithBranchFollowup}
             width={ui.panelWidth}
+            minWidth={ui.panelWidthMin}
+            maxWidth={ui.panelWidthMax}
             isFullscreen={ui.isPanelFullscreenLike}
             onClose={ui.closeConversation}
             onWidthChange={ui.handlePanelResize}

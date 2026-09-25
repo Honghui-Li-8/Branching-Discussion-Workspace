@@ -48,4 +48,17 @@ describe('conversation panel state (A10)', () => {
     rerender({ containerWidth: 1000 })
     expect(result.current.panelWidth).toBe(800)
   })
+
+  it('the separator range is the clamp bounds and always contains the width', () => {
+    const { result, rerender } = renderUiState(1000)
+    act(() => result.current.openConversation('n1'))
+    expect(result.current.panelWidthMin).toBe(300)
+    expect(result.current.panelWidthMax).toBe(1000)
+    expect(result.current.panelWidth).toBeGreaterThanOrEqual(result.current.panelWidthMin)
+    expect(result.current.panelWidth).toBeLessThanOrEqual(result.current.panelWidthMax)
+
+    // Before the container is measured, the width is the only upper bound.
+    rerender({ containerWidth: 0 })
+    expect(result.current.panelWidthMax).toBe(result.current.panelWidth)
+  })
 })

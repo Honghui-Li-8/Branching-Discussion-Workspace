@@ -143,6 +143,15 @@ export const useDiscussionTreeUiState = ({
     ? containerWidth || conversationPanelWidth
     : clampPanelWidth(conversationPanelWidth)
 
+  // The separator's announced range (A10): the clamp's own bounds, widened to
+  // include the current width so the value never sits outside its range —
+  // before the container is measured, the width is the only bound known.
+  const panelWidthMin = Math.min(
+    containerWidth ? Math.min(MIN_PANEL_WIDTH, containerWidth) : MIN_PANEL_WIDTH,
+    panelWidth,
+  )
+  const panelWidthMax = Math.max(containerWidth, panelWidth)
+
   const togglePanelFullScreen = () => {
     if (isPanelFullscreenLike) {
       resetPanelToDefault()
@@ -176,6 +185,8 @@ export const useDiscussionTreeUiState = ({
     conversationPanelFullscreen,
     isPanelFullscreenLike,
     panelWidth,
+    panelWidthMin,
+    panelWidthMax,
     foldNode,
     unfoldNode,
     openConversation,
