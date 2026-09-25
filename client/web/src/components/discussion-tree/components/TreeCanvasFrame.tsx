@@ -8,7 +8,7 @@ type TreeCanvasFrameProps = {
 /**
  * Visual host for the tree canvas and, when open, the conversation panel —
  * a flex row, so the two are siblings that share the width instead of the
- * panel floating over the canvas (A10 seam fix). Owns the dot-grid
+ * panel floating over the canvas (A10 seam fix). Owns the line-grid
  * background and the DOM ref the panel-width logic measures.
  */
 export const TreeCanvasFrame = ({ canvasRef, children }: TreeCanvasFrameProps) => {
@@ -17,9 +17,10 @@ export const TreeCanvasFrame = ({ canvasRef, children }: TreeCanvasFrameProps) =
       ref={canvasRef}
       className="relative flex min-h-0 flex-1 overflow-hidden bg-bg-subtlest"
       style={{
+        // A03 frame 302:445: a square line grid, one line per 96px.
         backgroundImage:
-          'radial-gradient(circle at 1px 1px, var(--color-border-default) 1px, transparent 0)',
-        backgroundSize: '24px 24px',
+          'linear-gradient(to right, var(--color-border-subtle) 1px, transparent 1px), linear-gradient(to bottom, var(--color-border-subtle) 1px, transparent 1px)',
+        backgroundSize: '96px 96px',
       }}
     >
       {children}

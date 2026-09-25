@@ -1,5 +1,4 @@
 export const zIndex = {
-  discussionHeader: 10,
   canvasBase: 20,
   edgeLayer: 30,
   cardLayer: 40,
