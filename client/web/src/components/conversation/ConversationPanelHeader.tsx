@@ -57,8 +57,10 @@ export const ConversationPanelHeader = ({
             </h2>
           </div>
         </div>
-        {/* Supplementary: hidden below md so the topic never wraps per character;
-            the title attribute keeps the full text reachable. */}
+        {/* Supplementary: hidden below md so the topic never wraps per character.
+            It is an excerpt of the last assistant message, which the message
+            list below renders in full at every width, so hiding it loses
+            nothing. The title attribute only restores clamped text at md+. */}
         <p
           className="m-0 hidden min-w-0 max-w-narrow shrink-[3] text-right text-caption text-text-muted md:line-clamp-3"
           title={conclusion}
