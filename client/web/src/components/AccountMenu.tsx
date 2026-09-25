@@ -24,7 +24,7 @@ type AccountMenuProps = {
  * logout and the legal pages stay reachable while collapsed.
  */
 export const AccountMenu = ({ variant }: AccountMenuProps) => {
-  const { authUser, isAuthenticated, isAuthBootstrapPending, isAuthActionPending, login, logout } =
+  const { authUser, authError, isAuthenticated, isAuthBootstrapPending, isAuthActionPending, login, logout } =
     useAuth()
 
   const currentUserName = isAuthBootstrapPending ? '…' : (authUser?.displayName ?? 'Guest')
@@ -83,10 +83,23 @@ export const AccountMenu = ({ variant }: AccountMenuProps) => {
         <DropdownMenuSeparator />
         <DropdownMenuItem
           disabled={isBusy}
-          onSelect={isAuthenticated ? () => void logout() : () => void login()}
+          onSelect={(event) => {
+            // Stay open until the request lands: success unmounts the shell,
+            // and a failure is reported here, beside the action that retries it.
+            event.preventDefault()
+            if (isAuthenticated) void logout()
+            else void login()
+          }}
         >
           {isAuthActionPending ? 'Working…' : isAuthenticated ? 'Logout' : 'Login'}
         </DropdownMenuItem>
+        {/* Collapsed, the footer that renders auth errors is hidden, so the
+            menu carries it. Expanded, the footer does — one alert, not two. */}
+        {variant === 'avatar' && authError && !isAuthBootstrapPending ? (
+          <p role="alert" className="m-0 px-2 pt-1 pb-1.5 text-caption text-error-default">
+            {authError}
+          </p>
+        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   )

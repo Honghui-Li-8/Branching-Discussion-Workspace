@@ -286,6 +286,28 @@ describe('signed-in shell layout (A10)', () => {
     expect(within(menu).getByRole('menuitem', { name: 'Logout' })).toBeTruthy()
   })
 
+  it('collapsed: a failed logout is reported in the account menu, which stays open', async () => {
+    const base = trpcFetch({ workspacesList: () => WORKSPACES })
+    const fetchImpl: typeof fetch = (input, init) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+      if (!url.includes('/auth/logout')) return base(input, init)
+      return Promise.resolve({ ok: false, status: 500, json: async () => ({}) } as unknown as Response)
+    }
+    const { store } = renderWithProviders(<WorkspaceLayout />, { authStatus: 'authenticated', fetchImpl })
+    await within(sidebar()).findByRole('button', { name: rowName(WORKSPACES[0]) })
+    fireEvent.click(within(sidebar()).getByRole('button', { name: 'Collapse sidebar' }))
+    expect(store.getState().appShell.isSidebarCollapsed).toBe(true)
+
+    // The collapsed strip comes first; the expanded subtree is hidden by CSS jsdom does not apply.
+    const [collapsedTrigger] = within(sidebar()).getAllByRole('button', { name: 'Account menu' })
+    fireEvent.keyDown(collapsedTrigger, { key: 'Enter' })
+    const menu = await screen.findByRole('menu')
+    fireEvent.click(within(menu).getByRole('menuitem', { name: 'Logout' }))
+
+    expect((await within(menu).findByRole('alert')).textContent).toMatch(/unable to sign out/i)
+    expect(screen.getByRole('menu')).toBe(menu)
+  })
+
   it('zero credit: the credit line says sending will fail', async () => {
     renderWithProviders(<WorkspaceLayout />, {
       authStatus: 'authenticated',
