@@ -3,8 +3,9 @@ import { selectActiveWorkspace, selectOpenNodeId, setOpenNodeId } from '../store
 import { useWorkspaceTreeData } from './discussion-tree/hooks/useWorkspaceTreeData'
 import type { TreeNode, TreeStatus } from '../types/tree'
 import { cn } from '../lib/utils'
+import { liveOutline } from './outlineFilter'
 
-/** Never fold in the outline: it is the complete map of the workspace. */
+/** The canvas's folds do not apply here; the outline filters by status instead. */
 const NO_FOLDS: Record<string, boolean> = {}
 
 const STATUS_DOT: Record<TreeStatus, string> = {
@@ -37,7 +38,6 @@ const OutlineRow = ({ node, depth, openNodeId, onOpen }: RowProps) => {
           isOpen
             ? 'border-accent-default bg-accent-tint font-medium text-accent-strong'
             : 'border-transparent text-text-default hover:bg-bg-subtle',
-          depth === 0 && 'font-semibold',
         )}
       >
         <span aria-hidden="true" className={cn('h-1.5 w-1.5 shrink-0 rounded-full', STATUS_DOT[node.status])} />
@@ -78,18 +78,48 @@ const OutlineTree = ({ workspaceId }: { workspaceId: string }) => {
     return <p className="m-0 px-3 py-2 text-caption text-text-muted">No nodes in this workspace yet.</p>
   }
 
+  const onOpen = (id: string) => dispatch(setOpenNodeId(id))
+  const view = liveOutline(tree, openNodeId)
+  const branches = view.tree.children ?? []
+  const isRootOpen = tree.id === openNodeId
+
   return (
-    <ul className="m-0 list-none p-0 px-2">
-      <OutlineRow node={tree} depth={0} openNodeId={openNodeId} onOpen={(id) => dispatch(setOpenNodeId(id))} />
-    </ul>
+    <div className="flex flex-col px-2">
+      {/* A03 frame 302:682: the root reads as the outline's heading row. */}
+      <button
+        type="button"
+        aria-current={isRootOpen ? 'true' : undefined}
+        onClick={() => onOpen(tree.id)}
+        className={cn(
+          'mb-1 truncate rounded-md px-2 py-1.5 text-left text-label font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default focus-visible:ring-offset-2',
+          isRootOpen ? 'bg-accent-tint text-accent-strong' : 'text-text-default hover:bg-bg-subtle',
+        )}
+      >
+        {tree.title}
+        <span className="sr-only">, {tree.status}</span>
+      </button>
+      {branches.length > 0 ? (
+        <ul className="m-0 list-none p-0">
+          {branches.map((branch) => (
+            <OutlineRow key={branch.id} node={branch} depth={1} openNodeId={openNodeId} onOpen={onOpen} />
+          ))}
+        </ul>
+      ) : (
+        <p className="m-0 px-2 py-1 text-caption text-text-muted">No open, exploring or pending branches.</p>
+      )}
+      <p className="m-0 mt-2 px-2 pb-2 text-caption text-text-muted">
+        {view.shown} of {view.total} nodes · open, exploring and pending
+      </p>
+    </div>
   )
 }
 
 /**
  * The sidebar's Outline view (A10b, A03 frame 302:682): the open workspace's
- * node tree as a folder-path list with a status dot per node, indentation
- * guide lines, and the stripe-and-tint highlight on the node whose
- * conversation is open. Selecting a row opens that node's conversation.
+ * live nodes (open, exploring, pending — see `liveOutline`) as a folder-path
+ * list with a status dot per node, indentation guide lines, and the
+ * stripe-and-tint highlight on the node whose conversation is open, which is
+ * always listed. Selecting a row opens that node's conversation.
  */
 export const WorkspaceOutline = () => {
   const workspace = useAppSelector(selectActiveWorkspace)

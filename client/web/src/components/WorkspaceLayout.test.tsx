@@ -524,7 +524,7 @@ describe('signed-in shell layout (A10)', () => {
     expect(within(dialog).getByRole('button', { name: /choose a database/i })).toHaveProperty('disabled', true)
   })
 
-  it('outline: the Outline tab lists the open workspace nodes and opens one', async () => {
+  it('outline: the Outline tab lists the live nodes and opens one', async () => {
     const { container, store } = renderWithProviders(<WorkspaceLayout />, {
       authStatus: 'authenticated',
       fetchImpl: trpcFetch({
@@ -544,7 +544,9 @@ describe('signed-in shell layout (A10)', () => {
 
     const child = await within(sidebar()).findByRole('button', { name: /Child branch/ })
     expect(within(sidebar()).getByRole('button', { name: /Root decision/ })).toBeTruthy()
-    expect(within(sidebar()).getByRole('button', { name: /Merged branch/ })).toBeTruthy()
+    // Owner pick A2 (2026-09-25): resolved nodes stay out of the outline.
+    expect(within(sidebar()).queryByRole('button', { name: /Merged branch/ })).toBeNull()
+    expect(within(sidebar()).getByText(/2 of 3 nodes/)).toBeTruthy()
     expect(child.getAttribute('aria-current')).toBeNull()
 
     fireEvent.click(child)
