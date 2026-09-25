@@ -55,10 +55,15 @@ export const useDiscussionTreeUiState = ({
   // the store directly and never runs openConversation. Any open — from here
   // or from the store — starts docked, the same as a canvas open, so the reset
   // follows the open node id rather than living only in the canvas opener.
+  // The bootstrap is one-shot on the same terms: once the open node leaves the
+  // node it was made for, it is dropped, so coming back opens the persisted
+  // conversation instead of replaying the turn overlay. The updater reads the
+  // latest queued bootstrap, so a branch open's own bootstrap always survives.
   const [lastOpenNodeId, setLastOpenNodeId] = useState(openNodeId)
   if (openNodeId !== lastOpenNodeId) {
     setLastOpenNodeId(openNodeId)
     if (openNodeId !== null) setConversationPanelFullscreen(false)
+    setPendingBootstrap((current) => (current && current.nodeId !== openNodeId ? null : current))
   }
   const [foldedNodeIds, setFoldedNodeIds] = useState<Record<string, boolean>>({})
 

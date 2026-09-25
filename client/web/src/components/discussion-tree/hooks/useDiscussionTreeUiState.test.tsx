@@ -77,4 +77,32 @@ describe('conversation panel state (A10)', () => {
     expect(result.current.conversationNodeId).toBe('n2')
     expect(result.current.conversationPanelFullscreen).toBe(false)
   })
+
+  it('a branch bootstrap is dropped once the outline leaves its node', () => {
+    const { result, store } = renderUiState(1000)
+    const bootstrap = {
+      turnId: 't1',
+      userFollowupMessageId: 'm1',
+      text: 'Why?',
+      status: 'failed' as const,
+    }
+    act(() => result.current.openConversationWithBranchFollowup('child', bootstrap))
+    expect(result.current.conversationTarget).toEqual({
+      nodeId: 'child',
+      branchFollowupBootstrap: bootstrap,
+    })
+
+    act(() => {
+      store.dispatch(setOpenNodeId('other'))
+    })
+    expect(result.current.conversationTarget?.branchFollowupBootstrap).toBeNull()
+
+    act(() => {
+      store.dispatch(setOpenNodeId('child'))
+    })
+    expect(result.current.conversationTarget).toEqual({
+      nodeId: 'child',
+      branchFollowupBootstrap: null,
+    })
+  })
 })
