@@ -10,6 +10,7 @@ import { act, renderHook } from '@testing-library/react'
 import { Provider } from 'react-redux'
 
 import { createAppStore } from '../../../store'
+import { setOpenNodeId } from '../../../store/slices/appShellSlice'
 import { useDiscussionTreeUiState } from './useDiscussionTreeUiState'
 
 const renderUiState = (containerWidth = 1000) => {
@@ -60,5 +61,20 @@ describe('conversation panel state (A10)', () => {
     // Before the container is measured, the width is the only upper bound.
     rerender({ containerWidth: 0 })
     expect(result.current.panelWidthMax).toBe(result.current.panelWidth)
+  })
+
+  it('a node opened from the store (the outline) starts docked, like a canvas open', () => {
+    const { result, store } = renderUiState(1000)
+    act(() => result.current.openConversation('n1'))
+    act(() => result.current.togglePanelFullScreen())
+    expect(result.current.conversationPanelFullscreen).toBe(true)
+    act(() => result.current.closeConversation())
+
+    act(() => {
+      store.dispatch(setOpenNodeId('n2'))
+    })
+
+    expect(result.current.conversationNodeId).toBe('n2')
+    expect(result.current.conversationPanelFullscreen).toBe(false)
   })
 })

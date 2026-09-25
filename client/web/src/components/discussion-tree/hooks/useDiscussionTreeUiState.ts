@@ -51,6 +51,15 @@ export const useDiscussionTreeUiState = ({
   )
   const [conversationPanelWidth, setConversationPanelWidth] = useState(DEFAULT_PANEL_WIDTH)
   const [conversationPanelFullscreen, setConversationPanelFullscreen] = useState(false)
+  // Opening a node from outside the canvas (the sidebar outline, A10b) writes
+  // the store directly and never runs openConversation. Any open — from here
+  // or from the store — starts docked, the same as a canvas open, so the reset
+  // follows the open node id rather than living only in the canvas opener.
+  const [lastOpenNodeId, setLastOpenNodeId] = useState(openNodeId)
+  if (openNodeId !== lastOpenNodeId) {
+    setLastOpenNodeId(openNodeId)
+    if (openNodeId !== null) setConversationPanelFullscreen(false)
+  }
   const [foldedNodeIds, setFoldedNodeIds] = useState<Record<string, boolean>>({})
 
   const clampPanelWidth = (candidate: number) => {
