@@ -35,4 +35,17 @@ describe('conversation panel state (A10)', () => {
     expect(result.current.conversationPanelFullscreen).toBe(false)
     expect(result.current.panelWidth).toBe(976)
   })
+
+  it('the docked width is clamped to a narrowed container and restored when it widens', () => {
+    const { result, rerender } = renderUiState(1000)
+    act(() => result.current.openConversation('n1'))
+    act(() => result.current.handlePanelResize(800))
+    expect(result.current.panelWidth).toBe(800)
+
+    rerender({ containerWidth: 390 })
+    expect(result.current.panelWidth).toBe(390)
+
+    rerender({ containerWidth: 1000 })
+    expect(result.current.panelWidth).toBe(800)
+  })
 })

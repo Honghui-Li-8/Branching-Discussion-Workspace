@@ -135,13 +135,13 @@ export const useDiscussionTreeUiState = ({
     containerWidth > 0 && conversationPanelWidth >= containerWidth * 0.8
   const isPanelFullscreenLike = conversationPanelFullscreen || isPanelNearFullscreen
 
-  const panelWidth = useMemo(
-    () =>
-      conversationPanelFullscreen
-        ? containerWidth || conversationPanelWidth
-        : conversationPanelWidth,
-    [containerWidth, conversationPanelFullscreen, conversationPanelWidth],
-  )
+  // The stored width is what the user chose; the rendered width is clamped to
+  // the container as it is now. The panel is a non-shrinking sibling of the
+  // canvas, so a width chosen on a wide window must not overflow a narrower
+  // one — and widening the window again restores the choice.
+  const panelWidth = conversationPanelFullscreen
+    ? containerWidth || conversationPanelWidth
+    : clampPanelWidth(conversationPanelWidth)
 
   const togglePanelFullScreen = () => {
     if (isPanelFullscreenLike) {
