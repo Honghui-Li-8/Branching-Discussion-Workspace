@@ -58,6 +58,9 @@ export const useCreateWorkspaceActions = ({ onCreated }: { onCreated?: () => voi
   const pendingKey = useAppSelector(selectCreatePendingKey)
   const setPendingKey = (key: CreatePendingKey | null) => dispatch(setCreatePendingKey(key))
   const [error, setError] = useState<string | null>(null)
+  // Whether the in-flight create is this surface's own: the surface that asked
+  // is the one that renders the outcome, so it must stay up until it lands.
+  const [isRequesting, setIsRequesting] = useState(false)
 
   // Fetch the fresh list and write it to the store *before* selecting the new
   // workspace: the sync component mirrors the query into the store on its own
@@ -80,12 +83,14 @@ export const useCreateWorkspaceActions = ({ onCreated }: { onCreated?: () => voi
     dispatch(setWorkspaces(fresh))
     dispatch(setActiveWorkspaceId(workspace.id))
     setPendingKey(null)
+    setIsRequesting(false)
     setError(null)
     onCreated?.()
   }
   const fail = () => {
     setError(CREATE_FAILED)
     setPendingKey(null)
+    setIsRequesting(false)
   }
 
   const createBlankMutation = trpc.workspaceCreate.useMutation({ onSuccess: settle, onError: fail })
@@ -100,6 +105,7 @@ export const useCreateWorkspaceActions = ({ onCreated }: { onCreated?: () => voi
     if (!isAvailable || pendingKey) return
     setError(null)
     setPendingKey('blank')
+    setIsRequesting(true)
     createBlankMutation.mutate({
       title: `New Workspace ${workspaces.length + 1}`,
       rootNodeTitle: 'Root decision',
@@ -111,6 +117,7 @@ export const useCreateWorkspaceActions = ({ onCreated }: { onCreated?: () => voi
     if (!isAvailable || pendingKey) return
     setError(null)
     setPendingKey(key)
+    setIsRequesting(true)
     createFromExampleMutation.mutate({ key })
   }
 
@@ -119,6 +126,7 @@ export const useCreateWorkspaceActions = ({ onCreated }: { onCreated?: () => voi
     createBlank,
     createFromExample,
     pendingKey,
+    isRequesting,
     error,
     clearError: () => setError(null),
     isAvailable,

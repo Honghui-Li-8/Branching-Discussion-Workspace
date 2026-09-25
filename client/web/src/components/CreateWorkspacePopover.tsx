@@ -13,7 +13,7 @@ import { useCreateWorkspaceActions } from './useCreateWorkspaceActions'
 export const CreateWorkspacePopover = () => {
   const [open, setOpen] = useState(false)
   // Closes on a successful create; a failure keeps it open to show the message.
-  const { examples, createBlank, createFromExample, pendingKey, error, clearError, isAvailable } =
+  const { examples, createBlank, createFromExample, pendingKey, isRequesting, error, clearError, isAvailable } =
     useCreateWorkspaceActions({ onCreated: () => setOpen(false) })
 
   const otherPending = (key: string) => pendingKey !== null && pendingKey !== key
@@ -22,6 +22,10 @@ export const CreateWorkspacePopover = () => {
     <Popover
       open={open}
       onOpenChange={(next) => {
+        // The popover is the only surface for this request's outcome: while
+        // its own create is in flight, Escape and outside clicks do not close
+        // it, so a failure is never reported to a closed popover.
+        if (!next && isRequesting) return
         setOpen(next)
         if (!next) clearError()
       }}

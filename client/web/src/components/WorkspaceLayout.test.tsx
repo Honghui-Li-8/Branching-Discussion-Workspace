@@ -107,6 +107,16 @@ const trpcFetch = (handlers: Handlers, calls: string[] = []): typeof fetch =>
     } as unknown as Response
   }
 
+/** Holds one procedure's requests in flight forever, for asserting pending states. */
+const neverSettling =
+  (procedure: string, base: typeof fetch): typeof fetch =>
+  (input, init) => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+    return url.split('/trpc/')[1]?.split('?')[0].split(',').includes(procedure)
+      ? new Promise<Response>(() => {})
+      : base(input, init)
+  }
+
 const WORKSPACES = [
   { id: 'w1', title: 'MVP Branching Decisions', summary: 'Should we branch?' },
   { id: 'w2', title: 'Choose a Database', summary: null },
@@ -420,16 +430,29 @@ describe('signed-in shell layout (A10)', () => {
     expect(screen.queryByText(/went wrong/i)).toBeNull()
   })
 
+  it('create: the popover stays open while its own create is in flight', async () => {
+    renderWithProviders(<WorkspaceLayout />, {
+      authStatus: 'authenticated',
+      fetchImpl: neverSettling('workspaceCreate', trpcFetch({ workspacesList: () => WORKSPACES })),
+    })
+    await within(sidebar()).findByRole('button', { name: rowName(WORKSPACES[0]) })
+
+    fireEvent.click(within(sidebar()).getByRole('button', { name: 'Create workspace' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Create workspace' })
+    fireEvent.click(within(dialog).getByRole('button', { name: /new blank workspace/i }))
+    await waitFor(() =>
+      expect(within(dialog).getByRole('button', { name: /new blank workspace/i }).getAttribute('aria-busy')).toBe('true'),
+    )
+
+    fireEvent.keyDown(dialog, { key: 'Escape' })
+    expect(screen.getByRole('dialog', { name: 'Create workspace' })).toBeTruthy()
+  })
+
   it('create: a pending create from the empty state holds the sidebar popover to it too', async () => {
-    const base = trpcFetch({ workspacesList: () => [] })
-    // The create never settles: the assertion is about the in-flight state.
-    const fetchImpl: typeof fetch = (input, init) =>
-      String(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url).includes(
-        'workspaceCreate',
-      )
-        ? new Promise<Response>(() => {})
-        : base(input, init)
-    renderWithProviders(<WorkspaceLayout />, { authStatus: 'authenticated', fetchImpl })
+    renderWithProviders(<WorkspaceLayout />, {
+      authStatus: 'authenticated',
+      fetchImpl: neverSettling('workspaceCreate', trpcFetch({ workspacesList: () => [] })),
+    })
     await waitFor(() => expect(within(sidebar()).getByText(/no workspaces yet/i)).toBeTruthy())
     const main = screen.getByRole('main', { name: 'Workspace' })
 
