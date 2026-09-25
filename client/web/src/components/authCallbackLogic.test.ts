@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, jest, test } from '@jest/globals'
 import {
   DESTINATION_STORAGE_KEY,
+  clearRequestedDestination,
   navigateAfterLogin,
   navigateAfterLoginFailure,
+  peekRequestedDestination,
   rememberRequestedDestination,
   resolvePostLoginDestination,
   runAuthExchange,
@@ -194,6 +196,21 @@ describe('requested-destination preservation (A10)', () => {
 
     expect(deps.navigate).toHaveBeenCalledWith('/login', { replace: true })
   })
+
+  test('the destination is consumed on success only, so a retry after failure keeps it', async () => {
+    const failed = makeDeps({ destination: '/terms', clearDestination: jest.fn() })
+    await runAuthExchange(failed)
+    expect(failed.clearDestination).not.toHaveBeenCalled()
+
+    const succeeded = makeDeps({
+      ...makeSession('valid-token'),
+      postLogin: makeSuccessPostLogin(),
+      destination: '/terms',
+      clearDestination: jest.fn(),
+    })
+    await runAuthExchange(succeeded)
+    expect(succeeded.clearDestination).toHaveBeenCalledTimes(1)
+  })
 })
 
 describe('destination storage (A10)', () => {
@@ -218,6 +235,14 @@ describe('destination storage (A10)', () => {
     expect(store.get(DESTINATION_STORAGE_KEY)).toBe('/terms')
     expect(takeRequestedDestination()).toBe('/terms')
     expect(takeRequestedDestination()).toBeNull()
+  })
+
+  test('peek leaves the path in place; clear removes it', () => {
+    rememberRequestedDestination('/terms')
+    expect(peekRequestedDestination()).toBe('/terms')
+    expect(peekRequestedDestination()).toBe('/terms')
+    clearRequestedDestination()
+    expect(peekRequestedDestination()).toBeNull()
   })
 
   test('a throwing storage is swallowed: remember is a no-op and take yields null', () => {

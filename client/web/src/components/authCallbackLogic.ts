@@ -56,15 +56,29 @@ export const rememberRequestedDestination = (path: string): void => {
   }
 }
 
-/** Reads and clears the remembered destination, so it is used at most once. */
-export const takeRequestedDestination = (): string | null => {
+/** Reads the remembered destination without clearing it. */
+export const peekRequestedDestination = (): string | null => {
   try {
-    const value = window.sessionStorage.getItem(DESTINATION_STORAGE_KEY)
-    window.sessionStorage.removeItem(DESTINATION_STORAGE_KEY)
-    return value
+    return window.sessionStorage.getItem(DESTINATION_STORAGE_KEY)
   } catch {
     return null
   }
+}
+
+/** Clears the remembered destination once a sign-in has succeeded. */
+export const clearRequestedDestination = (): void => {
+  try {
+    window.sessionStorage.removeItem(DESTINATION_STORAGE_KEY)
+  } catch {
+    // Nothing to clear when storage is unavailable.
+  }
+}
+
+/** Reads and clears the remembered destination, so it is used at most once. */
+export const takeRequestedDestination = (): string | null => {
+  const value = peekRequestedDestination()
+  clearRequestedDestination()
+  return value
 }
 
 /**
@@ -99,6 +113,11 @@ export interface AuthExchangeDeps {
   navigate: NavigateFn
   /** The remembered pre-sign-in page, if any; resolved by `navigateAfterLogin`. */
   destination?: string | null
+  /**
+   * Consumes the remembered page. Called on success only, so a failed or
+   * cancelled exchange keeps it for the retry from the sign-in page.
+   */
+  clearDestination?: () => void
 }
 
 export const runAuthExchange = async ({
@@ -108,6 +127,7 @@ export const runAuthExchange = async ({
   setAuthError,
   navigate,
   destination,
+  clearDestination,
 }: AuthExchangeDeps): Promise<void> => {
   try {
     const {
@@ -132,6 +152,7 @@ export const runAuthExchange = async ({
 
     dispatchAuthUser(payload.user)
     setAuthError(null)
+    clearDestination?.()
     navigateAfterLogin(navigate, destination)
   } catch (error) {
     const message =
