@@ -112,8 +112,11 @@ export const useDiscussionTreeUiState = ({
     setPendingBootstrap(null)
   }
 
+  // A resize — pointer drag or the separator's arrow keys — is a docked width:
+  // it leaves fullscreen, whose width follows the container, not the store.
   const handlePanelResize = (nextWidth: number) => {
     setConversationPanelWidth(clampPanelWidth(nextWidth))
+    setConversationPanelFullscreen(false)
   }
 
   const resetPanelToDefault = () => {
