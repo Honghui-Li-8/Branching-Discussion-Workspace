@@ -237,6 +237,14 @@ describe('destination storage (A10)', () => {
     expect(takeRequestedDestination()).toBeNull()
   })
 
+  test('starting sign-in from the flow\'s own pages keeps the saved page', () => {
+    rememberRequestedDestination('/terms')
+    rememberRequestedDestination('/login')
+    rememberRequestedDestination('/login?next=/x')
+    rememberRequestedDestination('/auth/callback')
+    expect(store.get(DESTINATION_STORAGE_KEY)).toBe('/terms')
+  })
+
   test('peek leaves the path in place; clear removes it', () => {
     rememberRequestedDestination('/terms')
     expect(peekRequestedDestination()).toBe('/terms')

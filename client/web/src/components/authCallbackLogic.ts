@@ -48,7 +48,13 @@ export const resolvePostLoginDestination = (candidate: string | null | undefined
   return NEVER_DESTINATIONS.has(pathOnly) ? PATHS.root : candidate
 }
 
+/** The sign-in flow's own pages: starting sign-in from one must not overwrite the saved page. */
+const AUTH_FLOW_PATHS: ReadonlySet<string> = new Set([PATHS.login, PATHS.authCallback])
+
 export const rememberRequestedDestination = (path: string): void => {
+  // The public shell's Sign in CTA still renders on /login; clicking it there
+  // would replace the page the visitor came from with one the resolver rejects.
+  if (AUTH_FLOW_PATHS.has(path.split(/[?#]/)[0])) return
   try {
     window.sessionStorage.setItem(DESTINATION_STORAGE_KEY, path)
   } catch {
