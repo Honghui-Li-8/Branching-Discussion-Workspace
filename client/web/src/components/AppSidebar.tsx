@@ -196,13 +196,18 @@ export const AppSidebar = () => {
                           className="text-label font-medium"
                         />
                       ) : (
-                        <WorkspaceItemActions
-                          workspaceTitle={workspace.title}
-                          onRename={() => startRename(workspace.id, workspace.title)}
-                          onDelete={() => handleDelete(workspace.id)}
-                          isDeletePending={deleteWorkspaceMutation.isPending}
-                        >
-                          <Tooltip>
+                        // The tooltip root wraps the actions so the context-menu
+                        // trigger (inside WorkspaceItemActions) slots onto the
+                        // tooltip trigger and both land on the row button. Root
+                        // renders no DOM node, so a trigger given it as child
+                        // would drop its right-click handler.
+                        <Tooltip>
+                          <WorkspaceItemActions
+                            workspaceTitle={workspace.title}
+                            onRename={() => startRename(workspace.id, workspace.title)}
+                            onDelete={() => handleDelete(workspace.id)}
+                            isDeletePending={deleteWorkspaceMutation.isPending}
+                          >
                             <TooltipTrigger asChild>
                               <button
                                 type="button"
@@ -218,11 +223,11 @@ export const AppSidebar = () => {
                                 <span className="truncate">{workspace.title}</span>
                               </button>
                             </TooltipTrigger>
-                            <TooltipContent side="right" className="max-w-narrow">
-                              {workspaceSummary}
-                            </TooltipContent>
-                          </Tooltip>
-                        </WorkspaceItemActions>
+                          </WorkspaceItemActions>
+                          <TooltipContent side="right" className="max-w-narrow">
+                            {workspaceSummary}
+                          </TooltipContent>
+                        </Tooltip>
                       )}
                     </li>
                   )

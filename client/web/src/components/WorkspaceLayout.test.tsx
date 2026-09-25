@@ -234,6 +234,23 @@ describe('signed-in shell layout (A10)', () => {
     expect(await seriousViolations(container)).toHaveLength(0)
   })
 
+  it('row actions: right-clicking a row still opens its context menu; focus shows the summary', async () => {
+    renderWithProviders(<WorkspaceLayout />, {
+      authStatus: 'authenticated',
+      fetchImpl: trpcFetch({ workspacesList: () => WORKSPACES }),
+    })
+    const row = await within(sidebar()).findByRole('button', { name: rowName(WORKSPACES[0]) })
+
+    fireEvent.focus(row)
+    expect((await screen.findByRole('tooltip')).textContent).toMatch(/should we branch/i)
+    fireEvent.blur(row)
+
+    fireEvent.contextMenu(row)
+    const menu = await screen.findByRole('menu')
+    expect(within(menu).getByRole('menuitem', { name: /rename/i })).toBeTruthy()
+    expect(within(menu).getByRole('menuitem', { name: /delete/i })).toBeTruthy()
+  })
+
   it('account menu: identity, Privacy, Terms and Logout live behind the avatar; no standalone legal links', async () => {
     renderWithProviders(<WorkspaceLayout />, {
       authStatus: 'authenticated',
