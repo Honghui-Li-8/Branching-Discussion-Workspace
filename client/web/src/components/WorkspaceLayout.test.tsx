@@ -261,6 +261,29 @@ describe('signed-in shell layout (A10)', () => {
     expect(within(menu).getByRole('menuitem', { name: /delete/i })).toBeTruthy()
   })
 
+  it('row actions: cancelling the delete confirm returns focus to whichever control opened it', async () => {
+    renderWithProviders(<WorkspaceLayout />, {
+      authStatus: 'authenticated',
+      fetchImpl: trpcFetch({ workspacesList: () => WORKSPACES }),
+    })
+    const trigger = await within(sidebar()).findByRole('button', { name: `Actions for ${WORKSPACES[0].title}` })
+    const row = within(sidebar()).getByRole('button', { name: rowName(WORKSPACES[0]) })
+
+    // From the overflow menu: the dialog has no trigger of its own to go back to.
+    fireEvent.keyDown(trigger, { key: 'Enter' })
+    fireEvent.click(within(await screen.findByRole('menu')).getByRole('menuitem', { name: /delete/i }))
+    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
+    await waitFor(() => expect(document.activeElement).toBe(trigger))
+
+    // From the right-click menu: back to the row itself.
+    fireEvent.contextMenu(row)
+    fireEvent.click(within(await screen.findByRole('menu')).getByRole('menuitem', { name: /delete/i }))
+    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
+    await waitFor(() => expect(document.activeElement).toBe(row))
+  })
+
   it('account menu: identity, Privacy, Terms and Logout live behind the avatar; no standalone legal links', async () => {
     renderWithProviders(<WorkspaceLayout />, {
       authStatus: 'authenticated',

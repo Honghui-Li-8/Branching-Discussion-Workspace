@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import type { ReactNode } from 'react'
+import { useRef, useState } from 'react'
+import type { ReactNode, RefObject } from 'react'
 import {
   ContextMenu,
   ContextMenuContent,
@@ -38,6 +38,10 @@ type Props = {
  * beside the row, reachable by mouse, touch and keyboard, plus the original
  * right-click context menu as an optional shortcut. Both drive one delete
  * confirmation. Delete is immediate on the server, and the copy says so.
+ *
+ * The confirmation is opened from a menu, not an AlertDialogTrigger, so Radix
+ * has no trigger to return focus to on close; it returns focus to whichever
+ * control opened it instead — the overflow button or the row.
  */
 export const WorkspaceItemActions = ({
   workspaceTitle,
@@ -47,13 +51,22 @@ export const WorkspaceItemActions = ({
   children,
 }: Props) => {
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const rowRef = useRef<HTMLElement>(null)
+  const overflowRef = useRef<HTMLButtonElement>(null)
+  const returnFocusRef = useRef<HTMLElement | null>(null)
+  const openConfirm = (invoker: RefObject<HTMLElement | null>) => {
+    returnFocusRef.current = invoker.current
+    setConfirmOpen(true)
+  }
   const OverflowIcon = OVERFLOW_ICONS.horizontal
 
   return (
     <>
       <div className="flex min-w-0 items-stretch gap-1">
         <ContextMenu>
-          <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
+          <ContextMenuTrigger ref={rowRef} asChild>
+            {children}
+          </ContextMenuTrigger>
           <ContextMenuContent>
             <ContextMenuItem onSelect={onRename}>
               <ICONS.rename className="h-4 w-4" aria-hidden="true" />
@@ -64,7 +77,7 @@ export const WorkspaceItemActions = ({
               Duplicate
             </ContextMenuItem>
             <ContextMenuSeparator />
-            <ContextMenuItem destructive onSelect={() => setConfirmOpen(true)}>
+            <ContextMenuItem destructive onSelect={() => openConfirm(rowRef)}>
               <ICONS.delete className="h-4 w-4" aria-hidden="true" />
               Delete
             </ContextMenuItem>
@@ -74,6 +87,7 @@ export const WorkspaceItemActions = ({
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
+              ref={overflowRef}
               variant="ghost"
               size="sm"
               className="shrink-0 self-center px-2"
@@ -92,7 +106,7 @@ export const WorkspaceItemActions = ({
               Duplicate
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem destructive onSelect={() => setConfirmOpen(true)}>
+            <DropdownMenuItem destructive onSelect={() => openConfirm(overflowRef)}>
               <ICONS.delete className="h-4 w-4" aria-hidden="true" />
               Delete
             </DropdownMenuItem>
@@ -101,7 +115,12 @@ export const WorkspaceItemActions = ({
       </div>
 
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent
+          onCloseAutoFocus={(event) => {
+            event.preventDefault()
+            returnFocusRef.current?.focus()
+          }}
+        >
           <AlertDialogTitle>Delete &ldquo;{workspaceTitle}&rdquo;?</AlertDialogTitle>
           <AlertDialogDescription>
             Deletes this workspace and every node and message in it immediately. This cannot be
