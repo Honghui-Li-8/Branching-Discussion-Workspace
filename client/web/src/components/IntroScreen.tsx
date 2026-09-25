@@ -17,7 +17,7 @@ export const IntroScreen = () => {
   return (
     <section
       aria-labelledby="intro-heading"
-      className="flex min-h-96 flex-1 flex-col items-center justify-center rounded-lg border border-dashed border-border-default bg-bg-default px-6 py-8 text-center"
+      className="flex min-h-96 flex-1 flex-col items-center justify-center bg-bg-default px-6 py-8 text-center"
     >
       <Container width="prose">
         <Stack gap="4" align="center">
