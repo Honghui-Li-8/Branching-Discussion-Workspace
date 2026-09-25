@@ -128,6 +128,23 @@ const WORKSPACES = [
 const rowName = (workspace: { title: string }) => new RegExp(`^${workspace.title}`)
 
 const sidebar = () => screen.getByRole('complementary', { name: 'Workspace navigation' })
+/** The expanded account row is named after the user it shows (WCAG 2.5.3). */
+const accountRow = () => within(sidebar()).getByRole('button', { name: `${TEST_USER.displayName}, account menu` })
+
+/**
+ * A failed sign-out, as the shell reports it: visible text beside the Logout
+ * item, which it describes (a menu may own only menu items), and an announcement
+ * from the sidebar's live region, which stays exposed while the menu hides the
+ * rest of the page.
+ */
+const expectLogoutError = async (menu: HTMLElement) => {
+  const message = await within(menu).findByText(/unable to sign out/i)
+  expect(message.getAttribute('aria-live')).toBeNull()
+  expect(within(menu).getByRole('menuitem', { name: 'Logout' }).getAttribute('aria-describedby')).toBe(message.id)
+  const announcer = sidebar().querySelector('[aria-live="assertive"]')
+  expect(announcer?.textContent).toMatch(/unable to sign out/i)
+  expect(announcer?.closest('[aria-hidden="true"]')).toBeNull()
+}
 const mockedTree = () => screen.queryByRole('region', { name: 'Discussion tree (mocked)' })
 
 describe('signed-in shell layout (A10)', () => {
@@ -298,6 +315,52 @@ describe('signed-in shell layout (A10)', () => {
     await waitFor(() => expect(document.activeElement).toBe(row))
   })
 
+  it('rename and delete failures: the row keeps its value, the newest failure is shown, a success clears it', async () => {
+    let renameFails = true
+    const { container } = renderWithProviders(<WorkspaceLayout />, {
+      authStatus: 'authenticated',
+      fetchImpl: trpcFetch({
+        workspacesList: () => WORKSPACES,
+        workspaceUpdate: () => {
+          if (renameFails) throw new Error('Failed to fetch')
+          return WORKSPACES[0]
+        },
+        workspaceDelete: () => {
+          throw new Error('Failed to fetch')
+        },
+      }),
+    })
+    const actions = async () => {
+      fireEvent.keyDown(await within(sidebar()).findByRole('button', { name: `Actions for ${WORKSPACES[0].title}` }), {
+        key: 'Enter',
+      })
+      return screen.findByRole('menu')
+    }
+    const rename = async (title: string) => {
+      fireEvent.click(within(await actions()).getByRole('menuitem', { name: /rename/i }))
+      const input = await within(sidebar()).findByRole('textbox', { name: 'Workspace name' })
+      fireEvent.change(input, { target: { value: title } })
+      fireEvent.keyDown(input, { key: 'Enter' })
+      fireEvent.blur(input)
+    }
+
+    await rename('Renamed')
+    expect((await within(sidebar()).findByRole('alert')).textContent).toMatch(/couldn’t rename.*unchanged/i)
+    expect(within(sidebar()).getByRole('button', { name: rowName(WORKSPACES[0]) })).toBeTruthy()
+    expect(await seriousViolations(container)).toHaveLength(0)
+
+    // A newer failure replaces the older message rather than hiding behind it.
+    fireEvent.click(within(await actions()).getByRole('menuitem', { name: /delete/i }))
+    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Delete' }))
+    await waitFor(() => expect(within(sidebar()).getByRole('alert').textContent).toMatch(/couldn’t delete.*still here/i))
+    expect(within(sidebar()).getByRole('button', { name: rowName(WORKSPACES[0]) })).toBeTruthy()
+
+    // A later success clears it.
+    renameFails = false
+    await rename('Renamed')
+    await waitFor(() => expect(within(sidebar()).queryByRole('alert')).toBeNull())
+  })
+
   it('account menu: identity, Privacy, Terms and Logout live behind the avatar; no standalone legal links', async () => {
     renderWithProviders(<WorkspaceLayout />, {
       authStatus: 'authenticated',
@@ -313,7 +376,7 @@ describe('signed-in shell layout (A10)', () => {
     expect(within(sidebar()).getByRole('link', { name: 'Trellis' }).getAttribute('href')).toBe('/')
     expect(within(sidebar()).getByText(/turns remaining/)).toBeTruthy()
 
-    const trigger = within(sidebar()).getByRole('button', { name: 'Account menu' })
+    const trigger = accountRow()
     fireEvent.keyDown(trigger, { key: 'Enter' })
     const menu = await screen.findByRole('menu')
     expect(within(menu).getByText(TEST_USER.displayName as string)).toBeTruthy()
@@ -341,8 +404,10 @@ describe('signed-in shell layout (A10)', () => {
     const menu = await screen.findByRole('menu')
     fireEvent.click(within(menu).getByRole('menuitem', { name: 'Logout' }))
 
-    expect((await within(menu).findByRole('alert')).textContent).toMatch(/unable to sign out/i)
+    await expectLogoutError(menu)
     expect(screen.getByRole('menu')).toBe(menu)
+    // The menu is portalled to <body>, outside the render container.
+    expect(await seriousViolations(document.body)).toHaveLength(0)
   })
 
   it('expanded: a failed logout keeps the signed-in shell and reports it in the menu', async () => {
@@ -355,12 +420,14 @@ describe('signed-in shell layout (A10)', () => {
     const { store } = renderWithProviders(<WorkspaceLayout />, { authStatus: 'authenticated', fetchImpl })
     await within(sidebar()).findByRole('button', { name: rowName(WORKSPACES[0]) })
 
-    fireEvent.keyDown(within(sidebar()).getByRole('button', { name: 'Account menu' }), { key: 'Enter' })
+    fireEvent.keyDown(accountRow(), { key: 'Enter' })
     const menu = await screen.findByRole('menu')
     fireEvent.click(within(menu).getByRole('menuitem', { name: 'Logout' }))
 
-    // The open menu hides the page from assistive tech, so the alert lives in the menu.
-    expect((await within(menu).findByRole('alert')).textContent).toMatch(/unable to sign out/i)
+    // The open menu hides the page from assistive tech, so the message lives in the menu.
+    await expectLogoutError(menu)
+    // The menu is portalled to <body>, outside the render container.
+    expect(await seriousViolations(document.body)).toHaveLength(0)
     expect(store.getState().auth.status).toBe('authenticated')
     fireEvent.keyDown(menu, { key: 'Escape' })
     await waitFor(() => expect(screen.queryByRole('menu')).toBeNull())

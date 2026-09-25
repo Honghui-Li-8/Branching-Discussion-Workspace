@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useId, type ReactNode } from 'react'
 import { useAuth } from './useAuth'
 import {
   DropdownMenu,
@@ -38,6 +38,8 @@ export const AccountMenu = ({ variant, detail }: AccountMenuProps) => {
   const avatarInitial = currentUserName.trim().slice(0, 1).toUpperCase() || '?'
   const isBusy = isAuthActionPending || isAuthBootstrapPending
   const OverflowIcon = OVERFLOW_ICONS.horizontal
+  const errorId = useId()
+  const logoutError = authError && !isAuthBootstrapPending ? authError : null
 
   const avatar = (
     <span
@@ -65,6 +67,7 @@ export const AccountMenu = ({ variant, detail }: AccountMenuProps) => {
       <DropdownMenuSeparator />
       <DropdownMenuItem
         disabled={isBusy}
+        aria-describedby={logoutError ? errorId : undefined}
         onSelect={(event) => {
           // Stay open until the request lands: success unmounts the shell,
           // and a failure is reported here, beside the action that retries it.
@@ -75,12 +78,14 @@ export const AccountMenu = ({ variant, detail }: AccountMenuProps) => {
       >
         {isAuthActionPending ? 'Working…' : isAuthenticated ? 'Logout' : 'Login'}
       </DropdownMenuItem>
-      {/* A failed sign-out keeps the menu open, and an open menu hides the rest
-          of the page from assistive tech, so the error is reported here, beside
-          the action that retries it, in both sidebar states. */}
-      {authError && !isAuthBootstrapPending ? (
-        <p role="alert" className="m-0 px-2 pt-1 pb-1.5 text-caption text-error-default">
-          {authError}
+      {/* A failed sign-out keeps the menu open, so the message is shown here,
+          beside the action that retries it, and describes that item. A menu may
+          own only menu items, so this is plain text: the announcement comes from
+          the sidebar's live region (AppSidebar), which stays exposed while the
+          menu hides the rest of the page. */}
+      {logoutError ? (
+        <p id={errorId} className="m-0 px-2 pt-1 pb-1.5 text-caption text-error-default">
+          {logoutError}
         </p>
       ) : null}
     </DropdownMenuContent>
@@ -120,7 +125,8 @@ export const AccountMenu = ({ variant, detail }: AccountMenuProps) => {
         <DropdownMenuTrigger asChild>
           <button
             type="button"
-            aria-label="Account menu"
+            // WCAG 2.5.3: the row shows the user's name, so the name leads.
+            aria-label={isAuthBootstrapPending ? 'Account menu' : `${currentUserName}, account menu`}
             title={currentUserName}
             disabled={isAuthBootstrapPending}
             className="absolute inset-0 cursor-pointer rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default disabled:cursor-default"
