@@ -1,8 +1,9 @@
 import { useRef } from 'react'
 import { NodeConversationPanel } from './NodeConversationPanel'
 import { IntroScreen } from './IntroScreen'
+import { WorkspacesLoadError } from './WorkspacesLoadError'
 import { useAppSelector } from '../store/hooks'
-import { selectActiveWorkspace } from '../store/slices/appShellSlice'
+import { selectActiveWorkspace, selectWorkspacesLoadFailed } from '../store/slices/appShellSlice'
 import { findNodeById } from './tree/treeUtils'
 import { useWorkspaceTreeData } from './discussion-tree/hooks/useWorkspaceTreeData'
 import { useTreeCanvasWidth } from './discussion-tree/hooks/useTreeCanvasWidth'
@@ -76,9 +77,11 @@ const WorkspaceTreeCanvas = ({ activeWorkspace }: WorkspaceTreeCanvasProps) => {
 
 export const DiscussionTreeView = () => {
   const activeWorkspace = useAppSelector(selectActiveWorkspace)
+  const isWorkspacesLoadFailed = useAppSelector(selectWorkspacesLoadFailed)
 
   if (!activeWorkspace) {
-    return <IntroScreen />
+    // A failed load is not an empty account: offer the retry, not the create actions.
+    return isWorkspacesLoadFailed ? <WorkspacesLoadError placement="main" /> : <IntroScreen />
   }
 
   return <WorkspaceTreeCanvas key={activeWorkspace.id} activeWorkspace={activeWorkspace} />

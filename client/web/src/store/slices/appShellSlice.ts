@@ -19,6 +19,8 @@ type AppShellState = {
   /** The node whose conversation is open (A10b): shared by the canvas and the sidebar outline. */
   openNodeId: string | null
   isWorkspacesLoading: boolean
+  /** The workspace list could not be loaded and nothing is cached: say so and offer a retry (A10). */
+  isWorkspacesLoadFailed: boolean
   isSidebarCollapsed: boolean
   /**
    * The in-flight create (A10). Shared, not per-component: the sidebar popover
@@ -33,6 +35,7 @@ const initialState: AppShellState = {
   activeWorkspaceId: null,
   openNodeId: null,
   isWorkspacesLoading: false,
+  isWorkspacesLoadFailed: false,
   isSidebarCollapsed: false,
   createPendingKey: null,
 }
@@ -46,6 +49,9 @@ const appShellSlice = createSlice({
     },
     setWorkspacesLoading: (state, action: PayloadAction<boolean>) => {
       state.isWorkspacesLoading = action.payload
+    },
+    setWorkspacesLoadFailed: (state, action: PayloadAction<boolean>) => {
+      state.isWorkspacesLoadFailed = action.payload
     },
     setActiveWorkspaceId: (state, action: PayloadAction<string | null>) => {
       if (state.activeWorkspaceId !== action.payload) {
@@ -69,6 +75,7 @@ const appShellSlice = createSlice({
 export const {
   setWorkspaces,
   setWorkspacesLoading,
+  setWorkspacesLoadFailed,
   setActiveWorkspaceId,
   setOpenNodeId,
   setSidebarCollapsed,
@@ -79,6 +86,7 @@ export const selectWorkspaces = (state: RootState) => state.appShell.workspaces
 export const selectActiveWorkspaceId = (state: RootState) => state.appShell.activeWorkspaceId
 export const selectOpenNodeId = (state: RootState) => state.appShell.openNodeId
 export const selectWorkspacesLoading = (state: RootState) => state.appShell.isWorkspacesLoading
+export const selectWorkspacesLoadFailed = (state: RootState) => state.appShell.isWorkspacesLoadFailed
 export const selectSidebarCollapsed = (state: RootState) => state.appShell.isSidebarCollapsed
 export const selectCreatePendingKey = (state: RootState) => state.appShell.createPendingKey
 export const selectActiveWorkspace = (state: RootState) =>

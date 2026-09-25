@@ -7,6 +7,7 @@ import {
   selectWorkspaces,
   setActiveWorkspaceId,
   setWorkspaces,
+  setWorkspacesLoadFailed,
   setWorkspacesLoading,
 } from '../store/slices/appShellSlice'
 
@@ -34,6 +35,7 @@ export const WorkspaceSync = ({ children }: WorkspaceSyncProps) => {
   useEffect(() => {
     if (authStatus === 'unauthenticated') {
       dispatch(setWorkspacesLoading(false))
+      dispatch(setWorkspacesLoadFailed(false))
       dispatch(setWorkspaces([]))
       dispatch(setActiveWorkspaceId(null))
       return
@@ -45,7 +47,11 @@ export const WorkspaceSync = ({ children }: WorkspaceSyncProps) => {
     }
 
     dispatch(setWorkspacesLoading(workspacesQuery.isLoading))
-  }, [authStatus, dispatch, workspacesQuery.isLoading])
+    // A failure with a list already in hand keeps showing that list; only a
+    // failure with nothing to show is surfaced, so it is never mistaken for
+    // "no workspaces yet".
+    dispatch(setWorkspacesLoadFailed(workspacesQuery.isError && !workspacesQuery.data))
+  }, [authStatus, dispatch, workspacesQuery.isLoading, workspacesQuery.isError, workspacesQuery.data])
 
   useEffect(() => {
     if (workspaces === null) {

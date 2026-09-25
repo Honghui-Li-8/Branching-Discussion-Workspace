@@ -41,15 +41,17 @@ jest.mock('@floating-ui/dom', () => ({
 // active; the stand-in keeps that branch real and mocks only the canvas.
 jest.mock('./DiscussionTreeView', () => {
   const { IntroScreen } = jest.requireActual<typeof import('./IntroScreen')>('./IntroScreen')
+  const { WorkspacesLoadError } = jest.requireActual<typeof import('./WorkspacesLoadError')>('./WorkspacesLoadError')
   const { useAppSelector } = jest.requireActual<typeof import('../store/hooks')>('../store/hooks')
-  const { selectActiveWorkspace } =
+  const { selectActiveWorkspace, selectWorkspacesLoadFailed } =
     jest.requireActual<typeof import('../store/slices/appShellSlice')>('../store/slices/appShellSlice')
-  const DiscussionTreeView = () =>
-    useAppSelector(selectActiveWorkspace) ? (
-      <section aria-label="Discussion tree (mocked)">tree</section>
-    ) : (
-      <IntroScreen />
-    )
+  // Mirrors the real view's branches; only the canvas itself is stubbed.
+  const DiscussionTreeView = () => {
+    const activeWorkspace = useAppSelector(selectActiveWorkspace)
+    const isLoadFailed = useAppSelector(selectWorkspacesLoadFailed)
+    if (activeWorkspace) return <section aria-label="Discussion tree (mocked)">tree</section>
+    return isLoadFailed ? <WorkspacesLoadError placement="main" /> : <IntroScreen />
+  }
   return { DiscussionTreeView }
 })
 
@@ -558,6 +560,34 @@ describe('signed-in shell layout (A10)', () => {
     fireEvent.mouseDown(within(sidebar()).getByRole('tab', { name: 'Workspaces' }), { button: 0 })
     fireEvent.click(within(sidebar()).getByRole('button', { name: rowName(WORKSPACES[1]) }))
     await waitFor(() => expect(store.getState().appShell.openNodeId).toBeNull())
+  })
+
+  it('load failed: the shell stays, names the failure instead of the empty state, and retries', async () => {
+    let failing = true
+    const { container } = renderWithProviders(<WorkspaceLayout />, {
+      authStatus: 'authenticated',
+      fetchImpl: trpcFetch({
+        workspacesList: () => {
+          if (failing) throw new Error('Connection reset')
+          return WORKSPACES
+        },
+      }),
+    })
+
+    const main = screen.getByRole('main', { name: 'Workspace' })
+    expect((await within(main).findByRole('alert')).textContent).toMatch(/couldn.t reach the server/i)
+    expect(within(main).getByRole('heading', { level: 1 }).textContent).toMatch(/didn.t load/i)
+    expect(within(sidebar()).getByText(/couldn.t load your workspaces/i)).toBeTruthy()
+    // Never the empty state: that would invite creating a workspace the user may already have.
+    expect(within(sidebar()).queryByText(/no workspaces yet/i)).toBeNull()
+    expect(within(main).queryByRole('button', { name: /new blank workspace/i })).toBeNull()
+    expect(await seriousViolations(container)).toHaveLength(0)
+
+    failing = false
+    fireEvent.click(within(main).getByRole('button', { name: 'Try again' }))
+    await within(sidebar()).findByRole('button', { name: rowName(WORKSPACES[0]) })
+    expect(within(main).queryByRole('alert')).toBeNull()
+    expect(mockedTree()).toBeTruthy()
   })
 
   it('outline: the tab is disabled when no workspace is open', async () => {

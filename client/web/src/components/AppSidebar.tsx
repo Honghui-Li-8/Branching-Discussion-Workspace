@@ -7,6 +7,7 @@ import {
   selectActiveWorkspaceId,
   selectSidebarCollapsed,
   selectWorkspaces,
+  selectWorkspacesLoadFailed,
   selectWorkspacesLoading,
   setActiveWorkspaceId,
   setSidebarCollapsed,
@@ -20,6 +21,7 @@ import { Input } from './ui/form-field'
 import { Skeleton } from './ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/disclosure'
 import { WorkspaceOutline } from './WorkspaceOutline'
+import { WorkspacesLoadError } from './WorkspacesLoadError'
 import { PANEL_TOGGLE_ICONS } from '../lib/icons'
 import { cn } from '../lib/utils'
 import { updatedLabel } from '../lib/updatedLabel'
@@ -34,6 +36,7 @@ export const AppSidebar = () => {
   const workspaces = useAppSelector(selectWorkspaces)
   const activeWorkspaceId = useAppSelector(selectActiveWorkspaceId)
   const isWorkspacesLoading = useAppSelector(selectWorkspacesLoading)
+  const isWorkspacesLoadFailed = useAppSelector(selectWorkspacesLoadFailed)
   const utils = trpc.useUtils()
   const { isAuthBootstrapPending, authError } = useAuth()
 
@@ -169,6 +172,10 @@ export const AppSidebar = () => {
                       </span>
                       <Skeleton className="h-9 w-full" />
                       <Skeleton className="h-9 w-full" />
+                    </li>
+                  ) : isWorkspacesLoadFailed && workspaces.length === 0 ? (
+                    <li>
+                      <WorkspacesLoadError placement="sidebar" />
                     </li>
                   ) : workspaces.length === 0 ? (
                     <li className="rounded-md border border-dashed border-border-default px-3 py-2.5 text-caption text-text-muted">
