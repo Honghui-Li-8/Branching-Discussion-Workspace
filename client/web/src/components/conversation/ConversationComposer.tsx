@@ -1,5 +1,6 @@
 import { type KeyboardEvent, type RefObject, type SubmitEvent } from "react";
 import { CHAT_INPUT_MIN_HEIGHT, CHAT_INPUT_MAX_HEIGHT } from "./conversationComposerConstants";
+import { Button } from "../ui/button";
 
 
 type ConversationComposerProps = {
@@ -30,30 +31,9 @@ export const ConversationComposer = ({
 
   return (
     <form
-      className="shrink-0 border-t border-slate-200 bg-white px-4 py-3"
+      className="shrink-0 border-t border-border-default bg-bg-default px-4 py-3"
       onSubmit={onConversationSubmit}
     >
-      {/*
-      <div className="mb-2 flex items-center justify-between gap-3">
-        <label className="flex items-center gap-2 text-xs text-[#2a6082]" htmlFor="chat-model">
-          Model
-          <select
-            id="chat-model"
-            className="rounded border border-[#9dc6dd] bg-white px-2 py-1 text-sm text-[#1e546f]"
-            value={conversationModel}
-            onChange={(event) => setConversationModel(event.target.value)}
-          >
-            {CHAT_MODELS.map((model) => (
-              <option key={model} value={model}>
-                {model}
-              </option>
-            ))}
-          </select>
-        </label>
-        <span className="text-[11px] text-[#5f89a1]">Model: {conversationModel}</span>
-      </div>
-      */}
-
       <div className="flex items-end gap-2">
         <textarea
           ref={conversationInputRef}
@@ -61,7 +41,8 @@ export const ConversationComposer = ({
           onChange={(event) => onConversationInputChange(event.target.value)}
           onInput={onInputResize}
           onKeyDown={onConversationKeyDown}
-          className="w-full resize-none rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm leading-6 text-slate-900 transition focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-500/10"
+          aria-label="Message"
+          className="w-full resize-none rounded-md border border-border-default bg-bg-subtle px-3 py-2 text-body text-text-default transition-colors focus:border-accent-default focus:bg-bg-default focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-default focus-visible:ring-offset-2"
           placeholder="Message..."
           rows={1}
           style={{
@@ -70,13 +51,9 @@ export const ConversationComposer = ({
             lineHeight: `${CHAT_INPUT_MIN_HEIGHT}px`,
           }}
         />
-        <button
-          type="submit"
-          className="h-9 rounded-lg border border-slate-950 bg-slate-950 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-200 disabled:text-slate-400"
-          disabled={!conversationInputText.trim().length}
-        >
+        <Button type="submit" size="sm" disabled={!conversationInputText.trim().length}>
           Send
-        </button>
+        </Button>
       </div>
     </form>
   );

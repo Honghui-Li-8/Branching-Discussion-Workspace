@@ -35,11 +35,7 @@ const WorkspaceTreeCanvas = ({ activeWorkspace }: WorkspaceTreeCanvasProps) => {
   return (
     <DiscussionTreeShell workspaceTitle={activeWorkspace.title}>
       <TreeCanvasFrame canvasRef={canvasRef}>
-        <TreeCanvasScrollArea
-          hasConversationPanel={conversationNode !== null}
-          conversationPanelFullscreen={ui.conversationPanelFullscreen}
-          conversationPanelWidth={ui.conversationPanelWidth}
-        >
+        <TreeCanvasScrollArea>
           <TreeCanvasContent
             layout={layout}
             isLoading={isTreeLoading}
@@ -65,6 +61,8 @@ const WorkspaceTreeCanvas = ({ activeWorkspace }: WorkspaceTreeCanvasProps) => {
             branchFollowupBootstrap={ui.conversationTarget?.branchFollowupBootstrap ?? null}
             onOpenBranchConversation={ui.openConversationWithBranchFollowup}
             width={ui.panelWidth}
+            minWidth={ui.panelWidthMin}
+            maxWidth={ui.panelWidthMax}
             isFullscreen={ui.isPanelFullscreenLike}
             onClose={ui.closeConversation}
             onWidthChange={ui.handlePanelResize}

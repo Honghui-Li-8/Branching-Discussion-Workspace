@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 const DEFAULT_PANEL_WIDTH = 560
 const MIN_PANEL_WIDTH = 300
 
@@ -94,8 +94,11 @@ export const useDiscussionTreeUiState = ({
     setConversationTarget(null)
   }
 
+  // A resize — pointer drag or the separator's arrow keys — is a docked width:
+  // it leaves fullscreen, whose width follows the container, not the store.
   const handlePanelResize = (nextWidth: number) => {
     setConversationPanelWidth(clampPanelWidth(nextWidth))
+    setConversationPanelFullscreen(false)
   }
 
   const resetPanelToDefault = () => {
@@ -114,13 +117,22 @@ export const useDiscussionTreeUiState = ({
     containerWidth > 0 && conversationPanelWidth >= containerWidth * 0.8
   const isPanelFullscreenLike = conversationPanelFullscreen || isPanelNearFullscreen
 
-  const panelWidth = useMemo(
-    () =>
-      conversationPanelFullscreen
-        ? containerWidth || conversationPanelWidth
-        : conversationPanelWidth,
-    [containerWidth, conversationPanelFullscreen, conversationPanelWidth],
+  // The stored width is what the user chose; the rendered width is clamped to
+  // the container as it is now. The panel is a non-shrinking sibling of the
+  // canvas, so a width chosen on a wide window must not overflow a narrower
+  // one — and widening the window again restores the choice.
+  const panelWidth = conversationPanelFullscreen
+    ? containerWidth || conversationPanelWidth
+    : clampPanelWidth(conversationPanelWidth)
+
+  // The separator's announced range (A10): the clamp's own bounds, widened to
+  // include the current width so the value never sits outside its range —
+  // before the container is measured, the width is the only bound known.
+  const panelWidthMin = Math.min(
+    containerWidth ? Math.min(MIN_PANEL_WIDTH, containerWidth) : MIN_PANEL_WIDTH,
+    panelWidth,
   )
+  const panelWidthMax = Math.max(containerWidth, panelWidth)
 
   const togglePanelFullScreen = () => {
     if (isPanelFullscreenLike) {
@@ -155,6 +167,8 @@ export const useDiscussionTreeUiState = ({
     conversationPanelFullscreen,
     isPanelFullscreenLike,
     panelWidth,
+    panelWidthMin,
+    panelWidthMax,
     foldNode,
     unfoldNode,
     openConversation,
