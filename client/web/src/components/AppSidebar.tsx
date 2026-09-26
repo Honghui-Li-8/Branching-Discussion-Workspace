@@ -7,17 +7,19 @@ import {
   selectActiveWorkspaceId,
   selectSidebarCollapsed,
   selectWorkspaces,
+  selectWorkspacesLoadFailed,
   selectWorkspacesLoading,
   setActiveWorkspaceId,
   setSidebarCollapsed,
 } from '../store/slices/appShellSlice'
-import { useAuth } from './useAuth'
 import { trpc } from '../trpc'
 import { CreditBalanceIndicator } from './CreditBalanceIndicator'
 import { AccountMenu } from './AccountMenu'
 import { Button } from './ui/button'
 import { Input } from './ui/form-field'
 import { Skeleton } from './ui/skeleton'
+import { useAuth } from './useAuth'
+import { WorkspacesLoadError } from './WorkspacesLoadError'
 import { PANEL_TOGGLE_ICONS } from '../lib/icons'
 import { cn } from '../lib/utils'
 import { updatedLabel } from '../lib/updatedLabel'
@@ -32,23 +34,33 @@ export const AppSidebar = () => {
   const workspaces = useAppSelector(selectWorkspaces)
   const activeWorkspaceId = useAppSelector(selectActiveWorkspaceId)
   const isWorkspacesLoading = useAppSelector(selectWorkspacesLoading)
+  const isWorkspacesLoadFailed = useAppSelector(selectWorkspacesLoadFailed)
   const utils = trpc.useUtils()
-  const { isAuthBootstrapPending, authError } = useAuth()
+  const { authError, isAuthBootstrapPending } = useAuth()
 
   const invalidateWorkspaceList = async () => {
     await utils.workspacesList.invalidate()
   }
 
+  // The most recent rename or delete failure, in words the user can act on.
+  // One slot, so a newer failure replaces an older one and a success clears it;
+  // the row keeps its server value either way (nothing is removed optimistically).
+  const [workspaceActionError, setWorkspaceActionError] = useState<string | null>(null)
+
   const updateWorkspaceMutation = trpc.workspaceUpdate.useMutation({
+    onMutate: () => setWorkspaceActionError(null),
     onSuccess: async () => {
       await invalidateWorkspaceList()
     },
+    onError: () => setWorkspaceActionError('Couldn’t rename the workspace. Its name is unchanged — try again.'),
   })
 
   const deleteWorkspaceMutation = trpc.workspaceDelete.useMutation({
+    onMutate: () => setWorkspaceActionError(null),
     onSuccess: async () => {
       await invalidateWorkspaceList()
     },
+    onError: () => setWorkspaceActionError('Couldn’t delete the workspace. It is still here — try again.'),
   })
 
   const isCollapsed = useAppSelector(selectSidebarCollapsed)
@@ -73,10 +85,6 @@ export const AppSidebar = () => {
     deleteWorkspaceMutation.mutate({ id: workspaceId })
   }
 
-  const workspaceActionError =
-    updateWorkspaceMutation.error?.message ??
-    deleteWorkspaceMutation.error?.message ??
-    null
   const ExpandIcon = PANEL_TOGGLE_ICONS.left.open
   const CollapseIcon = PANEL_TOGGLE_ICONS.left.close
 
@@ -89,6 +97,14 @@ export const AppSidebar = () => {
           isCollapsed ? 'lg:w-12 lg:overflow-hidden' : 'lg:w-72',
         )}
       >
+        {/* Announces sign-out and workspace-action failures in either sidebar
+            state. The expanded footer is hidden while collapsed, and an open
+            menu hides the page from assistive tech except explicit aria-live
+            regions (and a menu cannot own one), so the announcement lives here.
+            The footer and the account menu show the same message visually. */}
+        <p aria-live="assertive" className="sr-only">
+          {authError && !isAuthBootstrapPending ? authError : (workspaceActionError ?? '')}
+        </p>
         {/* Collapsed strip — desktop only. Rendered only while collapsed so the
             expand control is the one recovery path and is observable as such. */}
         {isCollapsed ? (
@@ -143,6 +159,10 @@ export const AppSidebar = () => {
                   </span>
                   <Skeleton className="h-9 w-full" />
                   <Skeleton className="h-9 w-full" />
+                </li>
+              ) : isWorkspacesLoadFailed && workspaces.length === 0 ? (
+                <li>
+                  <WorkspacesLoadError placement="sidebar" />
                 </li>
               ) : workspaces.length === 0 ? (
                 <li className="rounded-md border border-dashed border-border-default px-3 py-2.5 text-caption text-text-muted">
@@ -206,12 +226,10 @@ export const AppSidebar = () => {
 
           <div className="border-t border-border-default px-3 py-3">
             <AccountMenu variant="row" detail={<CreditBalanceIndicator />} />
-            {authError && !isAuthBootstrapPending ? (
-              <p role="alert" className="mt-2 mb-0 px-1.5 text-caption text-error-default">
-                {authError}
-              </p>
-            ) : workspaceActionError ? (
-              <p role="alert" className="mt-2 mb-0 px-1.5 text-caption text-error-default">
+            {/* Sign-out failures are reported inside the account menu, which
+                stays open on failure and would hide an alert placed here. */}
+            {workspaceActionError ? (
+              <p className="mt-2 mb-0 px-1.5 text-caption text-error-default">
                 {workspaceActionError}
               </p>
             ) : null}

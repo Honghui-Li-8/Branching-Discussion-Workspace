@@ -16,6 +16,7 @@ import { Cluster, Container, Stack } from '../ui/layout'
 import { Link } from '../ui/link'
 import { BrandMark } from '../BrandMark'
 import { SignInLink } from '../SignInLink'
+import { SessionExpiredNotice } from './SessionExpiredNotice'
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from '../ui/sheet'
 
 // A06 — the one shared public shell. Every public surface (landing, sign-in,
@@ -183,6 +184,7 @@ export const PublicShell = ({ children }: { children: ReactNode }) => {
       </header>
 
       <main id="main" tabIndex={-1} className="flex-1 outline-none">
+        <SessionExpiredNotice />
         {children}
       </main>
 
