@@ -4,7 +4,7 @@ import { getSupabaseClient } from '../lib/supabaseClient'
 import { useAppDispatch } from '../store/hooks'
 import { setAuthenticatedUser } from '../store/slices/authSlice'
 import { useAuth } from './useAuth'
-import { runAuthExchange } from './authCallbackLogic'
+import { clearRequestedDestination, peekRequestedDestination, runAuthExchange } from './authCallbackLogic'
 import { apiBaseUrl } from '../lib/env'
 import { Container, Stack } from './ui/layout'
 import { useDocumentTitle } from '../lib/useDocumentTitle'
@@ -45,6 +45,10 @@ export const AuthCallback = () => {
       dispatchAuthUser: (user) => dispatch(setAuthenticatedUser(user)),
       setAuthError,
       navigate,
+      // Peeked, not taken: a failure lands on /login, and the retry from there
+      // must still return the user to the page they started from.
+      destination: peekRequestedDestination(),
+      clearDestination: clearRequestedDestination,
     })
   }, [dispatch, navigate, setAuthError])
 

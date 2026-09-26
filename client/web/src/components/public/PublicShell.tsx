@@ -15,6 +15,7 @@ import { buttonVariants } from '../ui/button'
 import { Cluster, Container, Stack } from '../ui/layout'
 import { Link } from '../ui/link'
 import { BrandMark } from '../BrandMark'
+import { SignInLink } from '../SignInLink'
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from '../ui/sheet'
 
 // A06 — the one shared public shell. Every public surface (landing, sign-in,
@@ -63,23 +64,24 @@ const AuthCta = ({ className }: { className?: string }) => {
   // exists to prevent.
   if (authStatus === 'unknown') return null
 
-  const cta =
-    authStatus === 'authenticated'
-      ? { to: PATHS.root, label: 'Open workspace' }
-      : { to: PATHS.login, label: 'Sign in' }
+  const ctaClassName = cn(
+    buttonVariants({ variant: 'primary', size: 'sm' }),
+    'no-underline hover:no-underline hover:text-white focus-visible:ring-accent-wash',
+    className,
+  )
+
+  if (authStatus === 'authenticated') {
+    return (
+      <Link to={PATHS.root} underline="hover" className={ctaClassName}>
+        Open workspace
+      </Link>
+    )
+  }
 
   return (
-    <Link
-      to={cta.to}
-      underline="hover"
-      className={cn(
-        buttonVariants({ variant: 'primary', size: 'sm' }),
-        'no-underline hover:no-underline hover:text-white focus-visible:ring-accent-wash',
-        className,
-      )}
-    >
-      {cta.label}
-    </Link>
+    <SignInLink underline="hover" className={ctaClassName}>
+      Sign in
+    </SignInLink>
   )
 }
 
