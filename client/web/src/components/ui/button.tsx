@@ -11,7 +11,11 @@ export const buttonVariants = cva(
   {
     variants: {
       variant: {
-        primary: 'bg-accent-default text-white hover:bg-accent-hover active:bg-accent-active',
+        // ADR-0007: white on accent-default is 3.95:1, under WCAG 1.4.3's 4.5:1
+        // for text, so the primary fill starts one step down the ramp and each
+        // state steps once more. accent-default stays the brand value for rings
+        // and non-text UI at the 3:1 bar.
+        primary: 'bg-accent-hover text-white hover:bg-accent-active active:bg-accent-strong',
         secondary:
           'border border-border-strong bg-bg-default text-text-default hover:bg-bg-subtle active:bg-bg-muted',
         ghost: 'text-text-default hover:bg-bg-subtle active:bg-bg-muted',

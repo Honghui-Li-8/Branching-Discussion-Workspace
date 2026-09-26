@@ -48,7 +48,15 @@ const BREAKPOINTS = [
  */
 const ZOOM_200_EQUIVALENT = { name: '200% zoom @1440', width: 720 }
 
-const ALL_WIDTHS = [...BREAKPOINTS, ZOOM_200_EQUIVALENT]
+/**
+ * Verification widths, not breakpoints (A10, round 2 Q4, 2026-09-22): 390 is
+ * the phone width the phase verifies at, and it broke a circular "390px
+ * integration with A12" clause on three tickets. The Tailwind breakpoint set
+ * ADR-0004 fixes is unchanged; this list only adds a measurement.
+ */
+const VERIFICATION_WIDTHS = [{ name: 'xs', width: 390 }] as const
+
+const ALL_WIDTHS = [...VERIFICATION_WIDTHS, ...BREAKPOINTS, ZOOM_200_EQUIVALENT]
 
 /** Below `lg` the public shell collapses its navigation into the sheet menu. */
 const LG = 1024
@@ -89,7 +97,9 @@ const expectNoOverflow = async (page: Page, label: string) => {
  * Cross-origin (the API origin differs from Vite's), so the answers carry the
  * CORS headers a credentialed fetch requires.
  */
-const mockAuthenticated = async (page: Page) => {
+type MockWorkspace = { id: string; title: string; summary: string | null }
+
+const mockAuthenticated = async (page: Page, { workspaces = [] as MockWorkspace[] } = {}) => {
   const cors = (origin: string) => ({
     'access-control-allow-origin': origin,
     'access-control-allow-credentials': 'true',
@@ -120,13 +130,17 @@ const mockAuthenticated = async (page: Page) => {
     if (route.request().method() === 'OPTIONS') {
       return route.fulfill({ status: 204, headers: cors(origin) })
     }
-    // Batched tRPC GET: one result per call, in order. Only workspacesList is
-    // asked for with no workspace open; an empty list is the honest answer.
+    // Batched tRPC GET: one result per call, in order. `workspacesList`
+    // answers with the caller's fixture (empty by default); every other
+    // procedure — the tree and message queries a populated shell issues —
+    // answers with an empty list, which the canvas renders as "no nodes".
     const calls = route.request().url().split('/trpc/')[1]?.split('?')[0]?.split(',') ?? ['']
     return route.fulfill({
       status: 200,
       headers: cors(origin),
-      body: JSON.stringify(calls.map(() => ({ result: { data: [] } }))),
+      body: JSON.stringify(
+        calls.map((call) => ({ result: { data: call === 'workspacesList' ? workspaces : [] } })),
+      ),
     })
   })
 }
@@ -170,6 +184,28 @@ test.describe('reflow contract (ADR-0004) — signed-in workspace shell', () => 
       await expect(page.getByRole('banner')).toHaveCount(0)
 
       await expectNoOverflow(page, `workspace ${width}px`)
+    })
+  }
+
+  // A10: the populated shell — sidebar rows and an active workspace — was
+  // measured at zero widths before this loop; the empty state above is the
+  // only signed-in layout the harness knew.
+  const POPULATED: MockWorkspace[] = [
+    { id: 'e2e-w1', title: 'MVP Branching Decisions', summary: 'Should we branch this?' },
+  ]
+  for (const { name, width } of ALL_WIDTHS) {
+    test(`workspace (populated) at ${name} (${width}px)`, async ({ page }) => {
+      await mockAuthenticated(page, { workspaces: POPULATED })
+      await page.setViewportSize({ width, height: 900 })
+      await page.goto(PATHS.root)
+      await page.waitForLoadState('networkidle')
+
+      // Anchored: the row's name starts with the title; its actions button is "Actions for …".
+      await expect(page.getByRole('button', { name: /^MVP Branching Decisions/ })).toBeVisible()
+      await expect(page.getByRole('heading', { name: /opening or creating a workspace/i })).toHaveCount(0)
+      await expect(page.getByRole('banner')).toHaveCount(0)
+
+      await expectNoOverflow(page, `workspace (populated) ${width}px`)
     })
   }
 })
