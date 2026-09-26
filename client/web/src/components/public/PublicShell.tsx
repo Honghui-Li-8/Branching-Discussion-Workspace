@@ -14,6 +14,7 @@ import {
 import { buttonVariants } from '../ui/button'
 import { Cluster, Container, Stack } from '../ui/layout'
 import { Link } from '../ui/link'
+import { BrandMark } from '../BrandMark'
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from '../ui/sheet'
 
 // A06 — the one shared public shell. Every public surface (landing, sign-in,
@@ -129,15 +130,7 @@ export const PublicShell = ({ children }: { children: ReactNode }) => {
       <header data-surface="dark" className="bg-gray-900 text-text-inverse">
         <Container>
           <Cluster justify="between" gap="4" className="py-3">
-            <Link
-              to={PATHS.root}
-              underline="hover"
-              className="inline-flex items-center gap-2 text-label font-semibold text-text-inverse no-underline hover:text-text-inverse focus-visible:ring-accent-wash"
-            >
-              {/* The mark is decorative beside the wordmark; the link's name is "Trellis". */}
-              <img src="/favicon.svg" alt="" aria-hidden="true" width={28} height={28} className="size-7" />
-              Trellis
-            </Link>
+            <BrandMark tone="dark" />
 
             {showSections ? (
               <nav aria-label="Sections" className="hidden lg:block">
