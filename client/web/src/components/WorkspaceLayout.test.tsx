@@ -845,6 +845,42 @@ describe('signed-in shell layout (A10)', () => {
     expect(within(dialog).getByRole('button', { name: /choose a database/i })).toHaveProperty('disabled', true)
   })
 
+  it('outline: the Outline tab lists the live nodes and opens one', async () => {
+    const { container, store } = renderWithProviders(<WorkspaceLayout />, {
+      authStatus: 'authenticated',
+      fetchImpl: trpcFetch({
+        workspacesList: () => WORKSPACES,
+        nodesByWorkspace: () => [
+          { id: 'n1', parentNodeId: null, depth: 0, title: 'Root decision', status: 'open', createdAt: '2026-01-01T00:00:00Z' },
+          { id: 'n2', parentNodeId: 'n1', depth: 1, title: 'Child branch', status: 'exploring', createdAt: '2026-01-02T00:00:00Z' },
+          { id: 'n3', parentNodeId: 'n1', depth: 1, title: 'Merged branch', status: 'merged', createdAt: '2026-01-03T00:00:00Z' },
+        ],
+      }),
+    })
+    await within(sidebar()).findByRole('button', { name: rowName(WORKSPACES[0]) })
+
+    const outlineTab = within(sidebar()).getByRole('tab', { name: 'Outline' })
+    fireEvent.mouseDown(outlineTab, { button: 0 })
+    fireEvent.click(outlineTab)
+
+    const child = await within(sidebar()).findByRole('button', { name: /Child branch/ })
+    expect(within(sidebar()).getByRole('button', { name: /Root decision/ })).toBeTruthy()
+    // Owner pick A2 (2026-09-25): resolved nodes stay out of the outline.
+    expect(within(sidebar()).queryByRole('button', { name: /Merged branch/ })).toBeNull()
+    expect(within(sidebar()).getByText(/2 of 3 nodes/)).toBeTruthy()
+    expect(child.getAttribute('aria-current')).toBeNull()
+
+    fireEvent.click(child)
+    await waitFor(() => expect(child.getAttribute('aria-current')).toBe('true'))
+    expect(store.getState().appShell.openNodeId).toBe('n2')
+    expect(await seriousViolations(container)).toHaveLength(0)
+
+    // Switching workspaces closes the open node.
+    fireEvent.mouseDown(within(sidebar()).getByRole('tab', { name: 'Workspaces' }), { button: 0 })
+    fireEvent.click(within(sidebar()).getByRole('button', { name: rowName(WORKSPACES[1]) }))
+    await waitFor(() => expect(store.getState().appShell.openNodeId).toBeNull())
+  })
+
   it('load failed: the shell stays, names the failure instead of the empty state, and retries', async () => {
     let failing = true
     const { container } = renderWithProviders(<WorkspaceLayout />, {
@@ -872,6 +908,15 @@ describe('signed-in shell layout (A10)', () => {
     await within(sidebar()).findByRole('button', { name: rowName(WORKSPACES[0]) })
     expect(within(main).queryByRole('alert')).toBeNull()
     expect(mockedTree()).toBeTruthy()
+  })
+
+  it('outline: the tab is disabled when no workspace is open', async () => {
+    renderWithProviders(<WorkspaceLayout />, {
+      authStatus: 'authenticated',
+      fetchImpl: trpcFetch({ workspacesList: () => [] }),
+    })
+    await waitFor(() => expect(within(sidebar()).getByText(/no workspaces yet/i)).toBeTruthy())
+    expect(within(sidebar()).getByRole('tab', { name: 'Outline' })).toHaveProperty('disabled', true)
   })
 
   it('seeded: an unnamed icon button inside the shell turns the scan red', async () => {
