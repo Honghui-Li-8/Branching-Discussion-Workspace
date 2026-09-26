@@ -12,7 +12,7 @@ import { trpc } from '../trpc'
 import { AuthProvider } from '../components/AuthProvider'
 import { WorkspaceSync } from '../components/WorkspaceSync'
 import { createAppStore, type RootState } from '../store'
-import type { AuthStatus, AuthUser } from '../store/slices/authSlice'
+import type { AuthStatus, AuthUser, SignedOutReason } from '../store/slices/authSlice'
 
 // A06 — the first full-app render harness. Mirrors main.tsx's provider stack
 // (router → redux → tRPC → react-query → auth → workspace sync) around an
@@ -48,6 +48,8 @@ export type RenderWithProvidersOptions = Omit<RenderOptions, 'wrapper'> & {
   /** Preloaded auth status. `unknown` lets AuthProvider run its bootstrap fetch. */
   authStatus?: AuthStatus
   user?: AuthUser | null
+  /** Why a signed-out visitor was signed out, e.g. an expired session. */
+  signedOutReason?: SignedOutReason | null
   /** Global fetch for the render's lifetime (auth calls and tRPC batches both use it). */
   fetchImpl?: typeof fetch
 }
@@ -65,13 +67,14 @@ export const renderWithProviders = (
     route = '/',
     authStatus = 'unauthenticated',
     user = authStatus === 'authenticated' ? TEST_USER : null,
+    signedOutReason = null,
     fetchImpl = pendingFetch,
     ...renderOptions
   }: RenderWithProvidersOptions = {},
 ) => {
   globalThis.fetch = fetchImpl
 
-  const preloadedState: Partial<RootState> = { auth: { status: authStatus, user } }
+  const preloadedState: Partial<RootState> = { auth: { status: authStatus, user, signedOutReason } }
   const store = createAppStore(preloadedState)
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const trpcClient = trpc.createClient({
@@ -98,5 +101,5 @@ export const renderWithProviders = (
     </MemoryRouter>
   )
 
-  return { store, ...render(ui, { wrapper: Wrapper, ...renderOptions }) }
+  return { store, queryClient, ...render(ui, { wrapper: Wrapper, ...renderOptions }) }
 }

@@ -43,7 +43,9 @@ export const clearClientSessionState = ({
     return
   }
 
-  dispatch(clearAuthenticatedUser())
+  // Only a server-side UNAUTHORIZED reaches here, so the session ended on its
+  // own: the public shell explains it rather than landing the user silently.
+  dispatch(clearAuthenticatedUser({ reason: 'session-expired' }))
   dispatch(setWorkspacesLoading(false))
   dispatch(setWorkspaces([]))
   dispatch(setActiveWorkspaceId(null))

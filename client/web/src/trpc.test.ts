@@ -45,6 +45,7 @@ describe('trpc client auth handling', () => {
           id: 'w1',
           title: 'Workspace One',
           summary: 'Summary',
+          updatedAt: null,
         },
       ]),
     )
@@ -61,6 +62,8 @@ describe('trpc client auth handling', () => {
     const state = store.getState()
     expect(state.auth.status).toBe('unauthenticated')
     expect(state.auth.user).toBeNull()
+    // The server ended the session: the public shell explains it (A10).
+    expect(state.auth.signedOutReason).toBe('session-expired')
     expect(state.appShell.workspaces).toEqual([])
     expect(state.appShell.activeWorkspaceId).toBeNull()
     expect(state.appShell.isWorkspacesLoading).toBe(false)

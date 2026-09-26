@@ -8,7 +8,6 @@ import {
   useRef,
   useState,
 } from 'react'
-import { zIndex } from '../theme/zIndex'
 import type { TreeMessage, TreeNode } from '../types/tree'
 import { useAppSelector } from '../store/hooks'
 import { selectAuthUser } from '../store/slices/authSlice'
@@ -26,6 +25,8 @@ import { CHAT_INPUT_MAX_HEIGHT, CHAT_INPUT_MIN_HEIGHT, CHAT_MODELS } from './con
 import { ConversationMessageList } from './conversation/ConversationMessageList'
 import { ConversationPanelHeader } from './conversation/ConversationPanelHeader'
 
+const RESIZE_KEY_STEP = 24
+
 type NodeConversationPanelProps = {
   node: TreeNode
   branchFollowupBootstrap: BranchFollowupBootstrap | null
@@ -34,6 +35,9 @@ type NodeConversationPanelProps = {
     branchFollowupBootstrap: BranchFollowupBootstrap,
   ) => void
   width: number
+  /** The separator's range in pixels, for `aria-valuemin`/`aria-valuemax`. */
+  minWidth: number
+  maxWidth: number
   isFullscreen: boolean
   onClose: () => void
   onWidthChange: (nextWidth: number) => void
@@ -111,6 +115,8 @@ export const NodeConversationPanel = ({
   branchFollowupBootstrap,
   onOpenBranchConversation,
   width,
+  minWidth,
+  maxWidth,
   isFullscreen,
   onClose,
   onWidthChange,
@@ -580,20 +586,41 @@ export const NodeConversationPanel = ({
                   : null
 
   const statusBarClass: Record<StatusSeverity, string> = {
-    error: 'border-red-200 bg-red-50 text-red-700',
-    merge: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-    info:  'border-blue-100 bg-blue-50 text-blue-700',
+    error: 'border-error-wash bg-error-tint text-error-strong',
+    merge: 'border-merged-wash bg-merged-tint text-merged-strong',
+    info: 'border-info-wash bg-info-tint text-info-strong',
+  }
+
+  // Keyboard resize for the separator: arrows move the seam one step; the
+  // width state clamps the result the same way pointer drags are clamped.
+  const handleResizeKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    const step = event.shiftKey ? RESIZE_KEY_STEP * 4 : RESIZE_KEY_STEP
+    if (event.key === 'ArrowLeft') {
+      event.preventDefault()
+      onWidthChange(width + step)
+    } else if (event.key === 'ArrowRight') {
+      event.preventDefault()
+      onWidthChange(width - step)
+    }
   }
 
   return (
     <aside
-      className="absolute inset-y-0 right-0 flex h-full min-h-0 w-full flex-col overflow-hidden border-l border-slate-200 bg-white shadow-[-24px_0_48px_rgba(15,23,42,0.12)]"
-      style={{ width: `${width}px`, zIndex: zIndex.conversationPanel }}
+      aria-label="Conversation"
+      className="relative flex h-full min-h-0 shrink-0 flex-col overflow-hidden border-l border-border-default bg-bg-default"
+      style={{ width: `${width}px` }}
     >
       <div
-        className="absolute left-0 top-0 h-full w-3 -translate-x-2 cursor-ew-resize touch-none"
-        onPointerDown={handleResizeStart}
+        role="separator"
+        aria-orientation="vertical"
         aria-label="Resize conversation panel"
+        aria-valuenow={Math.round(width)}
+        aria-valuemin={Math.round(minWidth)}
+        aria-valuemax={Math.round(maxWidth)}
+        tabIndex={0}
+        className="absolute inset-y-0 left-0 w-2 -translate-x-1 cursor-ew-resize touch-none hover:bg-accent-wash/60 focus-visible:bg-accent-wash focus-visible:outline-none"
+        onPointerDown={handleResizeStart}
+        onKeyDown={handleResizeKeyDown}
       />
 
       <ConversationPanelHeader
@@ -638,17 +665,17 @@ export const NodeConversationPanel = ({
       {activeStatusEntry ? (
         <p
           role="status"
-          className={`m-0 shrink-0 border-t px-4 py-2 text-xs ${statusBarClass[activeStatusEntry.severity]}`}
+          className={`m-0 shrink-0 border-t px-4 py-2 text-caption ${statusBarClass[activeStatusEntry.severity]}`}
         >
           {activeStatusEntry.message}
         </p>
       ) : null}
       {runtimeSummary ? (
-        <details className="shrink-0 border-t border-slate-200 bg-slate-50">
-          <summary className="cursor-pointer px-4 py-1.5 text-[11px] text-slate-500 transition-colors duration-150 hover:bg-slate-100">
+        <details className="shrink-0 border-t border-border-default bg-bg-subtle">
+          <summary className="cursor-pointer px-4 py-1.5 text-caption text-text-muted transition-colors duration-150 hover:bg-bg-muted">
             Runtime
           </summary>
-          <p className="m-0 px-4 pb-2 text-[11px] text-slate-500">{runtimeSummary}</p>
+          <p className="m-0 px-4 pb-2 text-caption text-text-muted">{runtimeSummary}</p>
         </details>
       ) : null}
       {!isMerged ? (

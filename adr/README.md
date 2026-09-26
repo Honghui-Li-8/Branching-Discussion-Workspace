@@ -20,3 +20,4 @@ private tree and are there for the maintainer's traceability, not for the reader
 | [0004](./0004-reflow-contract-and-harness-split.md) | Reflow contract, and accessibility verification split by what each runtime can see |
 | [0005](./0005-focus-and-link-colour-roles.md) | Focus colour as its own role; link text moved to the 4.5:1 accent step |
 | [0006](./0006-api-image-runs-source-with-tsx.md) | API image runs TypeScript source with `tsx`, one image for API/worker/migrations; CDK in an `infra` workspace |
+| [0007](./0007-primary-button-contrast.md) | Primary button text contrast: repoint one step down the accent ramp, not a new value |

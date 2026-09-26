@@ -1,86 +1,74 @@
-import { useRef, useState } from 'react'
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
-import ChevronRightIcon from '@mui/icons-material/ChevronRight'
+import { useState } from 'react'
 import { useAppDispatch, useAppSelector } from '../store/hooks'
-import { WorkspaceContextMenu } from './WorkspaceContextMenu'
+import { WorkspaceItemActions } from './WorkspaceItemActions'
 import { CreateWorkspacePopover } from './CreateWorkspacePopover'
+import { BrandMark } from './BrandMark'
 import {
   selectActiveWorkspaceId,
   selectSidebarCollapsed,
   selectWorkspaces,
+  selectWorkspacesLoadFailed,
   selectWorkspacesLoading,
   setActiveWorkspaceId,
   setSidebarCollapsed,
 } from '../store/slices/appShellSlice'
-import { useAuth } from './useAuth'
 import { trpc } from '../trpc'
 import { CreditBalanceIndicator } from './CreditBalanceIndicator'
+import { AccountMenu } from './AccountMenu'
+import { Button } from './ui/button'
+import { Input } from './ui/form-field'
+import { Skeleton } from './ui/skeleton'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/disclosure'
+import { WorkspaceOutline } from './WorkspaceOutline'
+import { useAuth } from './useAuth'
+import { WorkspacesLoadError } from './WorkspacesLoadError'
+import { PANEL_TOGGLE_ICONS } from '../lib/icons'
+import { cn } from '../lib/utils'
+import { updatedLabel } from '../lib/updatedLabel'
 
+/**
+ * The signed-in navigation frame (A10): identity, the workspace list with a
+ * visible per-row menu, and the account row. Behaviour is the pre-A10 sidebar's;
+ * only the markup moved onto the A05 roles and the ui primitives.
+ */
 export const AppSidebar = () => {
   const dispatch = useAppDispatch()
   const workspaces = useAppSelector(selectWorkspaces)
   const activeWorkspaceId = useAppSelector(selectActiveWorkspaceId)
   const isWorkspacesLoading = useAppSelector(selectWorkspacesLoading)
+  const isWorkspacesLoadFailed = useAppSelector(selectWorkspacesLoadFailed)
   const utils = trpc.useUtils()
-  const {
-    authUser,
-    isAuthenticated,
-    isAuthBootstrapPending,
-    isAuthActionPending,
-    authError,
-    login,
-    logout,
-  } = useAuth()
+  const { authError, isAuthBootstrapPending } = useAuth()
 
   const invalidateWorkspaceList = async () => {
     await utils.workspacesList.invalidate()
   }
 
-  const createWorkspaceMutation = trpc.workspaceCreate.useMutation({
-    onSuccess: async (workspace) => {
-      await invalidateWorkspaceList()
-      dispatch(setActiveWorkspaceId(workspace.id))
-    },
-  })
+  // The most recent rename or delete failure, in words the user can act on.
+  // One slot, so a newer failure replaces an older one and a success clears it;
+  // the row keeps its server value either way (nothing is removed optimistically).
+  const [workspaceActionError, setWorkspaceActionError] = useState<string | null>(null)
 
   const updateWorkspaceMutation = trpc.workspaceUpdate.useMutation({
+    onMutate: () => setWorkspaceActionError(null),
     onSuccess: async () => {
       await invalidateWorkspaceList()
     },
+    onError: () => setWorkspaceActionError('Couldn’t rename the workspace. Its name is unchanged — try again.'),
   })
 
   const deleteWorkspaceMutation = trpc.workspaceDelete.useMutation({
+    onMutate: () => setWorkspaceActionError(null),
     onSuccess: async () => {
       await invalidateWorkspaceList()
     },
+    onError: () => setWorkspaceActionError('Couldn’t delete the workspace. It is still here — try again.'),
   })
-
-  const workspaceMutations = {
-    create: createWorkspaceMutation,
-    update: updateWorkspaceMutation,
-    delete: deleteWorkspaceMutation,
-  }
-
-  const createWorkspace = () => {
-    if (!isAuthenticated || workspaceMutations.create.isPending) {
-      return
-    }
-
-    const nextNumber = workspaces.length + 1
-    workspaceMutations.create.mutate({
-      title: `New Workspace ${nextNumber}`,
-      rootNodeTitle: 'Root decision',
-      rootNodeSummary: '',
-    })
-  }
 
   const isCollapsed = useAppSelector(selectSidebarCollapsed)
   const setIsCollapsed = (val: boolean) => dispatch(setSidebarCollapsed(val))
 
-  const [isPopoverOpen, setIsPopoverOpen] = useState(false)
-  const [popoverPosition, setPopoverPosition] = useState({ top: 0, left: 0 })
-  const createButtonRef = useRef<HTMLButtonElement>(null)
-
+  const [sidebarTab, setSidebarTab] = useState<'workspaces' | 'outline'>('workspaces')
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
 
@@ -100,175 +88,185 @@ export const AppSidebar = () => {
     deleteWorkspaceMutation.mutate({ id: workspaceId })
   }
 
-  const toggleCreatePopover = () => {
-    const anchorRect = createButtonRef.current?.getBoundingClientRect()
-    if (anchorRect) {
-      setPopoverPosition({ top: anchorRect.bottom + 6, left: anchorRect.left })
-    }
-    setIsPopoverOpen((current) => !current)
-  }
-
-  const currentUserName = isAuthBootstrapPending ? '...' : (authUser?.displayName ?? 'Guest')
-  const avatarInitial = currentUserName.trim().slice(0, 1).toUpperCase() || '?'
-  const workspaceActionError = workspaceMutations.create.error?.message ?? null
+  const ExpandIcon = PANEL_TOGGLE_ICONS.left.open
+  const CollapseIcon = PANEL_TOGGLE_ICONS.left.close
 
   return (
     <>
-    <aside
-      className={`flex min-h-0 flex-col border-b border-slate-200 bg-white transition-[width] duration-300 ease-in-out lg:min-h-screen lg:border-r lg:border-b-0 ${isCollapsed ? 'lg:w-10 lg:overflow-hidden' : 'lg:w-[272px]'}`}
-      aria-label="Workspace navigation"
-    >
-      {/* Collapsed strip — desktop only */}
-      <div className={`hidden flex-1 flex-col items-center justify-between py-2.5 ${isCollapsed ? 'lg:flex' : ''}`}>
-        <button
-          type="button"
-          className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
-          onClick={() => setIsCollapsed(false)}
-          aria-label="Expand sidebar"
-          title="Expand sidebar"
-        >
-          <ChevronRightIcon sx={{ fontSize: 16 }} />
-        </button>
-
-        <span
-          className="inline-flex h-8 w-8 cursor-default items-center justify-center rounded-full bg-slate-900 text-[13px] font-bold text-white shadow-sm"
-          title={currentUserName}
-          aria-label={currentUserName}
-        >
-          {avatarInitial}
-        </span>
-      </div>
-
-      <section className={`flex min-h-0 flex-1 flex-col ${isCollapsed ? 'lg:hidden' : ''}`}>
-        <header className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
-          <h2 className="m-0 text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">
-            Workspaces
-          </h2>
-          <div className="flex items-center gap-1">
-            <button
-              ref={createButtonRef}
-              type="button"
-              className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-slate-950 bg-slate-950 text-xl text-white shadow-sm transition-colors duration-150 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 disabled:cursor-not-allowed disabled:opacity-50"
-              onClick={toggleCreatePopover}
-              aria-label="Create workspace"
-              disabled={!isAuthenticated || isAuthBootstrapPending}
+      <aside
+        aria-label="Workspace navigation"
+        className={cn(
+          'flex min-h-0 flex-col border-b border-border-default bg-bg-default transition-[width] duration-300 ease-in-out motion-reduce:transition-none lg:min-h-screen lg:border-r lg:border-b-0',
+          isCollapsed ? 'lg:w-12 lg:overflow-hidden' : 'lg:w-72',
+        )}
+      >
+        {/* Announces sign-out and workspace-action failures in either sidebar
+            state. The expanded footer is hidden while collapsed, and an open
+            menu hides the page from assistive tech except explicit aria-live
+            regions (and a menu cannot own one), so the announcement lives here.
+            The footer and the account menu show the same message visually. */}
+        <p aria-live="assertive" className="sr-only">
+          {authError && !isAuthBootstrapPending ? authError : (workspaceActionError ?? '')}
+        </p>
+        {/* Collapsed strip — desktop only. Rendered only while collapsed so the
+            expand control is the one recovery path and is observable as such. */}
+        {isCollapsed ? (
+          <div className="hidden flex-1 flex-col items-center justify-between py-3 lg:flex">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="px-2"
+              onClick={() => setIsCollapsed(false)}
+              aria-label="Expand sidebar"
+              title="Expand sidebar"
             >
-              +
-            </button>
-            <button
-              type="button"
-              className="hidden h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white text-sm leading-none text-slate-600 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 lg:flex"
+              <ExpandIcon className="h-4 w-4" aria-hidden="true" />
+            </Button>
+            <AccountMenu variant="avatar" />
+          </div>
+        ) : null}
+
+        <div className={cn('flex min-h-0 flex-1 flex-col', isCollapsed && 'lg:hidden')}>
+          <div className="flex items-center justify-between gap-2 border-b border-border-default px-4 py-3">
+            <BrandMark tone="light" />
+            <Button
+              variant="ghost"
+              size="sm"
+              className="hidden px-2 lg:inline-flex"
               onClick={() => setIsCollapsed(true)}
               aria-label="Collapse sidebar"
               title="Collapse sidebar"
             >
-              <ChevronLeftIcon sx={{ fontSize: 16 }} />
-            </button>
+              <CollapseIcon className="h-4 w-4" aria-hidden="true" />
+            </Button>
           </div>
-        </header>
 
-        <ul className="m-0 flex max-h-[220px] list-none flex-col gap-2 overflow-y-auto p-3 lg:max-h-none">
-          {isWorkspacesLoading && workspaces.length === 0 ? (
-            <li className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-[12px] text-slate-500">
-              Loading workspaces...
-            </li>
-          ) : workspaces.length === 0 ? (
-            <li className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-2.5 text-[12px] text-slate-500">
-              No workspaces yet.
-            </li>
-          ) : (
-            workspaces.map((workspace) => {
-              const isActive = workspace.id === activeWorkspaceId
-              const workspaceSummary = workspace.summary?.trim() || 'No summary yet.'
-              const isRenaming = renamingId === workspace.id
+          {/* A03 sidebar anatomy (Figma 302:447, owner review 2026-09-22) with
+              the owner's 2026-09-25 row pick (W3): the create action is a
+              full-width primary button; each row is a one-line title over the
+              summary (up to two lines) and when it was last updated, and the
+              current row — overflow menu included — sits on a light accent tint. */}
+          <nav aria-label="Workspaces" className="flex min-h-0 flex-1 flex-col">
+            <div className="px-3 pt-3">
+              <CreateWorkspacePopover />
+            </div>
 
-              return (
-                <li key={workspace.id}>
-                  {isRenaming ? (
-                    <input
-                      autoFocus
-                      value={renameValue}
-                      onChange={(e) => setRenameValue(e.target.value)}
-                      onBlur={saveRename}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') e.currentTarget.blur()
-                        if (e.key === 'Escape') setRenamingId(null)
-                      }}
-                      className="w-full rounded-lg border border-blue-300 bg-blue-50 px-3 py-2.5 text-[13px] font-semibold text-slate-900 outline-none ring-4 ring-blue-500/10"
-                    />
-                  ) : (
-                    <WorkspaceContextMenu
-                      workspaceTitle={workspace.title}
-                      onRename={() => startRename(workspace.id, workspace.title)}
-                      onDelete={() => handleDelete(workspace.id)}
-                      isDeletePending={deleteWorkspaceMutation.isPending}
-                    >
-                      <button
-                        type="button"
-                        className={`flex w-full cursor-pointer flex-col gap-1.5 rounded-lg border px-3 py-2.5 text-left transition ${
-                          isActive
-                            ? 'border-blue-200 bg-blue-50 shadow-sm'
-                            : 'border-transparent bg-transparent hover:border-slate-200 hover:bg-slate-50'
-                        }`}
-                        onClick={() => dispatch(setActiveWorkspaceId(workspace.id))}
-                      >
-                        <span className="truncate text-[13px] font-semibold text-slate-900">
-                          {workspace.title}
-                        </span>
-                        <small className="line-clamp-2 text-[11px] leading-snug text-slate-500">{workspaceSummary}</small>
-                      </button>
-                    </WorkspaceContextMenu>
-                  )}
-                </li>
-              )
-            })
-          )}
-        </ul>
-      </section>
-
-      <section className={`border-t border-slate-200 px-4 py-3 ${isCollapsed ? 'lg:hidden' : ''}`}>
-        <div className="flex items-center justify-between gap-2.5">
-          <div className="flex min-w-0 items-center gap-2.5">
-            <span
-              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-900 text-[13px] font-bold text-white"
-              aria-hidden="true"
+            {/* A10b: Workspaces | Outline segmented control (A03 frame 302:682). */}
+            <Tabs
+              value={sidebarTab}
+              onValueChange={(value) => setSidebarTab(value === 'outline' ? 'outline' : 'workspaces')}
+              className="flex min-h-0 flex-1 flex-col"
             >
-              {avatarInitial}
-            </span>
-            <p className="m-0 truncate text-sm font-semibold text-slate-900">{currentUserName}</p>
-          </div>
-          <button
-            type="button"
-            className="cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.04em] text-slate-600 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 disabled:cursor-not-allowed disabled:opacity-60"
-            onClick={isAuthenticated ? () => void logout() : () => void login()}
-            disabled={isAuthActionPending || isAuthBootstrapPending}
-          >
-            {isAuthBootstrapPending
-              ? 'Checking...'
-              : isAuthActionPending
-                ? 'Working...'
-                : isAuthenticated
-                  ? 'Logout'
-                  : 'Login'}
-          </button>
-        </div>
-        <CreditBalanceIndicator />
-        {authError && !isAuthBootstrapPending ? (
-          <p className="mt-2 mb-0 text-[11px] text-red-700">{authError}</p>
-        ) : workspaceActionError ? (
-          <p className="mt-2 mb-0 text-[11px] text-red-700">{workspaceActionError}</p>
-        ) : null}
-      </section>
-    </aside>
+              <TabsList
+                aria-label="Sidebar view"
+                className="mx-3 mt-3 grid grid-cols-2 gap-0 overflow-hidden rounded-md border border-border-default bg-bg-subtle p-0"
+              >
+                <TabsTrigger
+                  value="workspaces"
+                  className="rounded-none border-b-0 py-1.5 text-center data-[state=active]:bg-accent-tint data-[state=active]:text-accent-strong"
+                >
+                  Workspaces
+                </TabsTrigger>
+                <TabsTrigger
+                  value="outline"
+                  disabled={!activeWorkspaceId}
+                  className="rounded-none border-b-0 py-1.5 text-center data-[state=active]:bg-accent-tint data-[state=active]:text-accent-strong"
+                >
+                  Outline
+                </TabsTrigger>
+              </TabsList>
 
-    {isPopoverOpen && (
-      <CreateWorkspacePopover
-        anchorRef={createButtonRef}
-        position={popoverPosition}
-        onCreateBlank={createWorkspace}
-        onClose={() => setIsPopoverOpen(false)}
-      />
-    )}
+              <TabsContent value="workspaces" className="flex min-h-0 flex-1 flex-col pt-2 text-text-default">
+                <ul className="m-0 flex max-h-56 list-none flex-col gap-0.5 overflow-y-auto px-2 pb-2 lg:max-h-none">
+                  {isWorkspacesLoading && workspaces.length === 0 ? (
+                    <li className="flex flex-col gap-1 px-1 py-1">
+                      <span role="status" className="sr-only">
+                        Loading workspaces
+                      </span>
+                      <Skeleton className="h-9 w-full" />
+                      <Skeleton className="h-9 w-full" />
+                    </li>
+                  ) : isWorkspacesLoadFailed && workspaces.length === 0 ? (
+                    <li>
+                      <WorkspacesLoadError placement="sidebar" />
+                    </li>
+                  ) : workspaces.length === 0 ? (
+                    <li className="rounded-md border border-dashed border-border-default px-3 py-2.5 text-caption text-text-muted">
+                      No workspaces yet.
+                    </li>
+                  ) : (
+                    workspaces.map((workspace) => {
+                      const isActive = workspace.id === activeWorkspaceId
+                      const summary = workspace.summary?.trim() || null
+                      const updated = workspace.updatedAt ? updatedLabel(workspace.updatedAt) : null
+                      const isRenaming = renamingId === workspace.id
+
+                      return (
+                        <li key={workspace.id}>
+                          {isRenaming ? (
+                            <Input
+                              autoFocus
+                              aria-label="Workspace name"
+                              value={renameValue}
+                              onChange={(e) => setRenameValue(e.target.value)}
+                              onBlur={saveRename}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') e.currentTarget.blur()
+                                if (e.key === 'Escape') setRenamingId(null)
+                              }}
+                              className="text-label font-medium"
+                            />
+                          ) : (
+                            <WorkspaceItemActions
+                              workspaceTitle={workspace.title}
+                              isActive={isActive}
+                              onRename={() => startRename(workspace.id, workspace.title)}
+                              onDelete={() => handleDelete(workspace.id)}
+                              isDeletePending={deleteWorkspaceMutation.isPending}
+                            >
+                              <button
+                                type="button"
+                                aria-current={isActive ? 'true' : undefined}
+                                className={cn(
+                                  'flex min-w-0 flex-1 cursor-pointer flex-col gap-0.5 rounded-md py-2 pr-1 pl-3 text-left text-label transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default focus-visible:ring-offset-2',
+                                  isActive ? 'font-medium text-accent-strong' : 'text-text-default',
+                                )}
+                                onClick={() => dispatch(setActiveWorkspaceId(workspace.id))}
+                              >
+                                <span className="truncate">{workspace.title}</span>
+                                {summary ? (
+                                  <span className="line-clamp-2 text-caption font-normal text-text-muted">{summary}</span>
+                                ) : null}
+                                {updated ? (
+                                  <span className="text-caption font-normal text-text-muted">{updated}</span>
+                                ) : null}
+                              </button>
+                            </WorkspaceItemActions>
+                          )}
+                        </li>
+                      )
+                    })
+                  )}
+                </ul>
+              </TabsContent>
+              <TabsContent value="outline" className="min-h-0 flex-1 overflow-y-auto pt-2 text-text-default">
+                <WorkspaceOutline />
+              </TabsContent>
+            </Tabs>
+          </nav>
+
+          <div className="border-t border-border-default px-3 py-3">
+            <AccountMenu variant="row" detail={<CreditBalanceIndicator />} />
+            {/* Sign-out failures are reported inside the account menu, which
+                stays open on failure and would hide an alert placed here. */}
+            {workspaceActionError ? (
+              <p className="mt-2 mb-0 px-1.5 text-caption text-error-default">
+                {workspaceActionError}
+              </p>
+            ) : null}
+          </div>
+        </div>
+      </aside>
     </>
   )
 }

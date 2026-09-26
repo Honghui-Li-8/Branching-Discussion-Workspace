@@ -797,8 +797,9 @@ export function SystemShowcaseGallery() {
                     is by commit diff and by eye against the A05a gallery's screenshots, not on this page.
                   </li>
                   <li>
-                    Contrast is not verified here (A13 owns it). Known open: white text on the teal primary Button
-                    (3.95:1). The gallery shows it as shipped.
+                    Contrast is not verified here (A13 owns it). The teal primary Button's white text was 3.95:1 on
+                    accent-default; ADR-0007 (A10, 2026-09-22) repointed the fill one step down the ramp to 4.74:1.
+                    The gallery shows it as shipped.
                   </li>
                   <li>
                     The shipped Combobox trigger has no accessible name: a `role="combobox"` element

@@ -1,5 +1,4 @@
 import type { ReactNode, RefObject } from 'react'
-import { zIndex } from '../../../theme/zIndex'
 
 type TreeCanvasFrameProps = {
   canvasRef: RefObject<HTMLDivElement | null>
@@ -7,18 +6,21 @@ type TreeCanvasFrameProps = {
 }
 
 /**
- * Visual host for the tree canvas.
- * Owns the canvas background and the root DOM ref used for width measurement.
+ * Visual host for the tree canvas and, when open, the conversation panel —
+ * a flex row, so the two are siblings that share the width instead of the
+ * panel floating over the canvas (A10 seam fix). Owns the line-grid
+ * background and the DOM ref the panel-width logic measures.
  */
 export const TreeCanvasFrame = ({ canvasRef, children }: TreeCanvasFrameProps) => {
   return (
     <div
       ref={canvasRef}
-      className="relative min-h-0 flex-1 overflow-hidden"
+      className="relative flex min-h-0 flex-1 overflow-hidden bg-bg-subtlest"
       style={{
-        background:
-          'radial-gradient(circle at 1px 1px, rgba(100, 116, 139, 0.16) 1px, transparent 0) 0 0 / 24px 24px, linear-gradient(180deg, #f8fafc 0%, #ffffff 100%)',
-        zIndex: zIndex.canvasBase,
+        // A03 frame 302:445: a square line grid, one line per 96px.
+        backgroundImage:
+          'linear-gradient(to right, var(--color-border-subtle) 1px, transparent 1px), linear-gradient(to bottom, var(--color-border-subtle) 1px, transparent 1px)',
+        backgroundSize: '96px 96px',
       }}
     >
       {children}

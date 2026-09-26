@@ -5,6 +5,7 @@ import type { ReactNode } from 'react'
 import { PATHS, sectionHref } from '../../routePaths'
 import { buttonVariants } from '../ui/button'
 import { Link, useHashFocus } from '../ui/link'
+import { SignInLink } from '../SignInLink'
 import { useDocumentTitle } from '../../lib/useDocumentTitle'
 import { Cluster, Stack } from '../ui/layout'
 import { Band } from './landing/Band'
@@ -79,12 +80,11 @@ const Hero = () => {
                 Open workspace
               </Link>
             ) : (
-              <Link
-                to={PATHS.login}
+              <SignInLink
                 className={cn(buttonVariants({ variant: 'primary', size: 'lg' }), 'no-underline hover:text-white hover:no-underline')}
               >
                 Sign in with Google
-              </Link>
+              </SignInLink>
             )}
             <Link to={sectionHref('features')} className="text-label">
               See how it works
