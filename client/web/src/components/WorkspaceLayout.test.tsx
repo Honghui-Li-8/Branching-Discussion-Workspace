@@ -9,11 +9,12 @@
  * and store-visible outcome only; every state also runs the ADR-0004 axe scan
  * at the serious/critical threshold.
  */
-import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { axe, toHaveNoViolations } from 'jest-axe'
 
 import { WorkspaceLayout } from './WorkspaceLayout'
 import { TEST_USER, pendingFetch, renderWithProviders } from '../testing/renderWithProviders'
+import { clearAuthenticatedUser, setAuthState } from '../store/slices/authSlice'
 
 expect.extend(toHaveNoViolations)
 
@@ -41,15 +42,17 @@ jest.mock('@floating-ui/dom', () => ({
 // active; the stand-in keeps that branch real and mocks only the canvas.
 jest.mock('./DiscussionTreeView', () => {
   const { IntroScreen } = jest.requireActual<typeof import('./IntroScreen')>('./IntroScreen')
+  const { WorkspacesLoadError } = jest.requireActual<typeof import('./WorkspacesLoadError')>('./WorkspacesLoadError')
   const { useAppSelector } = jest.requireActual<typeof import('../store/hooks')>('../store/hooks')
-  const { selectActiveWorkspace } =
+  const { selectActiveWorkspace, selectWorkspacesLoadFailed } =
     jest.requireActual<typeof import('../store/slices/appShellSlice')>('../store/slices/appShellSlice')
-  const DiscussionTreeView = () =>
-    useAppSelector(selectActiveWorkspace) ? (
-      <section aria-label="Discussion tree (mocked)">tree</section>
-    ) : (
-      <IntroScreen />
-    )
+  // Mirrors the real view's branches; only the canvas itself is stubbed.
+  const DiscussionTreeView = () => {
+    const activeWorkspace = useAppSelector(selectActiveWorkspace)
+    const isLoadFailed = useAppSelector(selectWorkspacesLoadFailed)
+    if (activeWorkspace) return <section aria-label="Discussion tree (mocked)">tree</section>
+    return isLoadFailed ? <WorkspacesLoadError placement="main" /> : <IntroScreen />
+  }
   return { DiscussionTreeView }
 })
 
@@ -91,6 +94,9 @@ const trpcFetch = (handlers: Handlers, calls: string[] = []): typeof fetch =>
         return { result: { data: handler ? handler(inputValue) : [] } }
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e)
+        if ((e as { trpcCode?: string }).trpcCode === 'UNAUTHORIZED') {
+          return { error: { message, code: -32001, data: { code: 'UNAUTHORIZED', httpStatus: 401, path: procedure } } }
+        }
         return {
           error: { message, code: -32603, data: { code: 'INTERNAL_SERVER_ERROR', httpStatus: 500, path: procedure } },
         }
@@ -117,6 +123,34 @@ const neverSettling =
       : base(input, init)
   }
 
+/** Holds one procedure's first request until released, to land its response late. */
+const heldOnce = (procedure: string, base: typeof fetch) => {
+  let open = () => {}
+  const gate = new Promise<void>((resolve) => {
+    open = resolve
+  })
+  let landed = () => {}
+  const hasLanded = new Promise<void>((resolve) => {
+    landed = resolve
+  })
+  let held = false
+  const fetchImpl: typeof fetch = async (input, init) => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+    if (held || !url.split('/trpc/')[1]?.split('?')[0].split(',').includes(procedure)) return base(input, init)
+    held = true
+    await gate
+    const response = await base(input, init)
+    landed()
+    return response
+  }
+  /** Lets the held request through; resolves once its response is handed back. */
+  const release = () => {
+    open()
+    return hasLanded
+  }
+  return { fetchImpl, release }
+}
+
 const WORKSPACES = [
   { id: 'w1', title: 'MVP Branching Decisions', summary: 'Should we branch?' },
   { id: 'w2', title: 'Choose a Database', summary: null },
@@ -126,6 +160,28 @@ const WORKSPACES = [
 const rowName = (workspace: { title: string }) => new RegExp(`^${workspace.title}`)
 
 const sidebar = () => screen.getByRole('complementary', { name: 'Workspace navigation' })
+/** The expanded account row is named after the user it shows (WCAG 2.5.3). */
+/** The sidebar's live region: announces failures whichever sidebar state is showing. */
+const announcer = () => sidebar().querySelector('[aria-live="assertive"]')
+/** The visible copy of a sidebar message (the live region repeats it for assistive tech). */
+const footerMessage = (text: RegExp) =>
+  within(sidebar()).queryAllByText(text).find((el) => !el.hasAttribute('aria-live'))
+const accountRow = () => within(sidebar()).getByRole('button', { name: `${TEST_USER.displayName}, account menu` })
+
+/**
+ * A failed sign-out, as the shell reports it: visible text beside the Logout
+ * item, which it describes (a menu may own only menu items), and an announcement
+ * from the sidebar's live region, which stays exposed while the menu hides the
+ * rest of the page.
+ */
+const expectLogoutError = async (menu: HTMLElement) => {
+  const message = await within(menu).findByText(/unable to sign out/i)
+  expect(message.getAttribute('aria-live')).toBeNull()
+  expect(within(menu).getByRole('menuitem', { name: 'Logout' }).getAttribute('aria-describedby')).toBe(message.id)
+  const announcer = sidebar().querySelector('[aria-live="assertive"]')
+  expect(announcer?.textContent).toMatch(/unable to sign out/i)
+  expect(announcer?.closest('[aria-hidden="true"]')).toBeNull()
+}
 const mockedTree = () => screen.queryByRole('region', { name: 'Discussion tree (mocked)' })
 
 describe('signed-in shell layout (A10)', () => {
@@ -160,6 +216,8 @@ describe('signed-in shell layout (A10)', () => {
 
     expect(within(sidebar()).getByText(/loading workspaces/i)).toBeTruthy()
     expect(within(sidebar()).queryByRole('button', { name: WORKSPACES[0].title })).toBeNull()
+    // Unknown list, no create: it could duplicate a workspace that has not shown yet.
+    expect(within(sidebar()).getByRole('button', { name: 'Create workspace' })).toHaveProperty('disabled', true)
     expect(await seriousViolations(container)).toHaveLength(0)
   })
 
@@ -296,6 +354,83 @@ describe('signed-in shell layout (A10)', () => {
     await waitFor(() => expect(document.activeElement).toBe(row))
   })
 
+  it('rename and delete failures: the row keeps its value, the newest failure is shown, a success clears it', async () => {
+    let renameFails = true
+    const { container } = renderWithProviders(<WorkspaceLayout />, {
+      authStatus: 'authenticated',
+      fetchImpl: trpcFetch({
+        workspacesList: () => WORKSPACES,
+        workspaceUpdate: () => {
+          if (renameFails) throw new Error('Failed to fetch')
+          return WORKSPACES[0]
+        },
+        workspaceDelete: () => {
+          throw new Error('Failed to fetch')
+        },
+      }),
+    })
+    const actions = async () => {
+      fireEvent.keyDown(await within(sidebar()).findByRole('button', { name: `Actions for ${WORKSPACES[0].title}` }), {
+        key: 'Enter',
+      })
+      return screen.findByRole('menu')
+    }
+    const rename = async (title: string) => {
+      fireEvent.click(within(await actions()).getByRole('menuitem', { name: /rename/i }))
+      const input = await within(sidebar()).findByRole('textbox', { name: 'Workspace name' })
+      fireEvent.change(input, { target: { value: title } })
+      fireEvent.keyDown(input, { key: 'Enter' })
+      fireEvent.blur(input)
+    }
+
+    await rename('Renamed')
+    await waitFor(() => expect(footerMessage(/couldn’t rename.*unchanged/i)).toBeTruthy())
+    expect(announcer()?.textContent).toMatch(/couldn’t rename/i)
+    expect(within(sidebar()).getByRole('button', { name: rowName(WORKSPACES[0]) })).toBeTruthy()
+    expect(await seriousViolations(container)).toHaveLength(0)
+
+    // A newer failure replaces the older message rather than hiding behind it.
+    fireEvent.click(within(await actions()).getByRole('menuitem', { name: /delete/i }))
+    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Delete' }))
+    await waitFor(() => expect(announcer()?.textContent).toMatch(/couldn’t delete.*still here/i))
+    expect(footerMessage(/couldn’t delete.*still here/i)).toBeTruthy()
+    expect(within(sidebar()).getByRole('button', { name: rowName(WORKSPACES[0]) })).toBeTruthy()
+
+    // A later success clears it.
+    renameFails = false
+    await rename('Renamed')
+    await waitFor(() => expect(footerMessage(/couldn’t/i)).toBeUndefined())
+    expect(announcer()?.textContent).toBe('')
+  })
+
+  it('collapsed: a rename that fails after collapsing is still announced', async () => {
+    const pendingRename: { settle?: () => void } = {}
+    renderWithProviders(<WorkspaceLayout />, {
+      authStatus: 'authenticated',
+      fetchImpl: (input, init) => {
+        const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+        const base = trpcFetch({ workspacesList: () => WORKSPACES, workspaceUpdate: () => { throw new Error('Failed to fetch') } })
+        if (!url.includes('workspaceUpdate')) return base(input, init)
+        return new Promise<Response>((resolve) => {
+          pendingRename.settle = () => void base(input, init).then(resolve)
+        })
+      },
+    })
+    fireEvent.keyDown(await within(sidebar()).findByRole('button', { name: `Actions for ${WORKSPACES[0].title}` }), { key: 'Enter' })
+    fireEvent.click(within(await screen.findByRole('menu')).getByRole('menuitem', { name: /rename/i }))
+    const input = await within(sidebar()).findByRole('textbox', { name: 'Workspace name' })
+    fireEvent.change(input, { target: { value: 'Renamed' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    fireEvent.blur(input)
+
+    fireEvent.click(within(sidebar()).getByRole('button', { name: 'Collapse sidebar' }))
+    await waitFor(() => expect(pendingRename.settle).toBeDefined())
+    pendingRename.settle?.()
+    await waitFor(() => expect(announcer()?.textContent).toMatch(/couldn’t rename/i))
+    // The announcer sits outside the subtree the collapsed sidebar hides.
+    expect(announcer()?.closest('.lg\\:hidden')).toBeNull()
+  })
+
   it('account menu: identity, Privacy, Terms and Logout live behind the avatar; no standalone legal links', async () => {
     renderWithProviders(<WorkspaceLayout />, {
       authStatus: 'authenticated',
@@ -311,7 +446,7 @@ describe('signed-in shell layout (A10)', () => {
     expect(within(sidebar()).getByRole('link', { name: 'Trellis' }).getAttribute('href')).toBe('/')
     expect(within(sidebar()).getByText(/turns remaining/)).toBeTruthy()
 
-    const trigger = within(sidebar()).getByRole('button', { name: 'Account menu' })
+    const trigger = accountRow()
     fireEvent.keyDown(trigger, { key: 'Enter' })
     const menu = await screen.findByRole('menu')
     expect(within(menu).getByText(TEST_USER.displayName as string)).toBeTruthy()
@@ -319,6 +454,25 @@ describe('signed-in shell layout (A10)', () => {
     expect(within(menu).getByRole('menuitem', { name: 'Privacy' }).getAttribute('href')).toBe('/privacy')
     expect(within(menu).getByRole('menuitem', { name: 'Terms' }).getAttribute('href')).toBe('/terms')
     expect(within(menu).getByRole('menuitem', { name: 'Logout' })).toBeTruthy()
+  })
+
+  it('logout: a chosen sign-out clears cached data, as an expired session does', async () => {
+    const base = trpcFetch({ workspacesList: () => WORKSPACES })
+    const fetchImpl: typeof fetch = (input, init) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+      if (!url.includes('/auth/logout')) return base(input, init)
+      return Promise.resolve({ ok: true, status: 200, json: async () => ({}) } as unknown as Response)
+    }
+    const { store, queryClient } = renderWithProviders(<WorkspaceLayout />, { authStatus: 'authenticated', fetchImpl })
+    await within(sidebar()).findByRole('button', { name: rowName(WORKSPACES[0]) })
+    expect(queryClient.getQueryCache().getAll().filter((query) => query.state.data !== undefined).length).toBeGreaterThan(0)
+
+    fireEvent.keyDown(accountRow(), { key: 'Enter' })
+    fireEvent.click(within(await screen.findByRole('menu')).getByRole('menuitem', { name: 'Logout' }))
+
+    await waitFor(() => expect(store.getState().auth.status).toBe('unauthenticated'))
+    // The next account signed in on this page must not inherit this one's list.
+    expect(queryClient.getQueryCache().getAll().filter((query) => query.state.data !== undefined)).toHaveLength(0)
   })
 
   it('collapsed: a failed logout is reported in the account menu, which stays open', async () => {
@@ -339,8 +493,34 @@ describe('signed-in shell layout (A10)', () => {
     const menu = await screen.findByRole('menu')
     fireEvent.click(within(menu).getByRole('menuitem', { name: 'Logout' }))
 
-    expect((await within(menu).findByRole('alert')).textContent).toMatch(/unable to sign out/i)
+    await expectLogoutError(menu)
     expect(screen.getByRole('menu')).toBe(menu)
+    // The menu is portalled to <body>, outside the render container.
+    expect(await seriousViolations(document.body)).toHaveLength(0)
+  })
+
+  it('expanded: a failed logout keeps the signed-in shell and reports it in the menu', async () => {
+    const base = trpcFetch({ workspacesList: () => WORKSPACES })
+    const fetchImpl: typeof fetch = (input, init) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+      if (!url.includes('/auth/logout')) return base(input, init)
+      return Promise.resolve({ ok: false, status: 500, json: async () => ({}) } as unknown as Response)
+    }
+    const { store } = renderWithProviders(<WorkspaceLayout />, { authStatus: 'authenticated', fetchImpl })
+    await within(sidebar()).findByRole('button', { name: rowName(WORKSPACES[0]) })
+
+    fireEvent.keyDown(accountRow(), { key: 'Enter' })
+    const menu = await screen.findByRole('menu')
+    fireEvent.click(within(menu).getByRole('menuitem', { name: 'Logout' }))
+
+    // The open menu hides the page from assistive tech, so the message lives in the menu.
+    await expectLogoutError(menu)
+    // The menu is portalled to <body>, outside the render container.
+    expect(await seriousViolations(document.body)).toHaveLength(0)
+    expect(store.getState().auth.status).toBe('authenticated')
+    fireEvent.keyDown(menu, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('menu')).toBeNull())
+    expect(within(sidebar()).getByRole('button', { name: rowName(WORKSPACES[0]) })).toBeTruthy()
   })
 
   it('zero credit: the credit line says sending will fail', async () => {
@@ -412,6 +592,108 @@ describe('signed-in shell layout (A10)', () => {
     await waitFor(() => expect(created.getAttribute('aria-current')).toBe('true'))
     expect(calls).toContain('workspaceCreate')
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Create workspace' })).toBeNull())
+  })
+
+  it('create: a session that expires as a create lands does not restore the old list', async () => {
+    let expired = false
+    const { store } = renderWithProviders(<WorkspaceLayout />, {
+      authStatus: 'authenticated',
+      fetchImpl: trpcFetch({
+        workspacesList: () => {
+          if (expired) throw Object.assign(new Error('UNAUTHORIZED'), { trpcCode: 'UNAUTHORIZED' })
+          return WORKSPACES
+        },
+        workspaceCreate: () => {
+          expired = true
+          return { id: 'w3', title: 'New Workspace 3', summary: null }
+        },
+      }),
+    })
+    await within(sidebar()).findByRole('button', { name: rowName(WORKSPACES[0]) })
+
+    fireEvent.click(within(sidebar()).getByRole('button', { name: 'Create workspace' }))
+    fireEvent.click(within(await screen.findByRole('dialog', { name: 'Create workspace' })).getByRole('button', { name: /new blank workspace/i }))
+    await waitFor(() => expect(store.getState().appShell.createPendingKey).toBeNull())
+
+    // The created workspace was not spliced into the captured list or selected.
+    expect(store.getState().appShell.workspaces.map((w) => w.id)).not.toContain('w3')
+    expect(store.getState().appShell.activeWorkspaceId).not.toBe('w3')
+  })
+
+  it.each([
+    [
+      'signing out',
+      async () => {
+        fireEvent.keyDown(accountRow(), { key: 'Enter' })
+        const menu = await screen.findByRole('menu')
+        fireEvent.click(within(menu).getByRole('menuitem', { name: 'Logout' }))
+        // This layout is rendered without routes, so nothing unmounts the menu.
+        fireEvent.keyDown(menu, { key: 'Escape' })
+        await waitFor(() => expect(screen.queryByRole('menu')).toBeNull())
+      },
+    ],
+    [
+      'the session expiring',
+      // What the global UNAUTHORIZED handler dispatches (clearClientSessionState).
+      async (store: ReturnType<typeof renderWithProviders>['store']) => {
+        act(() => {
+          store.dispatch(clearAuthenticatedUser({ reason: 'session-expired' }))
+        })
+      },
+    ],
+  ])('create: %s mid-create frees create for the next session, and the late result stays out', async (_, signOut) => {
+    let listFails = false
+    const base = trpcFetch({
+      workspacesList: () => {
+        if (listFails) throw new Error('list refresh failed')
+        return WORKSPACES
+      },
+      workspaceCreate: () => ({ id: 'w-old', title: 'New Workspace 3', summary: null }),
+    })
+    const held = heldOnce('workspaceCreate', neverSettling('workspaceCreateFromExample', base))
+    const fetchImpl: typeof fetch = (input, init) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+      if (url.includes('/auth/logout')) {
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({}) } as unknown as Response)
+      }
+      return held.fetchImpl(input, init)
+    }
+    const { store } = renderWithProviders(<WorkspaceLayout />, { authStatus: 'authenticated', fetchImpl })
+    await within(sidebar()).findByRole('button', { name: rowName(WORKSPACES[0]) })
+
+    // Session one: a blank create is in flight when the session ends.
+    fireEvent.click(within(sidebar()).getByRole('button', { name: 'Create workspace' }))
+    fireEvent.click(within(await screen.findByRole('dialog', { name: 'Create workspace' })).getByRole('button', { name: /new blank workspace/i }))
+    await waitFor(() => expect(store.getState().appShell.createPendingKey).toBe('blank'))
+    await signOut(store)
+    await waitFor(() => expect(store.getState().auth.status).toBe('unauthenticated'))
+    await waitFor(() => expect(store.getState().appShell.createPendingKey).toBeNull())
+
+    // Session two: create is available again, and a create of its own is in flight.
+    act(() => {
+      store.dispatch(setAuthState({ status: 'authenticated', user: TEST_USER }))
+    })
+    const trigger = within(sidebar()).getByRole('button', { name: 'Create workspace' })
+    await waitFor(() => expect(trigger).toHaveProperty('disabled', false))
+    // Session one's popover may still be open: nothing here routes away on sign-out.
+    if (!screen.queryByRole('dialog', { name: 'Create workspace' })) fireEvent.click(trigger)
+    const dialog = await screen.findByRole('dialog', { name: 'Create workspace' })
+    const example = within(dialog).getByRole('button', { name: /choose a database/i })
+    expect(example).toHaveProperty('disabled', false)
+    fireEvent.click(example)
+    await waitFor(() => expect(store.getState().appShell.createPendingKey).toBe('database-selection'))
+
+    // Session one's create lands late, with a failing refresh (the splice-in path).
+    listFails = true
+    await act(async () => {
+      await held.release()
+      // Past the refresh the late result triggers, and its fallback.
+      await new Promise((resolve) => setTimeout(resolve, 200))
+    })
+
+    expect(store.getState().appShell.createPendingKey).toBe('database-selection')
+    expect(store.getState().appShell.workspaces.map((w) => w.id)).not.toContain('w-old')
+    expect(store.getState().appShell.activeWorkspaceId).not.toBe('w-old')
   })
 
   it('create: a failing example create reports the error and leaves the list and selection intact', async () => {
@@ -487,6 +769,45 @@ describe('signed-in shell layout (A10)', () => {
     expect(screen.queryByText(/went wrong/i)).toBeNull()
   })
 
+  it('create: a create listed despite a failed refresh still leaves once it is deleted', async () => {
+    let rows: Array<{ id: string; title: string; summary: string | null }> = []
+    let listFails = false
+    const { store } = renderWithProviders(<WorkspaceLayout />, {
+      authStatus: 'authenticated',
+      fetchImpl: trpcFetch({
+        workspacesList: () => {
+          if (listFails) throw new Error('list refresh failed')
+          return rows
+        },
+        workspaceCreate: (input) => {
+          listFails = true
+          const created = { id: 'w9', title: (input as { title: string }).title, summary: null }
+          rows = [...rows, created]
+          return created
+        },
+        workspaceDelete: (input) => {
+          listFails = false
+          rows = rows.filter((row) => row.id !== (input as { id: string }).id)
+          return { id: (input as { id: string }).id }
+        },
+      }),
+    })
+    await waitFor(() => expect(within(sidebar()).getByText(/no workspaces yet/i)).toBeTruthy())
+
+    // Created from an empty account while the list refresh is failing.
+    fireEvent.click(within(screen.getByRole('main', { name: 'Workspace' })).getByRole('button', { name: /new blank workspace/i }))
+    await within(sidebar()).findByRole('button', { name: /^New Workspace 1/ }, { timeout: 4000 })
+
+    // Deleting it refetches a list equal to the one cached before the create.
+    fireEvent.keyDown(within(sidebar()).getByRole('button', { name: 'Actions for New Workspace 1' }), { key: 'Enter' })
+    fireEvent.click(within(await screen.findByRole('menu')).getByRole('menuitem', { name: /delete/i }))
+    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Delete' }))
+
+    await waitFor(() => expect(store.getState().appShell.workspaces).toEqual([]))
+    expect(store.getState().appShell.activeWorkspaceId).toBeNull()
+    expect(within(sidebar()).getByText(/no workspaces yet/i)).toBeTruthy()
+  })
+
   it('create: the popover stays open while its own create is in flight', async () => {
     renderWithProviders(<WorkspaceLayout />, {
       authStatus: 'authenticated',
@@ -522,6 +843,35 @@ describe('signed-in shell layout (A10)', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Create workspace' })
     expect(within(dialog).getByRole('button', { name: /new blank workspace/i })).toHaveProperty('disabled', true)
     expect(within(dialog).getByRole('button', { name: /choose a database/i })).toHaveProperty('disabled', true)
+  })
+
+  it('load failed: the shell stays, names the failure instead of the empty state, and retries', async () => {
+    let failing = true
+    const { container } = renderWithProviders(<WorkspaceLayout />, {
+      authStatus: 'authenticated',
+      fetchImpl: trpcFetch({
+        workspacesList: () => {
+          if (failing) throw new Error('Connection reset')
+          return WORKSPACES
+        },
+      }),
+    })
+
+    const main = screen.getByRole('main', { name: 'Workspace' })
+    expect((await within(main).findByRole('alert')).textContent).toMatch(/couldn’t reach the server/i)
+    expect(within(main).getByRole('heading', { level: 1 }).textContent).toMatch(/didn’t load/i)
+    expect(within(sidebar()).getByText(/couldn’t load your workspaces/i)).toBeTruthy()
+    // Never the empty state: that would invite creating a workspace the user may already have.
+    expect(within(sidebar()).queryByText(/no workspaces yet/i)).toBeNull()
+    expect(within(main).queryByRole('button', { name: /new blank workspace/i })).toBeNull()
+    expect(within(sidebar()).getByRole('button', { name: 'Create workspace' })).toHaveProperty('disabled', true)
+    expect(await seriousViolations(container)).toHaveLength(0)
+
+    failing = false
+    fireEvent.click(within(main).getByRole('button', { name: 'Try again' }))
+    await within(sidebar()).findByRole('button', { name: rowName(WORKSPACES[0]) })
+    expect(within(main).queryByRole('alert')).toBeNull()
+    expect(mockedTree()).toBeTruthy()
   })
 
   it('seeded: an unnamed icon button inside the shell turns the scan red', async () => {

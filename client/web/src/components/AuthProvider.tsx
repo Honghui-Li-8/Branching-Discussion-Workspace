@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useAppDispatch, useAppSelector } from '../store/hooks'
 import {
   clearAuthenticatedUser,
@@ -25,6 +26,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const [isAuthActionPending, setIsAuthActionPending] = useState(false)
   const [authError, setAuthError] = useState<string | null>(null)
+  const queryClient = useQueryClient()
   const [isLocalBypassPending, setIsLocalBypassPending] = useState(false)
   const [localBypassError, setLocalBypassError] = useState<string | null>(null)
 
@@ -126,13 +128,17 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       }
 
       dispatch(clearAuthenticatedUser())
+      // Drop this account's cached server data, as an expired session does
+      // (clearClientSessionState): the next account signed in on this page
+      // must not see it, and a refetch identical to it would not re-sync.
+      queryClient.clear()
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to sign out.'
       setAuthError(message)
     } finally {
       setIsAuthActionPending(false)
     }
-  }, [dispatch, isAuthActionPending, isAuthBootstrapPending])
+  }, [dispatch, isAuthActionPending, isAuthBootstrapPending, queryClient])
 
   const loginWithLocalBypass = useCallback(async (): Promise<boolean> => {
     // Declining is not failing: nothing is thrown, so the caller must not treat a
