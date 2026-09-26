@@ -16,6 +16,8 @@ type WorkspaceNavItem = {
 type AppShellState = {
   workspaces: WorkspaceNavItem[]
   activeWorkspaceId: string | null
+  /** The node whose conversation is open (A10b): shared by the canvas and the sidebar outline. */
+  openNodeId: string | null
   isWorkspacesLoading: boolean
   /** The workspace list could not be loaded and nothing is cached: say so and offer a retry (A10). */
   isWorkspacesLoadFailed: boolean
@@ -36,6 +38,7 @@ type AppShellState = {
 const initialState: AppShellState = {
   workspaces: [],
   activeWorkspaceId: null,
+  openNodeId: null,
   isWorkspacesLoading: false,
   isWorkspacesLoadFailed: false,
   isSidebarCollapsed: false,
@@ -57,7 +60,14 @@ const appShellSlice = createSlice({
       state.isWorkspacesLoadFailed = action.payload
     },
     setActiveWorkspaceId: (state, action: PayloadAction<string | null>) => {
+      if (state.activeWorkspaceId !== action.payload) {
+        // A node id belongs to one workspace; switching workspaces closes it.
+        state.openNodeId = null
+      }
       state.activeWorkspaceId = action.payload
+    },
+    setOpenNodeId: (state, action: PayloadAction<string | null>) => {
+      state.openNodeId = action.payload
     },
     setSidebarCollapsed: (state, action: PayloadAction<boolean>) => {
       state.isSidebarCollapsed = action.payload
@@ -78,6 +88,7 @@ export const {
   setWorkspacesLoading,
   setWorkspacesLoadFailed,
   setActiveWorkspaceId,
+  setOpenNodeId,
   setSidebarCollapsed,
   startCreate,
   endCreate,
@@ -85,6 +96,7 @@ export const {
 
 export const selectWorkspaces = (state: RootState) => state.appShell.workspaces
 export const selectActiveWorkspaceId = (state: RootState) => state.appShell.activeWorkspaceId
+export const selectOpenNodeId = (state: RootState) => state.appShell.openNodeId
 export const selectWorkspacesLoading = (state: RootState) => state.appShell.isWorkspacesLoading
 export const selectWorkspacesLoadFailed = (state: RootState) => state.appShell.isWorkspacesLoadFailed
 export const selectSidebarCollapsed = (state: RootState) => state.appShell.isSidebarCollapsed
