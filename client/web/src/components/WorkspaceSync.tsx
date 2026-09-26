@@ -4,10 +4,13 @@ import { useAppDispatch, useAppSelector } from '../store/hooks'
 import { selectAuthStatus } from '../store/slices/authSlice'
 import {
   selectActiveWorkspaceId,
+  selectWorkspaces,
   setActiveWorkspaceId,
   setWorkspaces,
   setWorkspacesLoading,
 } from '../store/slices/appShellSlice'
+
+import { toWorkspaceNavItems } from './workspaceNavItems'
 
 type WorkspaceSyncProps = {
   children: ReactNode
@@ -17,18 +20,14 @@ export const WorkspaceSync = ({ children }: WorkspaceSyncProps) => {
   const dispatch = useAppDispatch()
   const authStatus = useAppSelector(selectAuthStatus)
   const activeWorkspaceId = useAppSelector(selectActiveWorkspaceId)
+  const storeWorkspaces = useAppSelector(selectWorkspaces)
   const isAuthenticated = authStatus === 'authenticated'
   const workspacesQuery = trpc.workspacesList.useQuery(undefined, {
     enabled: isAuthenticated,
   })
 
   const workspaces = useMemo(
-    () =>
-      workspacesQuery.data?.map((workspace) => ({
-        id: workspace.id,
-        title: workspace.title,
-        summary: workspace.summary,
-      })) ?? null,
+    () => (workspacesQuery.data ? toWorkspaceNavItems(workspacesQuery.data) : null),
     [workspacesQuery.data],
   )
 
@@ -61,23 +60,26 @@ export const WorkspaceSync = ({ children }: WorkspaceSyncProps) => {
       return
     }
 
-    if (workspaces.length === 0) {
+    // A workspace written to the store ahead of the query (the create hook,
+    // A10) is known too: a store change re-renders this component before
+    // React Query has delivered the refetched list, and judging by the query
+    // alone reset a just-created selection — to the first row, or to nothing
+    // when the query still said the list was empty. The store catches up on
+    // the next render, so a stale extra entry costs at most one render.
+    const known = workspaces.length > 0 ? workspaces : storeWorkspaces
+    const knownIds = new Set([...workspaces, ...storeWorkspaces].map((workspace) => workspace.id))
+
+    if (knownIds.size === 0) {
       if (activeWorkspaceId !== null) {
         dispatch(setActiveWorkspaceId(null))
       }
       return
     }
 
-    if (!activeWorkspaceId) {
-      dispatch(setActiveWorkspaceId(workspaces[0].id))
-      return
+    if (!activeWorkspaceId || !knownIds.has(activeWorkspaceId)) {
+      dispatch(setActiveWorkspaceId(known[0].id))
     }
-
-    const activeWorkspaceExists = workspaces.some((workspace) => workspace.id === activeWorkspaceId)
-    if (!activeWorkspaceExists) {
-      dispatch(setActiveWorkspaceId(workspaces[0].id))
-    }
-  }, [activeWorkspaceId, dispatch, workspaces])
+  }, [activeWorkspaceId, dispatch, storeWorkspaces, workspaces])
 
   return children
 }
