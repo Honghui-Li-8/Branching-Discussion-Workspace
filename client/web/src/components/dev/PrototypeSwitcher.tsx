@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { isDev } from '../../lib/env'
 import { PROTOTYPE_PARAM } from './usePrototypeKey'
 
@@ -37,7 +37,9 @@ const ownsArrowKeys = (target: EventTarget | null) => {
  * prototype's throwaway branch; only this component lives on `main`.
  */
 export const PrototypeSwitcher = ({ options, param = PROTOTYPE_PARAM }: PrototypeSwitcherProps) => {
-  const [params, setParams] = useSearchParams()
+  const [params] = useSearchParams()
+  const { hash } = useLocation()
+  const navigate = useNavigate()
   const count = options.length
   const index = Math.max(
     0,
@@ -49,7 +51,9 @@ export const PrototypeSwitcher = ({ options, param = PROTOTYPE_PARAM }: Prototyp
     const next = options[(index + delta + count) % count]
     const nextParams = new URLSearchParams(params)
     nextParams.set(param, next.key)
-    setParams(nextParams, { replace: true })
+    // Navigate rather than setSearchParams, which drops the hash: a prototype
+    // is reviewed by section, so an anchored view has to survive the switch.
+    navigate({ search: `?${nextParams}`, hash }, { replace: true })
   }
 
   useEffect(() => {
